@@ -45,10 +45,14 @@ SEVERITY_SCORE: dict[Severity, int] = {
 # Inverse mapping: a cumulative incident score is bucketed back into a severity
 # so the UI can render incidents on the same scale as individual detections.
 SCORE_BANDS: list[tuple[int, Severity]] = [
-    (24, Severity.CRITICAL),
-    (14, Severity.HIGH),
-    (8, Severity.MEDIUM),
-    (3, Severity.LOW),
+    # Calibrated against the severity weights above: a single critical (14) or
+    # two highs (16) must land in the CRITICAL band, because an incident should
+    # be able to outrank its worst individual rule -- that is the entire reason
+    # to score incidents rather than just showing the max severity.
+    (14, Severity.CRITICAL),
+    (8, Severity.HIGH),
+    (5, Severity.MEDIUM),
+    (2, Severity.LOW),
     (0, Severity.INFO),
 ]
 
@@ -96,7 +100,7 @@ class Event(BaseModel):
         `TargetObject|contains` (raw Sysmon) without the matcher needing to know
         the difference.
         """
-        if field in self.model_fields:
+        if field in type(self).model_fields:
             return getattr(self, field)
         return self.raw.get(field)
 
