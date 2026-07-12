@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Data
+*.db
+*.sqlite3
+data/
+
+# Env
+.env
+
+# Node
+node_modules/
+
+# OS
+Thumbs.db
+.DS_Store

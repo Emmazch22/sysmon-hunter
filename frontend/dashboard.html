@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sysmon Hunter — Consola de deteccion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Base: acero frio. El color es senal, nunca decoracion. */
+    --bg:        #0B0F14;
+    --surface:   #111821;
+    --surface-2: #16202B;
+    --border:    #1F2C3A;
+    --border-hi: #2C3E52;
+
+    --text:      #C9D6E3;
+    --text-dim:  #7E90A3;
+    --text-mute: #55677A;
+
+    /* Estructura */
+    --struct:    #3FB6C8;
+
+    /* Severidad: la unica fuente de color saturado */
+    --sev-info:     #4A7FA5;
+    --sev-low:      #3FB6C8;
+    --sev-medium:   #DFA83C;
+    --sev-high:     #E8743B;
+    --sev-critical: #E4453D;
+
+    --attack:    #8C7BE0;
+
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+    --display: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    background-image:
+      linear-gradient(rgba(63,182,200,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(63,182,200,.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(11,15,20,.85);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 24px;
+    padding: 14px 22px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand span { color: var(--struct); }
+
+  .link-status {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-mute);
+    box-shadow: 0 0 0 0 rgba(63,182,200,.45);
+  }
+  .led.on {
+    background: var(--struct);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  .led.off { background: var(--sev-critical); }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(63,182,200,.5); }
+    70%  { box-shadow: 0 0 0 7px rgba(63,182,200,0); }
+    100% { box-shadow: 0 0 0 0 rgba(63,182,200,0); }
+  }
+
+  .meta {
+    font-size: 11px; color: var(--text-mute);
+    letter-spacing: .06em;
+  }
+/* ---------- Header navigation ---------- */
+  /* Links to the API surfaces that back this console. Each one is a real
+     endpoint an analyst may want to hit directly during an investigation. */
+  nav.routes {
+    display: flex;
+    gap: 2px;
+    margin-left: 8px;
+  }
+  nav.routes a {
+    color: var(--text-mute);
+    text-decoration: none;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    transition: color .12s, border-color .12s;
+  }
+  nav.routes a:hover {
+    color: var(--struct);
+    border-color: var(--border-hi);
+  }
+  nav.routes a:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+  }
+  /* ---------- Layout ---------- */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+    padding: 20px 22px 60px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+
+  /* ---------- Franja de metricas ---------- */
+  .stats {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--surface);
+    padding: 14px 16px;
+  }
+  .stat-label {
+    font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--text-mute); margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: var(--display);
+    font-size: 26px; font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value.alarm { color: var(--sev-critical); }
+
+  /* ---------- Panel ---------- */
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .panel-title {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--text-dim); font-weight: 500;
+  }
+  .panel-title b { color: var(--struct); font-weight: 700; }
+
+  /* ---------- Filtros ---------- */
+  .filters { display: flex; gap: 4px; }
+  .filter {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-mute);
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 8px; cursor: pointer;
+    transition: color .12s, border-color .12s;
+  }
+  .filter:hover { color: var(--text); border-color: var(--text-dim); }
+  .filter[aria-pressed="true"] { color: var(--bg); background: var(--struct); border-color: var(--struct); }
+  .filter:focus-visible { outline: 2px solid var(--struct); outline-offset: 2px; }
+
+  /* ---------- Feed de detecciones ---------- */
+  .feed { max-height: 620px; overflow-y: auto; }
+  .feed::-webkit-scrollbar { width: 8px; }
+  .feed::-webkit-scrollbar-track { background: var(--bg); }
+  .feed::-webkit-scrollbar-thumb { background: var(--border-hi); }
+
+  /* La firma: la espina de severidad. Grosor + color = urgencia. */
+  .det {
+    display: grid;
+    grid-template-columns: 4px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .det:last-child { border-bottom: 0; }
+  .spine { background: var(--sev); }
+  .det[data-sev="high"]     { --sev: var(--sev-high); }
+  .det[data-sev="critical"] { --sev: var(--sev-critical); }
+  .det[data-sev="medium"]   { --sev: var(--sev-medium); }
+  .det[data-sev="low"]      { --sev: var(--sev-low); }
+  .det[data-sev="info"]     { --sev: var(--sev-info); }
+  .det[data-sev="critical"] .spine {
+    background: repeating-linear-gradient(
+      -45deg, var(--sev-critical) 0 4px, #8E2621 4px 8px);
+  }
+
+  .det-body { padding: 12px 16px; }
+
+  .det-top {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .rule-id {
+    font-weight: 700; font-size: 11px;
+    color: var(--sev); letter-spacing: .06em;
+  }
+  .det-title { font-size: 13px; color: var(--text); flex: 1; min-width: 200px; }
+  .det-time { font-size: 10px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
+
+  .sev-tag {
+    font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+    font-weight: 700; padding: 2px 6px;
+    color: var(--sev);
+    border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent);
+    background: color-mix(in srgb, var(--sev) 8%, transparent);
+  }
+
+  /* Cadena de proceso: padre -> hijo, la pregunta que un hunter hace primero */
+  .chain {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .proc {
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+  }
+  .proc.child { color: var(--text); border-color: var(--border-hi); }
+  .arrow { color: var(--sev); font-weight: 700; }
+
+  .cmd {
+    font-size: 11px; color: var(--text-dim);
+    background: #0A0E13;
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--border-hi);
+    padding: 7px 10px;
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 60px; overflow: hidden;
+    cursor: pointer; position: relative;
+  }
+  .cmd.open { max-height: none; }
+  .cmd::before {
+    content: '$'; color: var(--text-mute); margin-right: 7px;
+  }
+
+  .chips { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 10px; letter-spacing: .05em;
+    color: var(--attack);
+    border: 1px solid color-mix(in srgb, var(--attack) 30%, transparent);
+    padding: 1px 6px;
+  }
+  .chip.host {
+    color: var(--text-mute);
+    border-color: var(--border-hi);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .det.new { animation: land .5s ease-out; }
+    @keyframes land {
+      from { opacity: 0; transform: translateY(-6px); background: color-mix(in srgb, var(--sev) 12%, transparent); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+
+  /* ---------- Vacio ---------- */
+  .empty {
+    padding: 60px 24px; text-align: center;
+  }
+  .empty-mark {
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--struct); margin-bottom: 10px;
+  }
+  .empty p { color: var(--text-mute); font-size: 12px; }
+  .empty code {
+    color: var(--text-dim); background: var(--surface-2);
+    border: 1px solid var(--border); padding: 1px 5px;
+  }
+
+  /* ---------- Rail derecho ---------- */
+  aside { display: flex; flex-direction: column; gap: 20px; }
+
+  .bars { padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 62px 1fr 28px; align-items: center; gap: 9px; }
+  .bar-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+  .bar-track { height: 6px; background: var(--surface-2); border: 1px solid var(--border); }
+  .bar-fill { height: 100%; background: var(--c); transition: width .35s ease-out; }
+  .bar-count { font-size: 11px; text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  .tech { padding: 6px 0; }
+  .tech-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tech-row:last-child { border-bottom: 0; }
+  .tech-id { color: var(--attack); font-size: 11px; font-weight: 500; }
+  .tech-n { color: var(--text-mute); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tech-empty { padding: 20px 16px; color: var(--text-mute); font-size: 11px; text-align: center; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    .link-status { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Sysmon <span>Hunter</span></div>
+
+  <!-- Direct access to the API surfaces behind the console -->
+  <nav class="routes" aria-label="API endpoints">
+    <a href="/api/docs" target="_blank" rel="noopener">API</a>
+    <a href="/detections?limit=200" target="_blank" rel="noopener">Raw</a>
+    <a href="/health" target="_blank" rel="noopener">Health</a>
+  </nav>
+
+  <div class="meta" id="engine">engine: --- rules</div>
+
+  <div class="link-status">
+    <span class="led" id="led"></span>
+    <span id="link">connecting</span>
+  </div>
+</header>
+
+<main>
+
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-label">Detecciones</div>
+      <div class="stat-value" id="s-total">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Alta / Critica</div>
+      <div class="stat-value" id="s-crit">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Hosts</div>
+      <div class="stat-value" id="s-hosts">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Tecnicas ATT&CK</div>
+      <div class="stat-value" id="s-tech">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Ultimo evento</div>
+      <div class="stat-value" id="s-last" style="font-size:16px;padding-top:5px">--:--:--</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title">Flujo de detecciones <b id="shown">0</b></div>
+      <div class="filters" role="group" aria-label="Filtrar por severidad">
+        <button class="filter" data-f="all" aria-pressed="true">Todas</button>
+        <button class="filter" data-f="critical" aria-pressed="false">Critica</button>
+        <button class="filter" data-f="high" aria-pressed="false">Alta</button>
+        <button class="filter" data-f="medium" aria-pressed="false">Media</button>
+      </div>
+    </div>
+    <div class="feed" id="feed">
+      <div class="empty" id="empty">
+        <div class="empty-mark">Sin detecciones</div>
+        <p>El motor esta escuchando. Envia telemetria a <code>POST /ingest</code> o dispara un atomic desde la VM.</p>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Severidad</div></div>
+      <div class="bars" id="bars"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Tecnicas observadas</div></div>
+      <div class="tech" id="tech"><div class="tech-empty">Ninguna todavia</div></div>
+    </div>
+  </aside>
+
+</main>
+
+<script>
+const SEV_ORDER = ['critical','high','medium','low','info'];
+const SEV_COLOR = {
+  critical: 'var(--sev-critical)', high: 'var(--sev-high)',
+  medium: 'var(--sev-medium)', low: 'var(--sev-low)', info: 'var(--sev-info)'
+};
+const SEV_ES = { critical:'critica', high:'alta', medium:'media', low:'baja', info:'info' };
+
+let detections = [];
+let filter = 'all';
+
+const $ = id => document.getElementById(id);
+
+/* ---- Render ---- */
+
+function shortPath(p) {
+  if (!p) return 'desconocido';
+  const parts = String(p).split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+
+function hhmmss(ts) {
+  const d = ts ? new Date(ts) : new Date();
+  return d.toLocaleTimeString('es-CR', { hour12: false });
+}
+
+function rowHTML(d) {
+  const sev = (d.severity || 'medium').toLowerCase();
+  const attack = (d.attack || []).map(t => `<span class="chip">${t}</span>`).join('');
+  const host = d.host && d.host !== 'unknown' ? `<span class="chip host">${d.host}</span>` : '';
+  const parent = shortPath(d.parent_image);
+  const child = shortPath(d.image);
+  const chain = d.parent_image
+    ? `<div class="chain">
+         <span class="proc">${parent}</span>
+         <span class="arrow">&#9654;</span>
+         <span class="proc child">${child}</span>
+       </div>`
+    : (d.image ? `<div class="chain"><span class="proc child">${child}</span></div>` : '');
+  const cmd = d.command_line
+    ? `<div class="cmd" tabindex="0">${escapeHtml(d.command_line)}</div>` : '';
+
+  return `
+    <article class="det new" data-sev="${sev}">
+      <div class="spine"></div>
+      <div class="det-body">
+        <div class="det-top">
+          <span class="rule-id">${d.rule_id || '---'}</span>
+          <span class="sev-tag">${SEV_ES[sev] || sev}</span>
+          <span class="det-title">${escapeHtml(d.title || '')}</span>
+          <span class="det-time">${hhmmss(d.matched_at)}</span>
+        </div>
+        ${chain}
+        ${cmd}
+        <div class="chips">${attack}${host}</div>
+      </div>
+    </article>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function render() {
+  const feed = $('feed');
+  const list = filter === 'all'
+    ? detections
+    : detections.filter(d => (d.severity || '').toLowerCase() === filter);
+
+  $('shown').textContent = list.length;
+
+  if (!list.length) {
+    feed.innerHTML = `
+      <div class="empty">
+        <div class="empty-mark">${filter === 'all' ? 'Sin detecciones' : 'Nada en este nivel'}</div>
+        <p>${filter === 'all'
+          ? 'El motor esta escuchando. Envia telemetria a <code>POST /ingest</code> o dispara un atomic desde la VM.'
+          : 'Cambia el filtro para ver el resto del flujo.'}</p>
+      </div>`;
+    return;
+  }
+  feed.innerHTML = [...list].reverse().map(rowHTML).join('');
+  feed.querySelectorAll('.cmd').forEach(c => {
+    c.addEventListener('click', () => c.classList.toggle('open'));
+  });
+}
+
+function renderStats() {
+  const crit = detections.filter(d => ['high','critical'].includes((d.severity||'').toLowerCase())).length;
+  const hosts = new Set(detections.map(d => d.host).filter(h => h && h !== 'unknown'));
+  const techs = {};
+  detections.forEach(d => (d.attack || []).forEach(t => techs[t] = (techs[t] || 0) + 1));
+
+  $('s-total').textContent = detections.length;
+  $('s-crit').textContent = crit;
+  $('s-crit').classList.toggle('alarm', crit > 0);
+  $('s-hosts').textContent = hosts.size;
+  $('s-tech').textContent = Object.keys(techs).length;
+  if (detections.length) {
+    $('s-last').textContent = hhmmss(detections[detections.length - 1].matched_at);
+  }
+
+  // Barras de severidad
+  const counts = {};
+  SEV_ORDER.forEach(s => counts[s] = 0);
+  detections.forEach(d => {
+    const s = (d.severity || 'medium').toLowerCase();
+    if (s in counts) counts[s]++;
+  });
+  const max = Math.max(1, ...Object.values(counts));
+  $('bars').innerHTML = SEV_ORDER.map(s => `
+    <div class="bar-row">
+      <span class="bar-label">${SEV_ES[s]}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="--c:${SEV_COLOR[s]};width:${(counts[s]/max)*100}%"></div>
+      </div>
+      <span class="bar-count">${counts[s]}</span>
+    </div>`).join('');
+
+  // Tecnicas ATT&CK ordenadas por frecuencia
+  const sorted = Object.entries(techs).sort((a,b) => b[1] - a[1]).slice(0, 12);
+  $('tech').innerHTML = sorted.length
+    ? sorted.map(([t,n]) => `
+        <div class="tech-row">
+          <span class="tech-id">${t}</span>
+          <span class="tech-n">${n}</span>
+        </div>`).join('')
+    : '<div class="tech-empty">Ninguna todavia</div>';
+}
+
+/* ---- Datos ---- */
+
+async function bootstrap() {
+  try {
+    const [h, d] = await Promise.all([
+      fetch('/health').then(r => r.json()),
+      fetch('/detections?limit=200').then(r => r.json())
+    ]);
+    $('engine').textContent = `motor: ${h.rules} reglas`;
+    detections = d.items || [];
+    render(); renderStats();
+  } catch (e) {
+    $('engine').textContent = 'motor: sin respuesta';
+  }
+}
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    $('led').className = 'led on';
+    $('link').textContent = 'en vivo';
+  };
+  ws.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'detection') {
+      detections.push(msg.data);
+      render(); renderStats();
+    }
+  };
+  ws.onclose = () => {
+    $('led').className = 'led off';
+    $('link').textContent = 'reconectando';
+    setTimeout(connect, 3000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+document.querySelectorAll('.filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    filter = btn.dataset.f;
+    document.querySelectorAll('.filter').forEach(b =>
+      b.setAttribute('aria-pressed', String(b === btn)));
+    render();
+  });
+});
+
+bootstrap();
+connect();
+</script>
+</body>
+</html>
