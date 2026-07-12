@@ -1,0 +1,9 @@
+id: SYS-010
+title: Suspicious process accessed LSASS memory
+event_id: 10
+severity: critical
+attack: [T1003.001]
+detection:
+  TargetImage|endswith: '\lsass.exe'
+  GrantedAccess: ['0x1010', '0x1410', '0x143a']
+condition: all

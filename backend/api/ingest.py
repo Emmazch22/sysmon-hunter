@@ -1,28 +1,44 @@
-from fastapi import APIRouter
+"""Telemetry intake.
 
-from backend.api.detections import DETECTIONS, serialize
-from backend.api.ws import manager
-from backend.engine.matcher import evaluate
-from backend.engine.normalizer import normalize
-from backend.engine.rule_loader import rule_store
+The single door every event comes through, whatever produced it: Winlogbeat on a
+live endpoint, the EVTX replay script, or a hand-written request during rule
+development.
 
+Deliberately thin. All it does is hand the payload to the pipeline -- the moment
+detection logic starts leaking into a route handler, it stops being testable
+without an HTTP client.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, status
+
+from backend.engine.pipeline import pipeline
+
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["ingest"])
 
 
-@router.post("/ingest")
-async def ingest(payload: dict) -> dict:
-    event = normalize(payload)
-    rules = rule_store.for_event(event.event_id)
-    hits = evaluate(event, rules)
+@router.post("/ingest", status_code=status.HTTP_202_ACCEPTED)
+async def ingest(payload: dict[str, Any]) -> dict[str, Any]:
+    """Accept one Sysmon event and run it through the detection pipeline.
 
-    for d in hits:
-        DETECTIONS.append(d)
-        await manager.broadcast({"type": "detection", "data": serialize(d)})
+    Returns 202 rather than 200: the event has been accepted and evaluated, but
+    the collector should not read anything into the response beyond that. It is
+    a shipper, not an analyst -- if it starts making decisions based on whether
+    we raised a detection, the detection logic has escaped the server.
 
-    return {
-        "event_id": event.event_id,
-        "rules_evaluated": len(rules),
-        "detections": [
-            {"rule_id": d.rule_id, "title": d.title, "severity": d.severity} for d in hits
-        ],
-    }
+    A malformed payload returns 400 and is dropped. It is never retried, because
+    a collector that retries a payload we cannot parse will retry it forever.
+    """
+    try:
+        return await pipeline.process(payload)
+    except Exception as exc:  # noqa: BLE001 - the boundary must not leak stack traces
+        log.exception("Failed to process inbound event")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Malformed event payload: {exc}",
+        ) from exc

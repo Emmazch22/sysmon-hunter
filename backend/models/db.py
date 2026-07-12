@@ -1,0 +1,186 @@
+"""Persistence layer.
+
+Detections and incidents survive a restart; the process tree does not. That is
+deliberate. The tree is a live working set whose value decays in minutes, while
+detections are evidence and incidents are findings -- both need to still be
+there tomorrow morning.
+
+SQLite via aiosqlite is enough for a single collector. The repository functions
+below are the only place SQL is written, so swapping in Postgres later means
+changing the URL in config and nothing else.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from typing import Any, Optional
+
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from backend.config import settings
+from backend.models.schemas import Detection, Incident
+
+log = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Declarative base for all tables."""
+
+
+class DetectionRow(Base):
+    """A rule firing, flattened for storage.
+
+    The originating event is kept whole in `raw_event` rather than being spread
+    across columns. When a rule turns out to be a false positive six weeks from
+    now, the analyst needs the event exactly as it arrived, not our lossy
+    projection of it.
+    """
+
+    __tablename__ = "detections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rule_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    attack: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    host: Mapped[str] = mapped_column(String(128), index=True)
+    image: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    parent_image: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    command_line: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    process_guid: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    incident_id: Mapped[Optional[str]] = mapped_column(
+        String(32), ForeignKey("incidents.id"), nullable=True, index=True
+    )
+
+    matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    raw_event: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class IncidentRow(Base):
+    """A correlated group of detections.
+
+    Member detections are not duplicated here; they point back via
+    `detections.incident_id`. Only the aggregates the console needs for its list
+    view are denormalized, so rendering the incident list is a single query.
+    """
+
+    __tablename__ = "incidents"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    host: Mapped[str] = mapped_column(String(128), index=True)
+    root_guid: Mapped[str] = mapped_column(String(64))
+    root_image: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    detection_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    chain: Mapped[list[str]] = mapped_column(JSON, default=list)
+    techniques: Mapped[list[str]] = mapped_column(JSON, default=list)
+    actionable: Mapped[int] = mapped_column(Integer, default=0)  # SQLite has no bool
+
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+engine = create_async_engine(settings.db_url, echo=False)
+Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def init_db() -> None:
+    """Create tables if they do not exist. Safe to call on every startup."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    log.info("Database ready at %s", settings.db_url)
+
+
+async def save_detection(detection: Detection) -> None:
+    """Persist a single detection."""
+    event = detection.event
+    row = DetectionRow(
+        rule_id=detection.rule_id,
+        title=detection.title,
+        severity=detection.severity.value,
+        attack=detection.attack,
+        host=event.host,
+        image=event.image,
+        parent_image=event.parent_image,
+        command_line=event.command_line,
+        process_guid=event.process_guid,
+        incident_id=detection.incident_id,
+        matched_at=detection.matched_at,
+        raw_event=event.raw,
+    )
+    async with Session() as session:
+        session.add(row)
+        await session.commit()
+
+
+async def upsert_incident(incident: Incident, actionable: bool) -> None:
+    """Insert or update an incident.
+
+    Incidents are mutable while open -- every new detection changes the score,
+    the severity band and the technique list -- so this runs on each correlation
+    rather than once at close time. If the process crashes mid-incident, what is
+    on disk is still accurate as of the last detection seen.
+    """
+    async with Session() as session:
+        row = await session.get(IncidentRow, incident.id)
+        if row is None:
+            row = IncidentRow(id=incident.id, first_seen=incident.first_seen)
+            session.add(row)
+
+        row.host = incident.host
+        row.root_guid = incident.root_guid
+        row.root_image = incident.root_image
+        row.severity = incident.severity.value
+        row.score = incident.score
+        row.detection_count = len(incident.detections)
+        row.chain = incident.chain
+        row.techniques = incident.techniques
+        row.actionable = int(actionable)
+        row.last_seen = incident.last_seen
+
+        await session.commit()
+
+
+async def list_detections(limit: int = 100) -> list[DetectionRow]:
+    """Most recent detections, newest last (the console appends downward)."""
+    async with Session() as session:
+        result = await session.execute(
+            select(DetectionRow).order_by(DetectionRow.matched_at.desc()).limit(limit)
+        )
+        return list(reversed(result.scalars().all()))
+
+
+async def list_incidents(limit: int = 50, actionable_only: bool = False) -> list[IncidentRow]:
+    """Most recent incidents, newest first (the console leads with the worst)."""
+    async with Session() as session:
+        stmt = select(IncidentRow).order_by(IncidentRow.last_seen.desc()).limit(limit)
+        if actionable_only:
+            stmt = stmt.where(IncidentRow.actionable == 1)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+
+async def get_incident_detections(incident_id: str) -> list[DetectionRow]:
+    """Every detection belonging to one incident, in the order they fired."""
+    async with Session() as session:
+        result = await session.execute(
+            select(DetectionRow)
+            .where(DetectionRow.incident_id == incident_id)
+            .order_by(DetectionRow.matched_at.asc())
+        )
+        return list(result.scalars().all())
+
+
+async def count_detections() -> int:
+    """Total detections on record, used by the console's stat strip."""
+    async with Session() as session:
+        result = await session.execute(select(DetectionRow.id))
+        return len(result.scalars().all())

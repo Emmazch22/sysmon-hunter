@@ -1,18 +1,27 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sysmon Hunter — Consola de deteccion</title>
+<title>Sysmon Hunter — Detection console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  /* ============================================================
+     Sysmon Hunter — analyst console
+
+     Design rule, applied throughout: colour is signal, never
+     decoration. The chrome is cold steel; the only saturated
+     colour in the interface encodes severity. If something is
+     bright, it matters.
+     ============================================================ */
+
   :root {
-    /* Base: acero frio. El color es senal, nunca decoracion. */
     --bg:        #0B0F14;
     --surface:   #111821;
     --surface-2: #16202B;
+    --sunken:    #0A0E13;
     --border:    #1F2C3A;
     --border-hi: #2C3E52;
 
@@ -20,17 +29,15 @@
     --text-dim:  #7E90A3;
     --text-mute: #55677A;
 
-    /* Estructura */
-    --struct:    #3FB6C8;
+    --struct:    #3FB6C8;   /* structural accent: chrome, links, live state */
+    --attack:    #8C7BE0;   /* ATT&CK technique identifiers */
 
-    /* Severidad: la unica fuente de color saturado */
+    /* Severity scale — the only saturated colour in the console */
     --sev-info:     #4A7FA5;
     --sev-low:      #3FB6C8;
     --sev-medium:   #DFA83C;
     --sev-high:     #E8743B;
     --sev-critical: #E4453D;
-
-    --attack:    #8C7BE0;
 
     --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
     --display: 'Space Grotesk', system-ui, sans-serif;
@@ -40,9 +47,10 @@
 
   body {
     background: var(--bg);
+    /* Faint grid: gives the surface a coordinate system without drawing focus */
     background-image:
-      linear-gradient(rgba(63,182,200,.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(63,182,200,.025) 1px, transparent 1px);
+      linear-gradient(rgba(63,182,200,.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(63,182,200,.022) 1px, transparent 1px);
     background-size: 32px 32px;
     color: var(--text);
     font-family: var(--mono);
@@ -53,42 +61,43 @@
   }
 
   /* ---------- Header ---------- */
+
   header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 13px 22px;
     border-bottom: 1px solid var(--border);
-    background: rgba(11,15,20,.85);
-    backdrop-filter: blur(8px);
-    position: sticky; top: 0; z-index: 10;
-    display: flex; align-items: center; gap: 24px;
-    padding: 14px 22px;
-    flex-wrap: wrap;
+    background: rgba(11,15,20,.88);
+    backdrop-filter: blur(10px);
   }
 
   .brand {
     font-family: var(--display);
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--text);
-    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 15px;
+    letter-spacing: .14em; text-transform: uppercase;
   }
   .brand span { color: var(--struct); }
 
-  .link-status {
+  nav.routes { display: flex; gap: 2px; }
+  nav.routes a {
+    color: var(--text-mute); text-decoration: none;
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 9px; border: 1px solid transparent;
+    transition: color .12s, border-color .12s;
+  }
+  nav.routes a:hover { color: var(--struct); border-color: var(--border-hi); }
+  nav.routes a:focus-visible { outline: 2px solid var(--struct); outline-offset: 2px; }
+
+  .engine { font-size: 11px; color: var(--text-mute); letter-spacing: .05em; }
+
+  .link {
     margin-left: auto;
     display: flex; align-items: center; gap: 8px;
     font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
     color: var(--text-dim);
   }
-  .led {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--text-mute);
-    box-shadow: 0 0 0 0 rgba(63,182,200,.45);
-  }
-  .led.on {
-    background: var(--struct);
-    animation: pulse 2.4s ease-out infinite;
-  }
+  .led { width: 7px; height: 7px; border-radius: 50%; background: var(--text-mute); }
+  .led.on { background: var(--struct); animation: pulse 2.4s ease-out infinite; }
   .led.off { background: var(--sev-critical); }
   @keyframes pulse {
     0%   { box-shadow: 0 0 0 0 rgba(63,182,200,.5); }
@@ -96,79 +105,45 @@
     100% { box-shadow: 0 0 0 0 rgba(63,182,200,0); }
   }
 
-  .meta {
-    font-size: 11px; color: var(--text-mute);
-    letter-spacing: .06em;
-  }
-/* ---------- Header navigation ---------- */
-  /* Links to the API surfaces that back this console. Each one is a real
-     endpoint an analyst may want to hit directly during an investigation. */
-  nav.routes {
-    display: flex;
-    gap: 2px;
-    margin-left: 8px;
-  }
-  nav.routes a {
-    color: var(--text-mute);
-    text-decoration: none;
-    font-size: 10px;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    padding: 4px 9px;
-    border: 1px solid transparent;
-    transition: color .12s, border-color .12s;
-  }
-  nav.routes a:hover {
-    color: var(--struct);
-    border-color: var(--border-hi);
-  }
-  nav.routes a:focus-visible {
-    outline: 2px solid var(--struct);
-    outline-offset: 2px;
-  }
   /* ---------- Layout ---------- */
+
   main {
     display: grid;
-    grid-template-columns: 1fr 300px;
-    gap: 20px;
-    padding: 20px 22px 60px;
-    max-width: 1500px;
-    margin: 0 auto;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 18px;
+    padding: 18px 22px 60px;
+    max-width: 1560px; margin: 0 auto;
   }
+  .col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
-  /* ---------- Franja de metricas ---------- */
+  /* ---------- Stat strip ---------- */
+
   .stats {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
   }
-  .stat {
-    background: var(--surface);
-    padding: 14px 16px;
-  }
+  .stat { background: var(--surface); padding: 13px 16px; }
   .stat-label {
     font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
-    color: var(--text-mute); margin-bottom: 6px;
+    color: var(--text-mute); margin-bottom: 5px;
   }
   .stat-value {
-    font-family: var(--display);
-    font-size: 26px; font-weight: 700;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
+    font-family: var(--display); font-size: 25px; font-weight: 700;
+    line-height: 1.1; font-variant-numeric: tabular-nums;
   }
   .stat-value.alarm { color: var(--sev-critical); }
+  .stat-value.small { font-size: 15px; padding-top: 6px; }
 
-  /* ---------- Panel ---------- */
-  .panel {
-    border: 1px solid var(--border);
-    background: var(--surface);
-  }
+  /* ---------- Panels ---------- */
+
+  .panel { border: 1px solid var(--border); background: var(--surface); }
   .panel-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
   }
@@ -177,155 +152,217 @@
     color: var(--text-dim); font-weight: 500;
   }
   .panel-title b { color: var(--struct); font-weight: 700; }
+  .panel-note { font-size: 10px; color: var(--text-mute); letter-spacing: .05em; }
 
-  /* ---------- Filtros ---------- */
-  .filters { display: flex; gap: 4px; }
+  .filters { display: flex; gap: 3px; }
   .filter {
-    background: transparent;
-    border: 1px solid var(--border-hi);
-    color: var(--text-mute);
-    font-family: var(--mono); font-size: 10px;
-    letter-spacing: .08em; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border-hi);
+    color: var(--text-mute); font-family: var(--mono);
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
     padding: 3px 8px; cursor: pointer;
-    transition: color .12s, border-color .12s;
+    transition: color .12s, border-color .12s, background .12s;
   }
   .filter:hover { color: var(--text); border-color: var(--text-dim); }
-  .filter[aria-pressed="true"] { color: var(--bg); background: var(--struct); border-color: var(--struct); }
+  .filter[aria-pressed="true"] {
+    color: var(--bg); background: var(--struct); border-color: var(--struct);
+  }
   .filter:focus-visible { outline: 2px solid var(--struct); outline-offset: 2px; }
 
-  /* ---------- Feed de detecciones ---------- */
-  .feed { max-height: 620px; overflow-y: auto; }
-  .feed::-webkit-scrollbar { width: 8px; }
-  .feed::-webkit-scrollbar-track { background: var(--bg); }
-  .feed::-webkit-scrollbar-thumb { background: var(--border-hi); }
+  /* ---------- Severity spine ----------
+     The signature element. A vertical bar at the leading edge of every row,
+     coloured by severity. Critical rows are hatched as well as red, so the
+     distinction survives a colour-blind analyst and a badly calibrated
+     SOC monitor. */
 
-  /* La firma: la espina de severidad. Grosor + color = urgencia. */
-  .det {
-    display: grid;
-    grid-template-columns: 4px 1fr;
-    border-bottom: 1px solid var(--border);
-  }
-  .det:last-child { border-bottom: 0; }
+  [data-sev]                { --sev: var(--sev-medium); }
+  [data-sev="info"]         { --sev: var(--sev-info); }
+  [data-sev="low"]          { --sev: var(--sev-low); }
+  [data-sev="medium"]       { --sev: var(--sev-medium); }
+  [data-sev="high"]         { --sev: var(--sev-high); }
+  [data-sev="critical"]     { --sev: var(--sev-critical); }
   .spine { background: var(--sev); }
-  .det[data-sev="high"]     { --sev: var(--sev-high); }
-  .det[data-sev="critical"] { --sev: var(--sev-critical); }
-  .det[data-sev="medium"]   { --sev: var(--sev-medium); }
-  .det[data-sev="low"]      { --sev: var(--sev-low); }
-  .det[data-sev="info"]     { --sev: var(--sev-info); }
-  .det[data-sev="critical"] .spine {
-    background: repeating-linear-gradient(
-      -45deg, var(--sev-critical) 0 4px, #8E2621 4px 8px);
+  [data-sev="critical"] .spine {
+    background: repeating-linear-gradient(-45deg,
+      var(--sev-critical) 0 4px, #8E2621 4px 8px);
   }
-
-  .det-body { padding: 12px 16px; }
-
-  .det-top {
-    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 8px;
-  }
-  .rule-id {
-    font-weight: 700; font-size: 11px;
-    color: var(--sev); letter-spacing: .06em;
-  }
-  .det-title { font-size: 13px; color: var(--text); flex: 1; min-width: 200px; }
-  .det-time { font-size: 10px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
 
   .sev-tag {
     font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
-    font-weight: 700; padding: 2px 6px;
+    font-weight: 700; padding: 2px 6px; white-space: nowrap;
     color: var(--sev);
     border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent);
     background: color-mix(in srgb, var(--sev) 8%, transparent);
   }
 
-  /* Cadena de proceso: padre -> hijo, la pregunta que un hunter hace primero */
+  /* ---------- Incident queue ---------- */
+
+  .queue { max-height: 560px; overflow-y: auto; }
+
+  .inc { display: grid; grid-template-columns: 4px 1fr; border-bottom: 1px solid var(--border); }
+  .inc:last-child { border-bottom: 0; }
+  .inc-body { padding: 13px 16px; }
+
+  .inc-top {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .inc-id {
+    font-size: 11px; font-weight: 700; color: var(--sev); letter-spacing: .05em;
+  }
+  .inc-host { font-size: 11px; color: var(--text-dim); }
+  .inc-host::before { content: '@'; color: var(--text-mute); }
+  .inc-score {
+    margin-left: auto; display: flex; align-items: baseline; gap: 5px;
+  }
+  .inc-score b {
+    font-family: var(--display); font-size: 17px; color: var(--sev);
+    font-variant-numeric: tabular-nums;
+  }
+  .inc-score span {
+    font-size: 9px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--text-mute);
+  }
+
+  /* Watch badge: an incident the engine is tracking but has not promoted.
+     Present so the analyst can see what the engine is considering, not just
+     what it decided. */
+  .watch {
+    font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--text-mute); border: 1px dashed var(--border-hi); padding: 1px 6px;
+  }
+
+  /* The process chain is the hero of an incident row: it is the first
+     question a hunter asks, before the rule title. */
   .chain {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 11px; margin-bottom: 8px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 9px 11px; margin-bottom: 10px;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--sev);
   }
   .proc {
-    color: var(--text-dim);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
+    font-size: 11px; color: var(--text-dim);
+    background: var(--surface-2); border: 1px solid var(--border);
     padding: 2px 7px;
   }
-  .proc.child { color: var(--text); border-color: var(--border-hi); }
-  .arrow { color: var(--sev); font-weight: 700; }
+  .proc:last-child { color: var(--text); border-color: var(--border-hi); }
+  .arrow { color: var(--sev); font-size: 10px; }
 
-  .cmd {
-    font-size: 11px; color: var(--text-dim);
-    background: #0A0E13;
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--border-hi);
-    padding: 7px 10px;
-    white-space: pre-wrap; word-break: break-all;
-    max-height: 60px; overflow: hidden;
-    cursor: pointer; position: relative;
+  .inc-meta {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    font-size: 10px; color: var(--text-mute);
+    letter-spacing: .05em; text-transform: uppercase;
   }
-  .cmd.open { max-height: none; }
-  .cmd::before {
-    content: '$'; color: var(--text-mute); margin-right: 7px;
-  }
-
-  .chips { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; }
   .chip {
-    font-size: 10px; letter-spacing: .05em;
-    color: var(--attack);
+    font-size: 10px; letter-spacing: .04em; text-transform: none;
+    color: var(--attack); padding: 1px 6px;
     border: 1px solid color-mix(in srgb, var(--attack) 30%, transparent);
-    padding: 1px 6px;
-  }
-  .chip.host {
-    color: var(--text-mute);
-    border-color: var(--border-hi);
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .det.new { animation: land .5s ease-out; }
-    @keyframes land {
-      from { opacity: 0; transform: translateY(-6px); background: color-mix(in srgb, var(--sev) 12%, transparent); }
-      to   { opacity: 1; transform: none; }
-    }
+  .drill {
+    background: none; border: 0; cursor: pointer;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--struct); padding: 0;
+  }
+  .drill:hover { text-decoration: underline; }
+  .drill:focus-visible { outline: 2px solid var(--struct); outline-offset: 2px; }
+
+  /* Member detections, revealed on drill-down */
+  .members { margin-top: 11px; border-top: 1px solid var(--border); }
+  .member {
+    display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+    padding: 8px 0 0;
+    font-size: 11px;
+  }
+  .member-id { color: var(--sev); font-weight: 700; font-size: 10px; }
+  .member-title { color: var(--text-dim); flex: 1; min-width: 160px; }
+  .member-time { color: var(--text-mute); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .cmd {
+    grid-column: 1 / -1; width: 100%;
+    margin-top: 5px; padding: 6px 9px;
+    font-size: 10px; color: var(--text-dim);
+    background: var(--sunken); border: 1px solid var(--border);
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .cmd::before { content: '$ '; color: var(--text-mute); }
+
+  /* ---------- Detection stream ---------- */
+
+  .stream { max-height: 400px; overflow-y: auto; }
+  .det {
+    display: grid; grid-template-columns: 3px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .det:last-child { border-bottom: 0; }
+  .det-body { padding: 9px 13px; min-width: 0; }
+  .det-top { display: flex; align-items: baseline; gap: 7px; }
+  .det-id { font-size: 10px; font-weight: 700; color: var(--sev); }
+  .det-time {
+    margin-left: auto; font-size: 10px; color: var(--text-mute);
+    font-variant-numeric: tabular-nums;
+  }
+  .det-title {
+    font-size: 11px; color: var(--text-dim); margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
-  /* ---------- Vacio ---------- */
-  .empty {
-    padding: 60px 24px; text-align: center;
-  }
-  .empty-mark {
-    font-family: var(--display); font-size: 13px; font-weight: 700;
-    letter-spacing: .16em; text-transform: uppercase;
-    color: var(--struct); margin-bottom: 10px;
-  }
-  .empty p { color: var(--text-mute); font-size: 12px; }
-  .empty code {
-    color: var(--text-dim); background: var(--surface-2);
-    border: 1px solid var(--border); padding: 1px 5px;
-  }
+  /* ---------- Side panels ---------- */
 
-  /* ---------- Rail derecho ---------- */
-  aside { display: flex; flex-direction: column; gap: 20px; }
-
-  .bars { padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
-  .bar-row { display: grid; grid-template-columns: 62px 1fr 28px; align-items: center; gap: 9px; }
+  .bars { padding: 13px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 58px 1fr 26px; align-items: center; gap: 9px; }
   .bar-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
   .bar-track { height: 6px; background: var(--surface-2); border: 1px solid var(--border); }
   .bar-fill { height: 100%; background: var(--c); transition: width .35s ease-out; }
   .bar-count { font-size: 11px; text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
-  .tech { padding: 6px 0; }
   .tech-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 7px 16px;
-    border-bottom: 1px solid var(--border);
+    padding: 7px 16px; border-bottom: 1px solid var(--border);
   }
   .tech-row:last-child { border-bottom: 0; }
-  .tech-id { color: var(--attack); font-size: 11px; font-weight: 500; }
+  .tech-id { color: var(--attack); font-size: 11px; }
   .tech-n { color: var(--text-mute); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .tech-empty { padding: 20px 16px; color: var(--text-mute); font-size: 11px; text-align: center; }
 
-  @media (max-width: 900px) {
+  /* ---------- Empty states ----------
+     An empty screen is an instruction, not an apology. */
+
+  .empty { padding: 44px 24px; text-align: center; }
+  .empty-mark {
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--struct); margin-bottom: 9px;
+  }
+  .empty p { color: var(--text-mute); font-size: 11px; line-height: 1.6; }
+  .empty code {
+    color: var(--text-dim); background: var(--surface-2);
+    border: 1px solid var(--border); padding: 1px 5px;
+  }
+  .empty-sm { padding: 26px 16px; }
+
+  /* ---------- Scrollbars ---------- */
+
+  .queue::-webkit-scrollbar, .stream::-webkit-scrollbar { width: 8px; }
+  .queue::-webkit-scrollbar-track, .stream::-webkit-scrollbar-track { background: var(--bg); }
+  .queue::-webkit-scrollbar-thumb, .stream::-webkit-scrollbar-thumb { background: var(--border-hi); }
+
+  /* ---------- Motion ---------- */
+
+  @media (prefers-reduced-motion: no-preference) {
+    .inc.fresh, .det.fresh { animation: land .45s ease-out; }
+    @keyframes land {
+      from {
+        opacity: 0; transform: translateY(-5px);
+        background: color-mix(in srgb, var(--sev) 12%, transparent);
+      }
+      to { opacity: 1; transform: none; }
+    }
+  }
+
+  @media (max-width: 1000px) {
     main { grid-template-columns: 1fr; }
-    .link-status { margin-left: 0; }
+    .link { margin-left: 0; }
   }
 </style>
 </head>
@@ -333,19 +370,15 @@
 
 <header>
   <div class="brand">Sysmon <span>Hunter</span></div>
-
-  <!-- Direct access to the API surfaces behind the console -->
   <nav class="routes" aria-label="API endpoints">
     <a href="/api/docs" target="_blank" rel="noopener">API</a>
-    <a href="/detections?limit=200" target="_blank" rel="noopener">Raw</a>
+    <a href="/incidents" target="_blank" rel="noopener">Raw</a>
     <a href="/health" target="_blank" rel="noopener">Health</a>
   </nav>
-
-  <div class="meta" id="engine">engine: --- rules</div>
-
-  <div class="link-status">
+  <div class="engine" id="engine">engine: starting</div>
+  <div class="link">
     <span class="led" id="led"></span>
-    <span id="link">connecting</span>
+    <span id="link-state">connecting</span>
   </div>
 </header>
 
@@ -353,234 +386,414 @@
 
   <section class="stats">
     <div class="stat">
-      <div class="stat-label">Detecciones</div>
-      <div class="stat-value" id="s-total">0</div>
+      <div class="stat-label">Incidents</div>
+      <div class="stat-value" id="s-incidents">0</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Alta / Critica</div>
-      <div class="stat-value" id="s-crit">0</div>
+      <div class="stat-label">Needs triage</div>
+      <div class="stat-value" id="s-actionable">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Detections</div>
+      <div class="stat-value" id="s-detections">0</div>
     </div>
     <div class="stat">
       <div class="stat-label">Hosts</div>
       <div class="stat-value" id="s-hosts">0</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Tecnicas ATT&CK</div>
-      <div class="stat-value" id="s-tech">0</div>
+      <div class="stat-label">Techniques</div>
+      <div class="stat-value" id="s-techniques">0</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Ultimo evento</div>
-      <div class="stat-value" id="s-last" style="font-size:16px;padding-top:5px">--:--:--</div>
+      <div class="stat-label">Last event</div>
+      <div class="stat-value small" id="s-last">--:--:--</div>
     </div>
   </section>
 
-  <section class="panel">
-    <div class="panel-head">
-      <div class="panel-title">Flujo de detecciones <b id="shown">0</b></div>
-      <div class="filters" role="group" aria-label="Filtrar por severidad">
-        <button class="filter" data-f="all" aria-pressed="true">Todas</button>
-        <button class="filter" data-f="critical" aria-pressed="false">Critica</button>
-        <button class="filter" data-f="high" aria-pressed="false">Alta</button>
-        <button class="filter" data-f="medium" aria-pressed="false">Media</button>
+  <div class="col">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Incident queue <b id="queue-count">0</b></div>
+        <div class="filters" role="group" aria-label="Filter incidents">
+          <button class="filter" data-scope="triage" aria-pressed="true">Needs triage</button>
+          <button class="filter" data-scope="all" aria-pressed="false">All</button>
+        </div>
       </div>
-    </div>
-    <div class="feed" id="feed">
-      <div class="empty" id="empty">
-        <div class="empty-mark">Sin detecciones</div>
-        <p>El motor esta escuchando. Envia telemetria a <code>POST /ingest</code> o dispara un atomic desde la VM.</p>
+      <div class="queue" id="queue">
+        <div class="empty">
+          <div class="empty-mark">Queue is clear</div>
+          <p>
+            The engine is listening. Send telemetry to <code>POST /ingest</code>,
+            or fire an atomic on the lab VM to see a chain build.
+          </p>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 
-  <aside>
-    <div class="panel">
-      <div class="panel-head"><div class="panel-title">Severidad</div></div>
+  <aside class="col">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Detection stream</div>
+        <div class="panel-note" id="stream-count">0</div>
+      </div>
+      <div class="stream" id="stream">
+        <div class="empty empty-sm"><p>Nothing yet.</p></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title">Severity</div></div>
       <div class="bars" id="bars"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><div class="panel-title">Tecnicas observadas</div></div>
-      <div class="tech" id="tech"><div class="tech-empty">Ninguna todavia</div></div>
-    </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title">ATT&CK techniques</div></div>
+      <div id="techniques">
+        <div class="empty empty-sm"><p>None observed.</p></div>
+      </div>
+    </section>
   </aside>
 
 </main>
 
 <script>
-const SEV_ORDER = ['critical','high','medium','low','info'];
-const SEV_COLOR = {
-  critical: 'var(--sev-critical)', high: 'var(--sev-high)',
-  medium: 'var(--sev-medium)', low: 'var(--sev-low)', info: 'var(--sev-info)'
+"use strict";
+
+/* ============================================================
+   Sysmon Hunter console
+
+   Two data paths that must agree:
+     - On load, history is replayed from SQLite over REST.
+     - While open, the engine pushes new objects over WebSocket.
+   Both deliver the identical JSON shape (see backend/api/serializers.py),
+   so a rendered row cannot tell which path it arrived on.
+   ============================================================ */
+
+const SEVERITIES = ["critical", "high", "medium", "low", "info"];
+const SEVERITY_COLOR = {
+  critical: "var(--sev-critical)",
+  high:     "var(--sev-high)",
+  medium:   "var(--sev-medium)",
+  low:      "var(--sev-low)",
+  info:     "var(--sev-info)",
 };
-const SEV_ES = { critical:'critica', high:'alta', medium:'media', low:'baja', info:'info' };
 
-let detections = [];
-let filter = 'all';
+const state = {
+  incidents: new Map(),   // id -> incident. A Map because incidents are updated
+                          // in place as new detections land on them.
+  detections: [],         // append-only stream, oldest first
+  expanded: new Set(),    // incident ids currently drilled into
+  scope: "triage",        // "triage" (actionable only) or "all"
+};
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-/* ---- Render ---- */
+/* ---------- Helpers ---------- */
 
-function shortPath(p) {
-  if (!p) return 'desconocido';
-  const parts = String(p).split(/[\\/]/);
-  return parts[parts.length - 1] || p;
+/** Escape untrusted strings before they touch innerHTML.
+ *  Command lines are attacker-controlled by definition: an operator who names
+ *  a process `<img onerror=...>` should not get script execution in the SOC. */
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
 }
 
-function hhmmss(ts) {
-  const d = ts ? new Date(ts) : new Date();
-  return d.toLocaleTimeString('es-CR', { hour12: false });
+/** Reduce a full Windows path to the executable name. */
+function baseName(path) {
+  if (!path) return "unknown";
+  const parts = String(path).split(/[\\/]/);
+  return parts[parts.length - 1] || String(path);
 }
 
-function rowHTML(d) {
-  const sev = (d.severity || 'medium').toLowerCase();
-  const attack = (d.attack || []).map(t => `<span class="chip">${t}</span>`).join('');
-  const host = d.host && d.host !== 'unknown' ? `<span class="chip host">${d.host}</span>` : '';
-  const parent = shortPath(d.parent_image);
-  const child = shortPath(d.image);
-  const chain = d.parent_image
-    ? `<div class="chain">
-         <span class="proc">${parent}</span>
-         <span class="arrow">&#9654;</span>
-         <span class="proc child">${child}</span>
-       </div>`
-    : (d.image ? `<div class="chain"><span class="proc child">${child}</span></div>` : '');
-  const cmd = d.command_line
-    ? `<div class="cmd" tabindex="0">${escapeHtml(d.command_line)}</div>` : '';
+function clockTime(iso) {
+  const date = iso ? new Date(iso) : new Date();
+  return date.toLocaleTimeString("en-GB", { hour12: false });
+}
+
+/* ---------- Rendering: incidents ---------- */
+
+function incidentHtml(incident, isFresh) {
+  const severity = incident.severity || "medium";
+  const expanded = state.expanded.has(incident.id);
+
+  const chain = (incident.chain || []).length
+    ? incident.chain
+        .map(escapeHtml)
+        .join('<span class="arrow">&#9656;</span>')
+        .replace(/^/, "<span class='proc'>")
+        .replace(/<span class="arrow">&#9656;<\/span>/g,
+                 "</span><span class='arrow'>&#9656;</span><span class='proc'>")
+        .concat("</span>")
+    : "<span class='proc'>chain unknown</span>";
+
+  const techniques = (incident.techniques || [])
+    .map((t) => `<span class="chip">${escapeHtml(t)}</span>`)
+    .join("");
+
+  const badge = incident.actionable
+    ? `<span class="sev-tag">${escapeHtml(severity)}</span>`
+    : `<span class="watch">watching</span>`;
+
+  const members = expanded ? membersHtml(incident) : "";
 
   return `
-    <article class="det new" data-sev="${sev}">
+    <article class="inc${isFresh ? " fresh" : ""}" data-sev="${escapeHtml(severity)}">
       <div class="spine"></div>
-      <div class="det-body">
-        <div class="det-top">
-          <span class="rule-id">${d.rule_id || '---'}</span>
-          <span class="sev-tag">${SEV_ES[sev] || sev}</span>
-          <span class="det-title">${escapeHtml(d.title || '')}</span>
-          <span class="det-time">${hhmmss(d.matched_at)}</span>
+      <div class="inc-body">
+        <div class="inc-top">
+          <span class="inc-id">${escapeHtml(incident.id)}</span>
+          ${badge}
+          <span class="inc-host">${escapeHtml(incident.host)}</span>
+          <span class="inc-score">
+            <b>${incident.score}</b><span>score</span>
+          </span>
         </div>
-        ${chain}
-        ${cmd}
-        <div class="chips">${attack}${host}</div>
+
+        <div class="chain">${chain}</div>
+
+        <div class="inc-meta">
+          <span>${incident.detection_count} detection${incident.detection_count === 1 ? "" : "s"}</span>
+          <span>${clockTime(incident.first_seen)} &ndash; ${clockTime(incident.last_seen)}</span>
+          <div class="chips">${techniques}</div>
+          <button class="drill" data-incident="${escapeHtml(incident.id)}">
+            ${expanded ? "Hide detections" : "Show detections"}
+          </button>
+        </div>
+
+        ${members}
       </div>
     </article>`;
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+/** Member detections of an incident, fetched on demand.
+ *  Rendered from whatever is cached; the fetch fills it in and re-renders. */
+function membersHtml(incident) {
+  if (!incident._members) {
+    return `<div class="members"><div class="member">
+              <span class="member-title">Loading detections&hellip;</span>
+            </div></div>`;
+  }
+  const rows = incident._members.map((d) => `
+    <div class="member" data-sev="${escapeHtml(d.severity)}">
+      <span class="member-id">${escapeHtml(d.rule_id)}</span>
+      <span class="member-title">${escapeHtml(d.title)}</span>
+      <span class="member-time">${clockTime(d.matched_at)}</span>
+      ${d.command_line ? `<div class="cmd">${escapeHtml(d.command_line)}</div>` : ""}
+    </div>`).join("");
+  return `<div class="members">${rows}</div>`;
 }
 
-function render() {
-  const feed = $('feed');
-  const list = filter === 'all'
-    ? detections
-    : detections.filter(d => (d.severity || '').toLowerCase() === filter);
+function visibleIncidents() {
+  const all = [...state.incidents.values()];
+  const scoped = state.scope === "triage" ? all.filter((i) => i.actionable) : all;
+  // Newest first: the analyst wants the freshest thing at the top of the queue.
+  return scoped.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
+}
 
-  $('shown').textContent = list.length;
+function renderQueue(freshId = null) {
+  const list = visibleIncidents();
+  $("queue-count").textContent = list.length;
 
   if (!list.length) {
-    feed.innerHTML = `
+    const triaging = state.scope === "triage";
+    $("queue").innerHTML = `
       <div class="empty">
-        <div class="empty-mark">${filter === 'all' ? 'Sin detecciones' : 'Nada en este nivel'}</div>
-        <p>${filter === 'all'
-          ? 'El motor esta escuchando. Envia telemetria a <code>POST /ingest</code> o dispara un atomic desde la VM.'
-          : 'Cambia el filtro para ver el resto del flujo.'}</p>
+        <div class="empty-mark">${triaging ? "Queue is clear" : "No incidents"}</div>
+        <p>${triaging
+          ? "Nothing has crossed the triage threshold. Switch to <b>All</b> to see what the engine is watching."
+          : "The engine is listening. Send telemetry to <code>POST /ingest</code>, or fire an atomic on the lab VM."}</p>
       </div>`;
     return;
   }
-  feed.innerHTML = [...list].reverse().map(rowHTML).join('');
-  feed.querySelectorAll('.cmd').forEach(c => {
-    c.addEventListener('click', () => c.classList.toggle('open'));
+
+  $("queue").innerHTML = list.map((i) => incidentHtml(i, i.id === freshId)).join("");
+
+  $("queue").querySelectorAll(".drill").forEach((button) => {
+    button.addEventListener("click", () => toggleDrill(button.dataset.incident));
   });
 }
+
+/** Expand or collapse an incident, fetching its detections the first time. */
+async function toggleDrill(incidentId) {
+  if (state.expanded.has(incidentId)) {
+    state.expanded.delete(incidentId);
+    renderQueue();
+    return;
+  }
+
+  state.expanded.add(incidentId);
+  renderQueue();
+
+  const incident = state.incidents.get(incidentId);
+  if (!incident || incident._members) return;
+
+  try {
+    const detail = await fetch(`/incidents/${incidentId}`).then((r) => r.json());
+    incident._members = detail.detections || [];
+  } catch {
+    incident._members = [];
+  }
+  renderQueue();
+}
+
+/* ---------- Rendering: detection stream ---------- */
+
+function renderStream(freshCount = 0) {
+  const recent = state.detections.slice(-60).reverse();
+  $("stream-count").textContent = state.detections.length;
+
+  if (!recent.length) {
+    $("stream").innerHTML = `<div class="empty empty-sm"><p>Nothing yet.</p></div>`;
+    return;
+  }
+
+  $("stream").innerHTML = recent.map((d, index) => `
+    <article class="det${index < freshCount ? " fresh" : ""}" data-sev="${escapeHtml(d.severity)}">
+      <div class="spine"></div>
+      <div class="det-body">
+        <div class="det-top">
+          <span class="det-id">${escapeHtml(d.rule_id)}</span>
+          <span class="det-time">${clockTime(d.matched_at)}</span>
+        </div>
+        <div class="det-title" title="${escapeHtml(d.title)}">
+          ${escapeHtml(baseName(d.parent_image))} &#9656; ${escapeHtml(baseName(d.image))}
+        </div>
+      </div>
+    </article>`).join("");
+}
+
+/* ---------- Rendering: aggregates ---------- */
 
 function renderStats() {
-  const crit = detections.filter(d => ['high','critical'].includes((d.severity||'').toLowerCase())).length;
-  const hosts = new Set(detections.map(d => d.host).filter(h => h && h !== 'unknown'));
-  const techs = {};
-  detections.forEach(d => (d.attack || []).forEach(t => techs[t] = (techs[t] || 0) + 1));
+  const incidents = [...state.incidents.values()];
+  const actionable = incidents.filter((i) => i.actionable);
+  const hosts = new Set(incidents.map((i) => i.host).filter((h) => h && h !== "unknown"));
 
-  $('s-total').textContent = detections.length;
-  $('s-crit').textContent = crit;
-  $('s-crit').classList.toggle('alarm', crit > 0);
-  $('s-hosts').textContent = hosts.size;
-  $('s-tech').textContent = Object.keys(techs).length;
-  if (detections.length) {
-    $('s-last').textContent = hhmmss(detections[detections.length - 1].matched_at);
+  const techniqueCounts = {};
+  for (const detection of state.detections) {
+    for (const technique of detection.attack || []) {
+      techniqueCounts[technique] = (techniqueCounts[technique] || 0) + 1;
+    }
   }
 
-  // Barras de severidad
-  const counts = {};
-  SEV_ORDER.forEach(s => counts[s] = 0);
-  detections.forEach(d => {
-    const s = (d.severity || 'medium').toLowerCase();
-    if (s in counts) counts[s]++;
-  });
-  const max = Math.max(1, ...Object.values(counts));
-  $('bars').innerHTML = SEV_ORDER.map(s => `
-    <div class="bar-row">
-      <span class="bar-label">${SEV_ES[s]}</span>
-      <div class="bar-track">
-        <div class="bar-fill" style="--c:${SEV_COLOR[s]};width:${(counts[s]/max)*100}%"></div>
-      </div>
-      <span class="bar-count">${counts[s]}</span>
-    </div>`).join('');
+  $("s-incidents").textContent  = incidents.length;
+  $("s-actionable").textContent = actionable.length;
+  $("s-actionable").classList.toggle("alarm", actionable.length > 0);
+  $("s-detections").textContent = state.detections.length;
+  $("s-hosts").textContent      = hosts.size;
+  $("s-techniques").textContent = Object.keys(techniqueCounts).length;
 
-  // Tecnicas ATT&CK ordenadas por frecuencia
-  const sorted = Object.entries(techs).sort((a,b) => b[1] - a[1]).slice(0, 12);
-  $('tech').innerHTML = sorted.length
-    ? sorted.map(([t,n]) => `
+  if (state.detections.length) {
+    $("s-last").textContent = clockTime(state.detections[state.detections.length - 1].matched_at);
+  }
+
+  // Severity distribution across detections, not incidents: this panel answers
+  // "what is the engine seeing", while the queue answers "what should I do".
+  const counts = Object.fromEntries(SEVERITIES.map((s) => [s, 0]));
+  for (const detection of state.detections) {
+    const severity = (detection.severity || "medium").toLowerCase();
+    if (severity in counts) counts[severity] += 1;
+  }
+  const peak = Math.max(1, ...Object.values(counts));
+
+  $("bars").innerHTML = SEVERITIES.map((severity) => `
+    <div class="bar-row">
+      <span class="bar-label">${severity}</span>
+      <div class="bar-track">
+        <div class="bar-fill"
+             style="--c:${SEVERITY_COLOR[severity]};width:${(counts[severity] / peak) * 100}%"></div>
+      </div>
+      <span class="bar-count">${counts[severity]}</span>
+    </div>`).join("");
+
+  const ranked = Object.entries(techniqueCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  $("techniques").innerHTML = ranked.length
+    ? ranked.map(([id, count]) => `
         <div class="tech-row">
-          <span class="tech-id">${t}</span>
-          <span class="tech-n">${n}</span>
-        </div>`).join('')
-    : '<div class="tech-empty">Ninguna todavia</div>';
+          <span class="tech-id">${escapeHtml(id)}</span>
+          <span class="tech-n">${count}</span>
+        </div>`).join("")
+    : `<div class="empty empty-sm"><p>None observed.</p></div>`;
 }
 
-/* ---- Datos ---- */
+/* ---------- Data ---------- */
 
+/** Replay history from the database so a reload does not look like a fresh start. */
 async function bootstrap() {
   try {
-    const [h, d] = await Promise.all([
-      fetch('/health').then(r => r.json()),
-      fetch('/detections?limit=200').then(r => r.json())
+    const [health, incidents, detections] = await Promise.all([
+      fetch("/health").then((r) => r.json()),
+      fetch("/incidents?limit=200").then((r) => r.json()),
+      fetch("/detections?limit=300").then((r) => r.json()),
     ]);
-    $('engine').textContent = `motor: ${h.rules} reglas`;
-    detections = d.items || [];
-    render(); renderStats();
-  } catch (e) {
-    $('engine').textContent = 'motor: sin respuesta';
+
+    $("engine").textContent =
+      `engine: ${health.rules_loaded} rules \u00b7 ${health.processes_tracked} processes tracked`;
+
+    for (const incident of incidents.items || []) {
+      state.incidents.set(incident.id, incident);
+    }
+    state.detections = detections.items || [];
+
+    renderQueue();
+    renderStream();
+    renderStats();
+  } catch {
+    $("engine").textContent = "engine: unreachable";
   }
 }
 
+/** Live feed. Reconnects on drop, because the console is expected to sit open
+ *  on a wall display for days and a transient blip must not require a reload. */
 function connect() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  const socket = new WebSocket(`${scheme}://${location.host}/ws`);
 
-  ws.onopen = () => {
-    $('led').className = 'led on';
-    $('link').textContent = 'en vivo';
+  socket.onopen = () => {
+    $("led").className = "led on";
+    $("link-state").textContent = "live";
   };
-  ws.onmessage = ev => {
-    const msg = JSON.parse(ev.data);
-    if (msg.type === 'detection') {
-      detections.push(msg.data);
-      render(); renderStats();
+
+  socket.onmessage = (message) => {
+    const { type, data } = JSON.parse(message.data);
+
+    if (type === "detection") {
+      state.detections.push(data);
+      renderStream(1);
+    } else if (type === "incident") {
+      // Preserve any already-fetched member list across the update, otherwise
+      // an expanded incident collapses to a spinner every time it grows.
+      const existing = state.incidents.get(data.id);
+      if (existing?._members) {
+        data._members = undefined;  // stale: refetch on next expand
+      }
+      state.incidents.set(data.id, data);
+      renderQueue(data.id);
     }
+    renderStats();
   };
-  ws.onclose = () => {
-    $('led').className = 'led off';
-    $('link').textContent = 'reconectando';
+
+  socket.onclose = () => {
+    $("led").className = "led off";
+    $("link-state").textContent = "reconnecting";
     setTimeout(connect, 3000);
   };
-  ws.onerror = () => ws.close();
+
+  socket.onerror = () => socket.close();
 }
 
-document.querySelectorAll('.filter').forEach(btn => {
-  btn.addEventListener('click', () => {
-    filter = btn.dataset.f;
-    document.querySelectorAll('.filter').forEach(b =>
-      b.setAttribute('aria-pressed', String(b === btn)));
-    render();
+/* ---------- Controls ---------- */
+
+document.querySelectorAll(".filter").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.scope = button.dataset.scope;
+    document.querySelectorAll(".filter").forEach((other) => {
+      other.setAttribute("aria-pressed", String(other === button));
+    });
+    renderQueue();
   });
 });
 
