@@ -57,6 +57,10 @@ class DetectionRow(Base):
         String(32), ForeignKey("incidents.id"), nullable=True, index=True
     )
 
+    # Supporting numbers for statistical detections (beacon interval, jitter,
+    # regularity). Empty for rule-based detections.
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
     matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     raw_event: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
@@ -113,6 +117,7 @@ async def save_detection(detection: Detection) -> None:
         command_line=event.command_line,
         process_guid=event.process_guid,
         incident_id=detection.incident_id,
+        evidence=detection.evidence,
         matched_at=detection.matched_at,
         raw_event=event.raw,
     )
@@ -158,7 +163,9 @@ async def list_detections(limit: int = 100) -> list[DetectionRow]:
         return list(reversed(result.scalars().all()))
 
 
-async def list_incidents(limit: int = 50, actionable_only: bool = False) -> list[IncidentRow]:
+async def list_incidents(
+    limit: int = 50, actionable_only: bool = False
+) -> list[IncidentRow]:
     """Most recent incidents, newest first (the console leads with the worst)."""
     async with Session() as session:
         stmt = select(IncidentRow).order_by(IncidentRow.last_seen.desc()).limit(limit)

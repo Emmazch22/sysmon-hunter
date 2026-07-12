@@ -16,6 +16,7 @@ from datetime import timedelta
 from typing import Any
 
 from backend.config import settings
+from backend.engine.beacon import BeaconDetector
 from backend.engine.correlator import IncidentEngine, ProcessTree
 from backend.engine.matcher import evaluate
 from backend.engine.normalizer import normalize
@@ -36,6 +37,15 @@ class Pipeline:
             window=timedelta(minutes=settings.correlation_window_minutes),
             score_threshold=settings.incident_score_threshold,
         )
+        self.beacons = BeaconDetector(
+            min_connections=settings.beacon_min_connections,
+            regularity_threshold=settings.beacon_regularity_threshold,
+            min_interval_seconds=settings.beacon_min_interval_seconds,
+            max_interval_seconds=settings.beacon_max_interval_seconds,
+            window=timedelta(minutes=settings.beacon_window_minutes),
+            cooldown=timedelta(minutes=settings.beacon_cooldown_minutes),
+            excluded_images=settings.beacon_excluded_images,
+        )
         self._events_seen = 0
 
     async def process(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -55,6 +65,17 @@ class Pipeline:
 
         rules = rule_store.for_event(event.event_id)
         detections = evaluate(event, rules)
+
+        # Statistical detection runs alongside the rule engine, not instead of
+        # it. A beacon is invisible to any single-event rule -- the signal lives
+        # in the intervals between events -- but once confirmed it becomes an
+        # ordinary Detection and travels the same path as everything else:
+        # correlated into the process tree, scored, persisted, pushed. That is
+        # the whole point of making it a Detection rather than a special case.
+        if settings.beacon_enabled:
+            beacon = self.beacons.observe(event)
+            if beacon is not None:
+                detections.append(beacon)
 
         raised: list[Incident] = []
         for detection in detections:
@@ -102,8 +123,8 @@ class Pipeline:
         module-level import here would make the pipeline depend on FastAPI --
         which would break the "runs under pytest with no server" property.
         """
-        from backend.api.ws import manager
         from backend.api.serializers import serialize_detection, serialize_incident
+        from backend.api.ws import manager
 
         await manager.broadcast(
             {"type": "detection", "data": serialize_detection(detection)}
@@ -120,6 +141,7 @@ class Pipeline:
         """
         closed = self.incidents.sweep()
         pruned = self.tree.prune()
+        pruned += self.beacons.prune()
         if closed:
             log.info("Swept %d idle incident(s)", len(closed))
         return pruned
@@ -132,6 +154,7 @@ class Pipeline:
             "rules_loaded": len(rule_store.all),
             "processes_tracked": self.tree.size,
             "incidents_open": self.incidents.open_count,
+            "channels_watched": self.beacons.tracked_channels,
         }
 
 

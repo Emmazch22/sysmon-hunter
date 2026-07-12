@@ -31,6 +31,7 @@ def serialize_detection(detection: Detection) -> dict[str, Any]:
         "parent_image": event.parent_image,
         "command_line": event.command_line,
         "incident_id": detection.incident_id,
+        "evidence": detection.evidence,
         "matched_at": detection.matched_at.isoformat(),
     }
 
@@ -47,6 +48,7 @@ def serialize_detection_row(row: DetectionRow) -> dict[str, Any]:
         "parent_image": row.parent_image,
         "command_line": row.command_line,
         "incident_id": row.incident_id,
+        "evidence": row.evidence or {},
         "matched_at": row.matched_at.isoformat(),
     }
 

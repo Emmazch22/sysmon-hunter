@@ -137,6 +137,14 @@ class Detection(BaseModel):
     # Set by the correlator once the detection is attached to an incident.
     incident_id: Optional[str] = None
 
+    # Supporting numbers for detections that are not a simple field match.
+    # A beacon detection puts its interval, jitter and regularity here, because
+    # "beacon detected" on its own is an assertion, and an assertion is not
+    # something an analyst can argue with when it turns out to be a false
+    # positive. Rule-based detections leave this empty: the rule *is* the
+    # evidence.
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
     @property
     def score(self) -> int:
         """Contribution of this detection to its incident's cumulative score."""

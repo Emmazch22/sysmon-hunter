@@ -45,5 +45,45 @@ class Settings(BaseSettings):
     # in-memory process tree so a long-running server does not grow without end.
     process_ttl_minutes: int = 120
 
+    # --- Beaconing ---
+    # Periodicity detection over Sysmon EventID 3. See engine/beacon.py for why
+    # these defaults are what they are; they are the knobs most worth tuning
+    # against real traffic, because the difference between "finds Cobalt Strike"
+    # and "flags every browser" lives entirely in this block.
+    beacon_enabled: bool = True
+
+    # Connections needed before a verdict. Five intervals is the fewest that can
+    # distinguish rhythm from coincidence -- below that, two random connections
+    # a minute apart look exactly like a beacon.
+    beacon_min_connections: int = 6
+
+    # Regularity floor, 0.0 to 1.0. At 0.75 a 60s beacon with Cobalt Strike's
+    # default 37% jitter still scores ~0.85 and is caught, while genuinely
+    # irregular traffic is not. Raise it if the console fills with noise; lower
+    # it only if you are willing to read that noise.
+    beacon_regularity_threshold: float = 0.75
+
+    # Interval bounds, in seconds. Faster than the floor is a streaming
+    # connection; slower than the ceiling is indistinguishable from a scheduled
+    # task on timing alone.
+    beacon_min_interval_seconds: float = 5.0
+    beacon_max_interval_seconds: float = 3600.0
+
+    beacon_window_minutes: int = 120
+    beacon_cooldown_minutes: int = 30
+
+    # Processes whose periodic traffic is expected. Every entry here is a place
+    # an implant can hide by naming itself correctly, so keep the list short and
+    # prefer raising the regularity threshold instead.
+    beacon_excluded_images: list[str] = [
+        "chrome.exe",
+        "msedge.exe",
+        "firefox.exe",
+        "svchost.exe",
+        "onedrive.exe",
+        "teams.exe",
+        "slack.exe",
+    ]
+
 
 settings = Settings()
