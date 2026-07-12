@@ -18,6 +18,7 @@ from typing import Any
 from backend.config import settings
 from backend.engine.beacon import BeaconDetector
 from backend.engine.correlator import IncidentEngine, ProcessTree
+from backend.engine.discovery import DiscoveryDetector
 from backend.engine.matcher import evaluate
 from backend.engine.normalizer import normalize
 from backend.engine.rule_loader import rule_store
@@ -45,6 +46,15 @@ class Pipeline:
             window=timedelta(minutes=settings.beacon_window_minutes),
             cooldown=timedelta(minutes=settings.beacon_cooldown_minutes),
             excluded_images=settings.beacon_excluded_images,
+        )
+        # Shares the process tree with the incident engine -- discovery bursts
+        # are grouped by tree root, so the detector needs the same ancestry view
+        # the correlator uses.
+        self.discovery = DiscoveryDetector(
+            tree=self.tree,
+            min_distinct=settings.discovery_min_distinct,
+            window=timedelta(minutes=settings.discovery_window_minutes),
+            cooldown=timedelta(minutes=settings.discovery_cooldown_minutes),
         )
         self._events_seen = 0
 
@@ -76,6 +86,13 @@ class Pipeline:
             beacon = self.beacons.observe(event)
             if beacon is not None:
                 detections.append(beacon)
+
+        # Discovery runs on process creation, after the tree has observed the
+        # event, so the burst can be attributed to the correct tree root.
+        if settings.discovery_enabled:
+            burst = self.discovery.observe(event)
+            if burst is not None:
+                detections.append(burst)
 
         raised: list[Incident] = []
         for detection in detections:
@@ -142,6 +159,7 @@ class Pipeline:
         closed = self.incidents.sweep()
         pruned = self.tree.prune()
         pruned += self.beacons.prune()
+        pruned += self.discovery.prune()
         if closed:
             log.info("Swept %d idle incident(s)", len(closed))
         return pruned
@@ -155,6 +173,7 @@ class Pipeline:
             "processes_tracked": self.tree.size,
             "incidents_open": self.incidents.open_count,
             "channels_watched": self.beacons.tracked_channels,
+            "recon_trees_watched": self.discovery.tracked_bursts,
         }
 
 

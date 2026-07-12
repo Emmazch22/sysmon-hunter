@@ -85,5 +85,19 @@ class Settings(BaseSettings):
         "slack.exe",
     ]
 
+    # --- Discovery burst ---
+    # Detection of reconnaissance clusters over Sysmon EventID 1. See
+    # engine/discovery.py. Counts *distinct* recon techniques per process tree,
+    # so a script repeating one command never trips it -- only genuine variety
+    # does.
+    discovery_enabled: bool = True
+
+    # Distinct recon techniques within the window that constitute a burst. Four
+    # is where an administrator's occasional diagnostic use becomes methodical
+    # host enumeration.
+    discovery_min_distinct: int = 4
+    discovery_window_minutes: int = 5
+    discovery_cooldown_minutes: int = 15
+
 
 settings = Settings()
