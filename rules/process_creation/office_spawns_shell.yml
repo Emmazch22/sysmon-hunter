@@ -1,0 +1,22 @@
+id: SYS-001
+title: Office lanza un interprete de comandos
+event_id: 1
+severity: high
+attack: [T1566.001, T1059]
+description: >
+  Un producto de Office crea un proceso hijo de shell o scripting,
+  patron tipico de macro maliciosa tras un phishing.
+detection:
+  parent_image|endswith:
+    - '\winword.exe'
+    - '\excel.exe'
+    - '\powerpnt.exe'
+    - '\outlook.exe'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\mshta.exe'
+condition: all

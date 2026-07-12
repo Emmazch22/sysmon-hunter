@@ -1,0 +1,10 @@
+id: SYS-002
+title: PowerShell con comando codificado
+event_id: 1
+severity: high
+attack: [T1059.001, T1027]
+detection:
+  image|endswith: '\powershell.exe'
+  command_line|re:
+    - '\s-e(nc|ncodedcommand)?\s+[a-z0-9+/=]{20,}'
+condition: all
