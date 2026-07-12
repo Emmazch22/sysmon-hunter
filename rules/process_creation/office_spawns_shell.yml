@@ -1,11 +1,8 @@
-id: SYS-001
-title: Office lanza un interprete de comandos
-event_id: 1
-severity: high
-attack: [T1566.001, T1059]
+# rules/process_creation/office_spawns_shell.yml
+title: Office application spawned a command interpreter
 description: >
-  Un producto de Office crea un proceso hijo de shell o scripting,
-  patron tipico de macro maliciosa tras un phishing.
+  An Office product created a shell or scripting child process, the classic
+  signature of a malicious macro following a phishing delivery.
 detection:
   parent_image|endswith:
     - '\winword.exe'

@@ -1,5 +1,6 @@
 id: SYS-002
-title: PowerShell con comando codificado
+# rules/process_creation/encoded_powershell.yml
+title: PowerShell executed an encoded command
 event_id: 1
 severity: high
 attack: [T1059.001, T1027]

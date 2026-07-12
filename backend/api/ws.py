@@ -19,7 +19,7 @@ class ConnectionManager:
         await ws.accept()
         async with self._lock:
             self._clients.add(ws)
-        log.info("Dashboard conectado (%d activos)", len(self._clients))
+        log.info("Console connected (%d active)", len(self._clients))
 
     async def disconnect(self, ws: WebSocket) -> None:
         async with self._lock:
