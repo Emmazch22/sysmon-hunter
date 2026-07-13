@@ -68,10 +68,8 @@ class TestWorstVerdict:
 class TestGracefulDegradation:
     async def test_no_keys_returns_unavailable_not_error(self, monkeypatch) -> None:
         """With no keys configured, enrichment must still return a result -- every
-        provider simply reports itself unavailable.
-
-        The keys are cleared explicitly so this holds whether or not the machine
-        running the tests happens to have a populated .env."""
+        provider simply reports itself unavailable. Keys are cleared explicitly so
+        this holds whether or not the machine has a populated .env."""
         from backend.config import settings
 
         monkeypatch.setattr(settings, "abuseipdb_api_key", "")
@@ -88,8 +86,7 @@ class TestGracefulDegradation:
         assert await service.enrich("10.0.0.1") is None
 
     async def test_cache_prevents_duplicate_lookups(self, monkeypatch) -> None:
-        """A second lookup of the same indicator returns the cached object, so no
-        request is made -- the safeguard that keeps a tight free tier usable."""
+        """A second lookup returns the cached object, so no request is made."""
         from backend.config import settings
 
         monkeypatch.setattr(settings, "abuseipdb_api_key", "")
@@ -99,3 +96,60 @@ class TestGracefulDegradation:
         first = await service.enrich("185.234.72.19")
         second = await service.enrich("185.234.72.19")
         assert first is second
+
+
+class TestHashEnrichment:
+    """Hash enrichment reuses the enrichment pipeline for the highest-value
+    lookup the tool offers: a flagged hash is a confirmed-malicious binary."""
+
+    def test_hashes_are_classified_by_length(self) -> None:
+        from backend.engine.enrichment import classify_indicator
+
+        assert classify_indicator("d41d8cd98f00b204e9800998ecf8427e") == "hash"  # md5
+        assert (
+            classify_indicator("da39a3ee5e6b4b0d3255bfef95601890afd80709") == "hash"
+        )  # sha1
+        assert (
+            classify_indicator(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            )
+            == "hash"
+        )  # sha256
+
+    def test_non_hex_of_hash_length_is_not_a_hash(self) -> None:
+        """A 32-character string that is not hex is not an MD5 -- length alone is
+        not enough."""
+        from backend.engine.enrichment import classify_indicator
+
+        assert classify_indicator("z" * 32) is None
+
+    def test_parse_sysmon_hashes(self) -> None:
+        from backend.engine.enrichment import parse_sysmon_hashes
+
+        parsed = parse_sysmon_hashes("MD5=ABC,SHA256=DEF,IMPHASH=00FF")
+        assert parsed == {"md5": "ABC", "sha256": "DEF", "imphash": "00FF"}
+
+    def test_best_hash_prefers_sha256(self) -> None:
+        """SHA256 is the most collision-resistant, so it is the lookup key when
+        present -- MD5 is a last resort because collisions are cheap."""
+        from backend.engine.enrichment import best_hash
+
+        assert best_hash({"md5": "A", "sha1": "B", "sha256": "C"}) == "C"
+        assert best_hash({"md5": "A", "sha1": "B"}) == "B"
+        assert best_hash({"md5": "A"}) == "A"
+        assert best_hash({}) is None
+
+    async def test_hash_enrichment_dispatches_to_virustotal_only(
+        self, monkeypatch
+    ) -> None:
+        """A hash goes to VirusTotal's file endpoint, not AbuseIPDB (which only
+        knows IPs)."""
+        from backend.config import settings
+        from backend.engine.enrichment import EnrichmentService
+
+        monkeypatch.setattr(settings, "virustotal_api_key", "")
+        service = EnrichmentService()
+        result = await service.enrich("d41d8cd98f00b204e9800998ecf8427e")
+        assert result is not None
+        assert result.indicator_type == "hash"
+        assert [r.provider for r in result.results] == ["VirusTotal"]

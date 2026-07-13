@@ -249,8 +249,21 @@ function timelineDetail(d) {
         ? `<div class="tl-detail-cmd">${escapeHtml(d.command_line)}</div>` : "";
     const parentCmd = f.parent_command_line
         ? `<div class="tl-detail-parentcmd"><span class="tl-detail-key">Parent cmd</span>${escapeHtml(f.parent_command_line)}</div>` : "";
-    const hashes = f.hashes
-        ? `<div class="tl-detail-row"><span class="tl-detail-key">Hashes</span><span class="tl-detail-val hash">${escapeHtml(f.hashes)}</span></div>` : "";
+    // Hashes get a "Check" button: the strongest hash present is looked up on
+    // VirusTotal. A flagged hash is the strongest signal the tool can surface --
+    // it turns "a process ran" into "a known-malicious binary executed".
+    let hashes = "";
+    if (f.hashes) {
+        const best = bestHash(f.hashes);
+        hashes = `
+      <div class="tl-detail-row" style="grid-column:1/-1">
+        <span class="tl-detail-key">Hashes</span>
+        <span class="tl-detail-val hash">${escapeHtml(f.hashes)}</span>
+        ${best ? `<div class="enrich-slot" data-indicator="${escapeHtml(best)}" style="margin-top:6px">
+          <button class="enrich-btn" data-enrich="${escapeHtml(best)}">Check hash reputation</button>
+        </div>` : ""}
+      </div>`;
+    }
 
     const techniques = (d.attack || [])
         .map((t) => `<span class="chip" data-technique="${escapeHtml(t)}" role="button" tabindex="0">${escapeHtml(t)}</span>`)
@@ -263,6 +276,17 @@ function timelineDetail(d) {
       ${parentCmd}
       ${techniques ? `<div class="tl-detail-tech">${techniques}</div>` : ""}
     </div>`;
+}
+
+/** Pick the strongest hash (SHA256 > SHA1 > MD5) from a Sysmon Hashes string,
+ *  mirroring the backend so the client enriches the same value the report would. */
+function bestHash(raw) {
+    const parts = {};
+    for (const p of String(raw).split(",")) {
+        const [k, v] = p.split("=");
+        if (k && v) parts[k.trim().toLowerCase()] = v.trim();
+    }
+    return parts.sha256 || parts.sha1 || parts.md5 || null;
 }
 
 /** Full timestamp for the detail panel: date + time, not just the clock. */

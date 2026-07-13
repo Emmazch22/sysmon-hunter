@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -73,8 +74,15 @@ class Enrichment:
         return "unknown"
 
 
+# Hash lengths in hex characters, by algorithm. A file hash is enrichable against
+# VirusTotal; the length alone identifies which algorithm it is.
+_HASH_LENGTHS = {32: "md5", 40: "sha1", 64: "sha256"}
+
+_HEX = re.compile(r"^[0-9a-fA-F]+$")
+
+
 def classify_indicator(value: str) -> Optional[str]:
-    """Return "ip", "domain", or None for something we do not enrich.
+    """Return "ip", "domain", "hash", or None for something we do not enrich.
 
     Private and reserved IPs return None: enriching 10.0.0.1 against a global
     reputation service is pointless and leaks internal addressing to a third
@@ -89,10 +97,40 @@ def classify_indicator(value: str) -> Optional[str]:
     except ValueError:
         pass
 
+    # A file hash: hex of a length that matches a known algorithm.
+    if len(value) in _HASH_LENGTHS and _HEX.match(value):
+        return "hash"
+
     # Very loose domain check: something with a dot and no spaces or slashes.
     if "." in value and " " not in value and "/" not in value and len(value) < 254:
         return "domain"
 
+    return None
+
+
+def parse_sysmon_hashes(raw: str) -> dict[str, str]:
+    """Parse Sysmon's Hashes field, e.g. 'SHA256=ABC,MD5=DEF', into a dict.
+
+    Sysmon emits several algorithms in one field. The strongest one present is
+    what should be sent to VirusTotal, so callers can pick from this by key.
+    """
+    out: dict[str, str] = {}
+    for part in raw.split(","):
+        if "=" in part:
+            algorithm, digest = part.split("=", 1)
+            out[algorithm.strip().lower()] = digest.strip()
+    return out
+
+
+def best_hash(hashes: dict[str, str]) -> Optional[str]:
+    """Pick the strongest hash available: SHA256 > SHA1 > MD5.
+
+    A stronger hash is a more reliable lookup key -- MD5 collisions are cheap
+    enough that malware authors produce them deliberately, so it is the last
+    resort, not the first."""
+    for algorithm in ("sha256", "sha1", "md5"):
+        if algorithm in hashes:
+            return hashes[algorithm]
     return None
 
 
@@ -210,6 +248,81 @@ async def query_virustotal(
     )
 
 
+async def query_virustotal_file(
+    client: httpx.AsyncClient, file_hash: str
+) -> ProviderResult:
+    """VirusTotal reputation for a file hash. Free tier: 4 requests/min.
+
+    This is the highest-value enrichment the tool offers: a hash that several
+    engines flag turns "a process ran" into "a known-malicious binary executed",
+    which is the difference between a lead and a confirmed compromise.
+    """
+    name = "VirusTotal"
+    report_link = f"https://www.virustotal.com/gui/file/{file_hash}"
+
+    if not settings.virustotal_api_key:
+        return ProviderResult(
+            name, available=False, summary="No API key configured", link=report_link
+        )
+
+    try:
+        response = await client.get(
+            f"https://www.virustotal.com/api/v3/files/{file_hash}",
+            headers={"x-apikey": settings.virustotal_api_key},
+            timeout=8.0,
+        )
+        # A 404 is meaningful here, not an error: VT has never seen this file.
+        # For a bespoke payload that is itself suspicious -- unknown binaries are
+        # rarer than known-good ones on a normal host.
+        if response.status_code == 404:
+            return ProviderResult(
+                name,
+                available=True,
+                verdict="unknown",
+                summary="Not seen by VirusTotal (unknown file)",
+                details={"known": False},
+                link=report_link,
+            )
+        response.raise_for_status()
+        attrs = response.json()["data"]["attributes"]
+        stats = attrs["last_analysis_stats"]
+    except httpx.HTTPError as exc:
+        log.warning("VirusTotal file query failed for %s: %s", file_hash, exc)
+        return ProviderResult(
+            name, available=False, summary=f"Query failed: {exc}", link=report_link
+        )
+
+    malicious = stats.get("malicious", 0)
+    suspicious = stats.get("suspicious", 0)
+    total = sum(stats.values()) or 1
+
+    if malicious >= 3:
+        verdict = "malicious"
+    elif malicious + suspicious > 0:
+        verdict = "suspicious"
+    else:
+        verdict = "clean"
+
+    # The name VT knows the file by is useful context -- often a malware family.
+    label = attrs.get("meaningful_name") or attrs.get("type_description", "")
+
+    return ProviderResult(
+        provider=name,
+        available=True,
+        verdict=verdict,
+        summary=f"{malicious}/{total} engines flag malicious"
+        + (f" · {label}" if label else ""),
+        details={
+            "malicious": malicious,
+            "suspicious": suspicious,
+            "total_engines": total,
+            "label": label,
+            "known": True,
+        },
+        link=report_link,
+    )
+
+
 class EnrichmentService:
     """Runs indicators through the configured providers, with caching."""
 
@@ -233,9 +346,13 @@ class EnrichmentService:
 
         results: list[ProviderResult] = []
         async with httpx.AsyncClient() as client:
-            if kind == "ip":
+            if kind == "hash":
+                results.append(await query_virustotal_file(client, indicator))
+            elif kind == "ip":
                 results.append(await query_abuseipdb(client, indicator))
-            results.append(await query_virustotal(client, indicator, kind))
+                results.append(await query_virustotal(client, indicator, kind))
+            else:  # domain
+                results.append(await query_virustotal(client, indicator, kind))
 
         enrichment = Enrichment(
             indicator=indicator, indicator_type=kind, results=results
