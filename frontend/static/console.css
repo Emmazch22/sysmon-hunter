@@ -1,0 +1,1117 @@
+/* ============================================================
+     Sysmon Hunter — analyst console
+
+     Design rule, applied throughout: colour is signal, never
+     decoration. The chrome is cold steel; the only saturated
+     colour in the interface encodes severity. If something is
+     bright, it matters.
+     ============================================================ */
+
+:root {
+    --bg: #0B0F14;
+    --surface: #111821;
+    --surface-2: #16202B;
+    --sunken: #0A0E13;
+    --border: #1F2C3A;
+    --border-hi: #2C3E52;
+
+    --text: #C9D6E3;
+    --text-dim: #7E90A3;
+    --text-mute: #55677A;
+
+    --struct: #3FB6C8;
+    /* structural accent: chrome, links, live state */
+    --attack: #8C7BE0;
+    /* ATT&CK technique identifiers */
+
+    /* Severity scale — the only saturated colour in the console */
+    --sev-info: #4A7FA5;
+    --sev-low: #3FB6C8;
+    --sev-medium: #DFA83C;
+    --sev-high: #E8743B;
+    --sev-critical: #E4453D;
+
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+    --display: 'Space Grotesk', system-ui, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg);
+    /* Faint grid: gives the surface a coordinate system without drawing focus */
+    background-image:
+        linear-gradient(rgba(63, 182, 200, .022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 182, 200, .022) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient scan line: a single dim band drifting down the viewport. Pure
+     atmosphere, pointer-events off, and disabled under reduced-motion. It reads
+     as "live surveillance surface" without competing with any real signal. */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(to bottom,
+            transparent 0%,
+            rgba(63, 182, 200, .03) 50%,
+            transparent 100%);
+    background-size: 100% 260px;
+    background-repeat: no-repeat;
+    animation: scan 7s linear infinite;
+    opacity: .6;
+}
+
+@keyframes scan {
+    0% {
+        background-position: 0 -260px;
+    }
+
+    100% {
+        background-position: 0 100vh;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body::after {
+        display: none;
+    }
+}
+
+main,
+header {
+    position: relative;
+    z-index: 2;
+}
+
+/* ---------- Icon system ----------
+     Inline SVGs, no icon font or external request. Every glyph is stroked with
+     currentColor, so an icon placed inside a severity-coloured element inherits
+     that severity automatically -- the icon obeys the same "colour is signal"
+     rule as everything else. */
+.ico {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.13em;
+}
+
+.ico-lg {
+    width: 15px;
+    height: 15px;
+}
+
+/* ---------- Header ---------- */
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 13px 22px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11, 15, 20, .88);
+    backdrop-filter: blur(10px);
+}
+
+.brand {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.brand span {
+    color: var(--struct);
+}
+
+nav.routes {
+    display: flex;
+    gap: 2px;
+}
+
+nav.routes a {
+    color: var(--text-mute);
+    text-decoration: none;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    transition: color .12s, border-color .12s;
+}
+
+nav.routes a:hover {
+    color: var(--struct);
+    border-color: var(--border-hi);
+}
+
+nav.routes a:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+.engine {
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+}
+
+.link {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-mute);
+}
+
+.led.on {
+    background: var(--struct);
+    animation: pulse 2.4s ease-out infinite;
+}
+
+.led.off {
+    background: var(--sev-critical);
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(63, 182, 200, .5);
+    }
+
+    70% {
+        box-shadow: 0 0 0 7px rgba(63, 182, 200, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(63, 182, 200, 0);
+    }
+}
+
+/* ---------- Layout ---------- */
+
+main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 18px;
+    padding: 18px 22px 60px;
+    max-width: 1560px;
+    margin: 0 auto;
+}
+
+.col {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+}
+
+/* ---------- Stat strip ---------- */
+
+.stats {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+}
+
+.stat {
+    background: var(--surface);
+    padding: 13px 16px;
+}
+
+.stat-label {
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-family: var(--display);
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-value.alarm {
+    color: var(--sev-critical);
+}
+
+.stat-value.small {
+    font-size: 15px;
+    padding-top: 6px;
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+}
+
+/* Corner ticks: two short hairlines at the top-left of each panel, like
+     registration marks on an instrument bezel. Subtle structural detail that
+     signals "read-out surface" rather than "web card". */
+.panel::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 9px;
+    height: 9px;
+    border-top: 1px solid var(--struct);
+    border-left: 1px solid var(--struct);
+    opacity: .5;
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+.panel-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.panel-title .ico {
+    color: var(--struct);
+}
+
+.panel-title b {
+    color: var(--struct);
+    font-weight: 700;
+}
+
+.panel-note {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+}
+
+.filters {
+    display: flex;
+    gap: 3px;
+}
+
+.filter {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.filter:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+.filter[aria-pressed="true"] {
+    color: var(--bg);
+    background: var(--struct);
+    border-color: var(--struct);
+}
+
+.filter:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+/* ---------- Severity spine ----------
+     The signature element. A vertical bar at the leading edge of every row,
+     coloured by severity. Critical rows are hatched as well as red, so the
+     distinction survives a colour-blind analyst and a badly calibrated
+     SOC monitor. */
+
+[data-sev] {
+    --sev: var(--sev-medium);
+}
+
+[data-sev="info"] {
+    --sev: var(--sev-info);
+}
+
+[data-sev="low"] {
+    --sev: var(--sev-low);
+}
+
+[data-sev="medium"] {
+    --sev: var(--sev-medium);
+}
+
+[data-sev="high"] {
+    --sev: var(--sev-high);
+}
+
+[data-sev="critical"] {
+    --sev: var(--sev-critical);
+}
+
+.spine {
+    background: var(--sev);
+}
+
+[data-sev="critical"] .spine {
+    background: repeating-linear-gradient(-45deg,
+            var(--sev-critical) 0 4px, #8E2621 4px 8px);
+}
+
+.sev-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 2px 6px;
+    white-space: nowrap;
+    color: var(--sev);
+    border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent);
+    background: color-mix(in srgb, var(--sev) 8%, transparent);
+}
+
+/* ---------- Incident queue ---------- */
+
+.queue {
+    max-height: 560px;
+    overflow-y: auto;
+}
+
+.inc {
+    display: grid;
+    grid-template-columns: 4px 1fr;
+    border-bottom: 1px solid var(--border);
+}
+
+.inc:last-child {
+    border-bottom: 0;
+}
+
+.inc-body {
+    padding: 13px 16px;
+}
+
+.inc-top {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.inc-id {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sev);
+    letter-spacing: .05em;
+}
+
+.inc-host {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.inc-host::before {
+    content: '@';
+    color: var(--text-mute);
+}
+
+.inc-score {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.inc-score b {
+    font-family: var(--display);
+    font-size: 17px;
+    color: var(--sev);
+    font-variant-numeric: tabular-nums;
+}
+
+.inc-score span {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-mute);
+}
+
+/* Watch badge: an incident the engine is tracking but has not promoted.
+     Present so the analyst can see what the engine is considering, not just
+     what it decided. */
+.watch {
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    border: 1px dashed var(--border-hi);
+    padding: 1px 6px;
+}
+
+/* The process chain is the hero of an incident row: it is the first
+     question a hunter asks, before the rule title. */
+.chain {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 9px 11px;
+    margin-bottom: 10px;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--sev);
+}
+
+.proc {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+}
+
+.proc:last-child {
+    color: var(--text);
+    border-color: var(--border-hi);
+}
+
+.arrow {
+    color: var(--sev);
+    font-size: 10px;
+}
+
+.inc-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.chips {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    font-size: 10px;
+    letter-spacing: .04em;
+    text-transform: none;
+    color: var(--attack);
+    padding: 1px 6px;
+    border: 1px solid color-mix(in srgb, var(--attack) 30%, transparent);
+}
+
+.drill {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--struct);
+    padding: 0;
+}
+
+.drill:hover {
+    text-decoration: underline;
+}
+
+.drill:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+/* Member detections, revealed on drill-down */
+.members {
+    margin-top: 11px;
+    border-top: 1px solid var(--border);
+}
+
+.member {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+    padding: 8px 0 0;
+    font-size: 11px;
+}
+
+.member-id {
+    color: var(--sev);
+    font-weight: 700;
+    font-size: 10px;
+}
+
+.member-title {
+    color: var(--text-dim);
+    flex: 1;
+    min-width: 160px;
+}
+
+.member-time {
+    color: var(--text-mute);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cmd {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 5px;
+    padding: 6px 9px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.cmd::before {
+    content: '$ ';
+    color: var(--text-mute);
+}
+
+/* ---------- Evidence panel ----------
+     Statistical detections (beacon, discovery burst) carry the numbers behind
+     the verdict. A finding that says only "beacon detected" is an assertion; the
+     analyst needs the interval, the jitter and the regularity to agree or push
+     back. This panel renders that supporting data inline on the member row. */
+
+.evidence {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 7px;
+    padding: 10px 11px;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--sev);
+}
+
+.evidence-head {
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 8px;
+}
+
+/* Metrics laid out as a compact label/value grid — the numbers an analyst
+     scans first (interval, jitter, regularity, count). */
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 8px 14px;
+    margin-bottom: 9px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metric-value {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.metric-value.accent {
+    color: var(--sev);
+}
+
+.metric-label {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+}
+
+/* A visual bar for regularity — a 0..1 score reads faster as a filled track
+     than as a bare decimal. Colour follows severity, so a near-metronomic
+     beacon glows the same critical red as the rest of the row. */
+.gauge {
+    margin-bottom: 9px;
+}
+
+.gauge-track {
+    height: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.gauge-fill {
+    height: 100%;
+    background: var(--sev);
+    transition: width .4s ease-out;
+}
+
+/* Sample commands or destinations behind the finding. */
+.evidence-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.evidence-list .row {
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 4px 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.evidence-list .row::before {
+    content: '$ ';
+    color: var(--text-mute);
+}
+
+.techniques-inline {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+/* ---------- Detection stream ---------- */
+
+.stream {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.det {
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    border-bottom: 1px solid var(--border);
+}
+
+.det:last-child {
+    border-bottom: 0;
+}
+
+.det-body {
+    padding: 9px 13px;
+    min-width: 0;
+}
+
+.det-top {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
+.det-id {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--sev);
+}
+
+.det-time {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-mute);
+    font-variant-numeric: tabular-nums;
+}
+
+.det-title {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Side panels ---------- */
+
+.bars {
+    padding: 13px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: 58px 1fr 26px;
+    align-items: center;
+    gap: 9px;
+}
+
+.bar-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-dim);
+}
+
+.bar-track {
+    height: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+
+.bar-fill {
+    height: 100%;
+    background: var(--c);
+    transition: width .35s ease-out;
+}
+
+.bar-count {
+    font-size: 11px;
+    text-align: right;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.tech-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tech-row:last-child {
+    border-bottom: 0;
+}
+
+.tech-id {
+    color: var(--attack);
+    font-size: 11px;
+}
+
+.tech-n {
+    color: var(--text-mute);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Empty states ----------
+     An empty screen is an instruction, not an apology. */
+
+.empty {
+    padding: 44px 24px;
+    text-align: center;
+}
+
+.empty-mark {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--struct);
+    margin-bottom: 9px;
+}
+
+.empty p {
+    color: var(--text-mute);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.empty code {
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+}
+
+.empty-sm {
+    padding: 26px 16px;
+}
+
+/* ---------- Scrollbars ---------- */
+
+.queue::-webkit-scrollbar,
+.stream::-webkit-scrollbar {
+    width: 8px;
+}
+
+.queue::-webkit-scrollbar-track,
+.stream::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+
+.queue::-webkit-scrollbar-thumb,
+.stream::-webkit-scrollbar-thumb {
+    background: var(--border-hi);
+}
+
+/* ---------- Motion ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+
+    .inc.fresh,
+    .det.fresh {
+        animation: land .45s ease-out;
+    }
+
+    @keyframes land {
+        from {
+            opacity: 0;
+            transform: translateY(-5px);
+            background: color-mix(in srgb, var(--sev) 12%, transparent);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+}
+
+@media (max-width: 1000px) {
+    main {
+        grid-template-columns: 1fr;
+    }
+
+    .link {
+        margin-left: 0;
+    }
+}
+
+/* ---------- Technique detail modal ----------
+     A technique chip is a lead, not a definition. Clicking it opens this panel
+     with the description straight from MITRE's dataset, so an analyst who does
+     not have T1490 memorised can read what it means without leaving the console
+     for the ATT&CK website. */
+
+.tech-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(6, 9, 13, .78);
+    backdrop-filter: blur(3px);
+}
+
+.tech-overlay.open {
+    display: flex;
+}
+
+.tech-modal {
+    width: min(560px, 100%);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    position: relative;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+
+/* Same corner tick as the panels, so the modal reads as part of the console. */
+.tech-modal::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 11px;
+    height: 11px;
+    border-top: 1px solid var(--attack);
+    border-left: 1px solid var(--attack);
+}
+
+.tech-modal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+.tech-modal-id {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .08em;
+    color: var(--attack);
+    border: 1px solid color-mix(in srgb, var(--attack) 40%, transparent);
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.tech-modal-titles {
+    flex: 1;
+    min-width: 0;
+}
+
+.tech-modal-name {
+    font-family: var(--display);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.tech-modal-tactics {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+}
+
+.tactic {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    border: 1px solid var(--border-hi);
+    padding: 1px 6px;
+}
+
+.tech-close {
+    background: none;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim);
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color .12s, border-color .12s;
+}
+
+.tech-close:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+.tech-close:focus-visible {
+    outline: 2px solid var(--attack);
+    outline-offset: 2px;
+}
+
+.tech-modal-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+}
+
+.tech-modal-body.loading {
+    color: var(--text-mute);
+    font-style: italic;
+}
+
+.tech-modal-foot {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+}
+
+.tech-modal-foot a {
+    color: var(--struct);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.tech-modal-foot a:hover {
+    text-decoration: underline;
+}
+
+/* Make every technique chip look and behave clickable. */
+.chip[data-technique] {
+    cursor: pointer;
+    transition: border-color .12s, color .12s;
+}
+
+.chip[data-technique]:hover {
+    color: var(--text);
+    border-color: var(--attack);
+}
+
+.chip[data-technique]:focus-visible {
+    outline: 2px solid var(--attack);
+    outline-offset: 1px;
+}

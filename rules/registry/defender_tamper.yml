@@ -2,7 +2,7 @@ id: SYS-031
 title: Windows Defender setting disabled via registry
 event_id: 13
 severity: high
-attack: [T1562.001]
+attack: [T1685]
 description: >
   A registry write targeted a Defender control that turns off real-time
   protection or adds a scan exclusion. Disabling defences is a standard step

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sysmon Hunter — Detection console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/console.css">
+</head>
+
+<body>
+
+    <!-- Icon sprite: defined once, referenced by <use href="#id"> throughout.
+     Inline so there is no external request and the glyphs inherit currentColor. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-shield" viewBox="0 0 24 24">
+            <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" />
+        </symbol>
+        <symbol id="i-beacon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1l2.1-2.1M17 7l2.1-2.1" />
+        </symbol>
+        <symbol id="i-recon" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+        </symbol>
+        <symbol id="i-process" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="14" rx="1" />
+            <path d="M3 8h18M7 12h6" />
+        </symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24">
+            <path d="M12 3l9 16H3l9-16z" />
+            <path d="M12 10v4M12 17v.5" />
+        </symbol>
+        <symbol id="i-stream" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h10" />
+        </symbol>
+        <symbol id="i-attack" viewBox="0 0 24 24">
+            <path d="M12 2v20M2 7l10 5 10-5M2 17l10 5 10-5M2 12l10 5 10-5" />
+        </symbol>
+        <symbol id="i-pulse" viewBox="0 0 24 24">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24">
+            <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5" />
+        </symbol>
+    </svg>
+
+    <header>
+        <div class="brand">
+            <svg class="ico ico-lg" style="color:var(--struct)">
+                <use href="#i-shield" />
+            </svg>
+            Sysmon <span>Hunter</span>
+        </div>
+        <nav class="routes" aria-label="API endpoints">
+            <a href="/api/docs" target="_blank" rel="noopener">API</a>
+            <a href="/incidents" target="_blank" rel="noopener">Raw</a>
+            <a href="/health" target="_blank" rel="noopener">Health</a>
+        </nav>
+        <div class="engine" id="engine">engine: starting</div>
+        <div class="link">
+            <span class="led" id="led"></span>
+            <span id="link-state">connecting</span>
+        </div>
+    </header>
+
+    <main>
+
+        <section class="stats">
+            <div class="stat">
+                <div class="stat-label">Incidents</div>
+                <div class="stat-value" id="s-incidents">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Needs triage</div>
+                <div class="stat-value" id="s-actionable">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Detections</div>
+                <div class="stat-value" id="s-detections">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Hosts</div>
+                <div class="stat-value" id="s-hosts">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Techniques</div>
+                <div class="stat-value" id="s-techniques">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Last event</div>
+                <div class="stat-value small" id="s-last">--:--:--</div>
+            </div>
+        </section>
+
+        <div class="col">
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">
+                        <svg class="ico">
+                            <use href="#i-layers" />
+                        </svg>
+                        Incident queue <b id="queue-count">0</b>
+                    </div>
+                    <div class="filters" role="group" aria-label="Filter incidents">
+                        <button class="filter" data-scope="triage" aria-pressed="true">Needs triage</button>
+                        <button class="filter" data-scope="all" aria-pressed="false">All</button>
+                    </div>
+                </div>
+                <div class="queue" id="queue">
+                    <div class="empty">
+                        <div class="empty-mark">Queue is clear</div>
+                        <p>
+                            The engine is listening. Send telemetry to <code>POST /ingest</code>,
+                            or fire an atomic on the lab VM to see a chain build.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <aside class="col">
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">
+                        <svg class="ico">
+                            <use href="#i-stream" />
+                        </svg>
+                        Detection stream
+                    </div>
+                    <div class="panel-note" id="stream-count">0</div>
+                </div>
+                <div class="stream" id="stream">
+                    <div class="empty empty-sm">
+                        <p>Nothing yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">
+                        <svg class="ico">
+                            <use href="#i-pulse" />
+                        </svg>
+                        Severity
+                    </div>
+                </div>
+                <div class="bars" id="bars"></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">
+                        <svg class="ico">
+                            <use href="#i-attack" />
+                        </svg>
+                        ATT&CK techniques
+                    </div>
+                </div>
+                <div id="techniques">
+                    <div class="empty empty-sm">
+                        <p>None observed.</p>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+    </main>
+
+    <!-- Technique detail modal: populated from /attack/{id} on chip click. -->
+    <div class="tech-overlay" id="tech-overlay" role="dialog" aria-modal="true" aria-labelledby="tech-name">
+        <div class="tech-modal">
+            <div class="tech-modal-head">
+                <span class="tech-modal-id" id="tech-id">T0000</span>
+                <div class="tech-modal-titles">
+                    <div class="tech-modal-name" id="tech-name"></div>
+                    <div class="tech-modal-tactics" id="tech-tactics"></div>
+                </div>
+                <button class="tech-close" id="tech-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="tech-modal-body" id="tech-body"></div>
+            <div class="tech-modal-foot">
+                <span>Source: MITRE ATT&CK</span>
+                <a id="tech-link" href="https://attack.mitre.org" target="_blank" rel="noopener">
+                    View on attack.mitre.org
+                    <svg class="ico">
+                        <use href="#i-attack" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/console.js"></script>
+</body>
+
+</html>

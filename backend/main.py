@@ -19,9 +19,11 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from backend.api import detections, incidents, ingest, ws
+from backend.api import attack, detections, incidents, ingest, ws
 from backend.config import BASE_DIR, settings
+from backend.engine.attack import attack_lookup
 from backend.engine.pipeline import pipeline
 from backend.engine.rule_loader import rule_store
 from backend.models import db
@@ -33,7 +35,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("hunter")
 
-CONSOLE = BASE_DIR / "frontend" / "dashboard.html"
+FRONTEND = BASE_DIR / "frontend"
+CONSOLE = FRONTEND / "console.html"
 
 # How often the background loop closes idle incidents and evicts dead processes.
 # Well under the correlation window, so an incident is never held open by
@@ -65,10 +68,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await db.init_db()
 
     count = rule_store.load(settings.rules_dir)
+    attack_lookup.load()
     if rule_store.errors:
         log.warning("%d rule(s) were rejected -- see /health", len(rule_store.errors))
     if count == 0:
-        log.warning("No rules loaded. The engine will accept events and detect nothing.")
+        log.warning(
+            "No rules loaded. The engine will accept events and detect nothing."
+        )
 
     sweeper = asyncio.create_task(_sweep_loop())
     log.info("%s ready with %d rules", settings.app_name, count)
@@ -93,6 +99,11 @@ app.include_router(ingest.router)
 app.include_router(detections.router)
 app.include_router(incidents.router)
 app.include_router(ws.router)
+app.include_router(attack.router)
+
+# Serve the console's CSS and JS. Split out of the HTML so each is cached and
+# edited on its own, rather than shipping one monolithic file.
+app.mount("/static", StaticFiles(directory=str(FRONTEND / "static")), name="static")
 
 
 @app.get("/", include_in_schema=False)
