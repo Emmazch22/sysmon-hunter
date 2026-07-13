@@ -16,7 +16,16 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, select
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    inspect,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -97,9 +106,28 @@ Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 
 
 async def init_db() -> None:
-    """Create tables if they do not exist. Safe to call on every startup."""
+    """Verify the database has been migrated. Does not create tables.
+
+    Schema ownership belongs to Alembic and nowhere else. An earlier version
+    called `create_all()` here, which quietly created any *missing* table but
+    could not alter an *existing* one -- so adding a column to a model produced
+    a server that started cleanly and then failed at the first query with
+    "no such column". The failure surfaced far from its cause.
+
+    Now startup fails immediately, with an instruction, if migrations are behind.
+    """
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        tables = await conn.run_sync(
+            lambda sync_conn: inspect(sync_conn).get_table_names()
+        )
+
+    missing = {"detections", "incidents"} - set(tables)
+    if missing:
+        raise RuntimeError(
+            f"Database is not migrated (missing tables: {', '.join(sorted(missing))}).\n"
+            f"Run:  python -m alembic upgrade head"
+        )
+
     log.info("Database ready at %s", settings.db_url)
 
 
