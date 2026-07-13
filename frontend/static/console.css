@@ -1351,3 +1351,139 @@ main {
     width: 13px;
     height: 13px;
 }
+
+/* ---------- Timeline node detail (popup) ----------
+     A floating panel to the right of the clicked node, so the timeline stays in
+     view while an analyst reads one step. On narrow screens it drops below the
+     timeline instead, since there is no room beside it. */
+
+.timeline-wrap {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.timeline-svg-col {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 460px;
+}
+
+.tl-popup-anchor {
+    position: absolute;
+    left: 460px;
+    /* just past the timeline column */
+    transform: translateY(-50%);
+    width: 340px;
+    z-index: 30;
+}
+
+.tl-detail {
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-left: 3px solid var(--sev);
+    padding: 13px 15px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+    position: relative;
+}
+
+/* A small pointer connecting the popup back to its node. */
+.tl-detail::before {
+    content: "";
+    position: absolute;
+    left: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid var(--border-hi);
+}
+
+.tl-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 14px;
+    margin-bottom: 4px;
+}
+
+.tl-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.tl-detail-key {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+}
+
+.tl-detail-val {
+    font-size: 11px;
+    color: var(--text);
+    word-break: break-all;
+}
+
+.tl-detail-val.hash {
+    color: var(--attack);
+    font-size: 10px;
+}
+
+.tl-detail-cmd,
+.tl-detail-parentcmd {
+    margin-top: 10px;
+    padding: 8px 10px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.tl-detail-cmd::before {
+    content: "$ ";
+    color: var(--text-mute);
+}
+
+.tl-detail-parentcmd {
+    color: var(--text-mute);
+}
+
+.tl-detail-parentcmd .tl-detail-key {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.tl-detail-tech {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+/* Narrow screens: no room to the right, so the popup becomes a block below. */
+@media (max-width: 900px) {
+    .timeline-wrap {
+        display: block;
+    }
+
+    .timeline-svg-col {
+        max-width: 100%;
+    }
+
+    .tl-popup-anchor {
+        position: static;
+        transform: none;
+        width: 100%;
+        left: auto;
+        margin-top: 10px;
+    }
+
+    .tl-detail::before {
+        display: none;
+    }
+}

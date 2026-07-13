@@ -25,6 +25,7 @@ const state = {
     detections: [],         // append-only stream, oldest first
     expanded: new Set(),    // incident ids currently drilled into
     timelineFor: new Set(), // incident ids showing the timeline view instead of the list
+    timelineNode: new Map(), // incidentId -> index of the expanded timeline node
     scope: "triage",        // "triage" (actionable only) or "all"
 };
 
@@ -142,7 +143,7 @@ function incidentHtml(incident, isFresh) {
  *  Nodes inherit severity colour; criticals get a halo. It is the same picture
  *  an analyst sketches on paper during triage.
  */
-function timelineSvg(detections) {
+function timelineSvg(detections, incidentId) {
     if (!detections.length) return "";
 
     const sorted = [...detections].sort(
@@ -154,20 +155,20 @@ function timelineSvg(detections) {
     const width = 440;
     const top = 14;
     const height = top + sorted.length * rowH + 10;
-
     const y = (i) => top + i * rowH + rowH / 2;
 
-    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="timeline-svg" role="img" aria-label="Incident timeline">`;
+    // Which node, if any, is expanded on this incident's timeline.
+    const selected = state.timelineNode.get(incidentId);
 
-    // The spine: a vertical line the nodes hang from.
+    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="timeline-svg" role="img" aria-label="Incident timeline">`;
     svg += `<line x1="${spineX}" y1="${y(0)}" x2="${spineX}" y2="${y(sorted.length - 1)}" stroke="var(--border-hi)" stroke-width="1"/>`;
 
     sorted.forEach((d, i) => {
         const sev = (d.severity || "medium").toLowerCase();
         const color = `var(--sev-${sev})`;
         const cy = y(i);
+        const isSelected = selected === i;
 
-        // Gap label between this node and the previous one.
         if (i > 0) {
             const gapMs = new Date(d.matched_at) - new Date(sorted[i - 1].matched_at);
             const gap = humanGap(gapMs);
@@ -176,22 +177,98 @@ function timelineSvg(detections) {
             }
         }
 
-        // Timestamp on the left.
         svg += `<text x="${spineX - 18}" y="${cy + 3}" fill="var(--text-mute)" font-size="9" font-family="monospace" text-anchor="end">${clockTime(d.matched_at)}</text>`;
 
-        // Node, with a halo for criticals so the eye lands on them first.
-        if (sev === "critical") {
+        // Selected node gets a filled halo; criticals always get a faint one.
+        if (isSelected) {
+            svg += `<circle cx="${spineX}" cy="${cy}" r="10" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+        } else if (sev === "critical") {
             svg += `<circle cx="${spineX}" cy="${cy}" r="9" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
         }
         svg += `<circle cx="${spineX}" cy="${cy}" r="5" fill="${color}"/>`;
 
-        // Rule id + process to the right.
         svg += `<text x="${spineX + 16}" y="${cy - 2}" fill="${color}" font-size="11" font-weight="700" font-family="monospace">${escapeHtml(d.rule_id)}</text>`;
         svg += `<text x="${spineX + 16}" y="${cy + 11}" fill="var(--text-dim)" font-size="9" font-family="monospace">${escapeHtml(baseName(d.image))}</text>`;
+
+        // A transparent hit area spanning the whole row, so the click target is the
+        // entire band, not just the 5px dot. The chevron hints it is expandable.
+        svg += `<rect x="0" y="${cy - rowH / 2}" width="${width}" height="${rowH}" fill="transparent" style="cursor:pointer" data-timeline-node="${i}" data-incident="${escapeHtml(incidentId)}"><title>Click for detail</title></rect>`;
+        svg += `<text x="${width - 8}" y="${cy + 3}" fill="var(--text-mute)" font-size="10" text-anchor="end" style="pointer-events:none">${isSelected ? "\u25be" : "\u203a"}</text>`;
     });
 
     svg += `</svg>`;
-    return svg;
+
+    // Detail popup for the selected node, floated to the right of its row rather
+    // than pushed below the timeline, so the sequence stays in view while an
+    // analyst reads one step. Positioned by the node's vertical offset.
+    let popup = "";
+    if (selected != null && sorted[selected]) {
+        const nodeY = y(selected);
+        // As a fraction of the SVG height, so it tracks the node when the SVG scales.
+        const topPct = (nodeY / height) * 100;
+        popup = `<div class="tl-popup-anchor" style="top:${topPct}%">${timelineDetail(sorted[selected])}</div>`;
+    }
+
+    return `<div class="timeline-wrap"><div class="timeline-svg-col">${svg}</div>${popup}</div>`;
+}
+
+/** The expandable detail for one timeline node: the full forensic picture of
+ *  that detection -- command line, user, privileges, parent process, hashes.
+ *  This is what turns the timeline from a picture into an investigation tool:
+ *  click a step, see exactly what ran and as whom. */
+function timelineDetail(d) {
+    const f = d.forensics || {};
+    const rows = [];
+
+    const push = (label, value) => {
+        if (value) rows.push(
+            `<div class="tl-detail-row"><span class="tl-detail-key">${escapeHtml(label)}</span>` +
+            `<span class="tl-detail-val">${escapeHtml(value)}</span></div>`
+        );
+    };
+
+    push("Rule", `${d.rule_id} — ${d.title || ""}`);
+    push("Time", fmtFullTime(d.matched_at));
+    push("Process", d.image);
+    push("Parent", d.parent_image);
+    push("User", f.user);
+    push("Integrity", f.integrity_level);
+    push("PID", f.process_id);
+    push("Parent PID", f.parent_process_id);
+    push("Working dir", f.current_directory);
+    push("Logon ID", f.logon_id);
+    push("Session", f.session_id);
+    push("Destination", f.destination_ip ? `${f.destination_ip}:${f.destination_port || "?"}` + (f.destination_hostname ? ` (${f.destination_hostname})` : "") : "");
+    push("Target", f.target_image);
+    push("Access", f.granted_access);
+    push("Registry key", f.registry_key);
+    push("Named pipe", f.pipe_name);
+    push("DNS query", f.dns_query);
+
+    const cmd = d.command_line
+        ? `<div class="tl-detail-cmd">${escapeHtml(d.command_line)}</div>` : "";
+    const parentCmd = f.parent_command_line
+        ? `<div class="tl-detail-parentcmd"><span class="tl-detail-key">Parent cmd</span>${escapeHtml(f.parent_command_line)}</div>` : "";
+    const hashes = f.hashes
+        ? `<div class="tl-detail-row"><span class="tl-detail-key">Hashes</span><span class="tl-detail-val hash">${escapeHtml(f.hashes)}</span></div>` : "";
+
+    const techniques = (d.attack || [])
+        .map((t) => `<span class="chip" data-technique="${escapeHtml(t)}" role="button" tabindex="0">${escapeHtml(t)}</span>`)
+        .join(" ");
+
+    return `
+    <div class="tl-detail" data-sev="${escapeHtml((d.severity || "medium").toLowerCase())}">
+      <div class="tl-detail-grid">${rows.join("")}${hashes}</div>
+      ${cmd}
+      ${parentCmd}
+      ${techniques ? `<div class="tl-detail-tech">${techniques}</div>` : ""}
+    </div>`;
+}
+
+/** Full timestamp for the detail panel: date + time, not just the clock. */
+function fmtFullTime(iso) {
+    if (!iso) return "";
+    return new Date(iso).toLocaleString("en-GB", { hour12: false });
 }
 
 /** A compact human gap: "3s", "5m", "2h". Empty for sub-second gaps, which are
@@ -229,7 +306,7 @@ function membersHtml(incident) {
     // fired" and "in what order it unfolded".
     const showTimeline = state.timelineFor.has(incident.id);
     const timeline = showTimeline
-        ? `<div class="timeline">${timelineSvg(incident._members)}</div>`
+        ? `<div class="timeline">${timelineSvg(incident._members, incident.id)}</div>`
         : `<div class="members">${rows}</div>`;
 
     return `
@@ -631,6 +708,17 @@ function closeTechnique() {
 document.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-technique]");
     if (chip) openTechnique(chip.dataset.technique);
+
+    // Expand or collapse a timeline node's detail.
+    const node = event.target.closest("[data-timeline-node]");
+    if (node) {
+        const id = node.dataset.incident;
+        const idx = parseInt(node.dataset.timelineNode, 10);
+        if (state.timelineNode.get(id) === idx) state.timelineNode.delete(id);
+        else state.timelineNode.set(id, idx);
+        renderQueue();
+        return;
+    }
 
     // Switch an expanded incident between list and timeline view.
     const tab = event.target.closest(".view-tab");
