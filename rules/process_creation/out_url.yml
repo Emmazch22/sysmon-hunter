@@ -1,0 +1,16 @@
+id: SYS-037
+title: rundll32 executing a URL or file handler via url.dll
+event_id: 1
+severity: high
+attack: [T1218.011, T1204.001]
+description: >
+  rundll32 invoked url.dll or ieframe.dll with OpenURL or FileProtocolHandler.
+  These exported functions open a URL or launch a file through the shell's
+  protocol handlers, and attackers abuse them to execute payloads (binaries,
+  HTAs, scripts) while hiding behind a signed Microsoft binary. This is a
+  documented LOLBAS technique with no legitimate use in this form.
+detection:
+  image|endswith: '\rundll32.exe'
+  command_line|re:
+    - '\b(url|ieframe|shdocvw)\.dll\s*,\s*(openurl|fileprotocolhandler)'
+condition: all

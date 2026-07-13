@@ -81,6 +81,43 @@ CASES = [
         event(10, TargetImage=r"C:\W\explorer.exe", GrantedAccess="0x1410"),
     ),
     # --- Ostap chain rules, validated against the real EVTX sample ---
+    # --- WinPwnage url.dll LOLBin, validated against the real EVTX sample ---
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"rundll32.exe  url.dll,OpenURL file://C:/Windows/system32/calc.exe",
+        ),
+    ),
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"rundll32.exe  url.dll,FileProtocolHandler file:///C:/programdata/calc.hta",
+        ),
+    ),
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r'"C:\Windows\System32\rundll32.exe" ieframe.dll,OpenURL c:\temp\x.url',
+        ),
+    ),
+    (
+        "SYS-037",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"rundll32.exe shell32.dll,Control_RunDLL desk.cpl",
+        ),
+    ),
     (
         "SYS-034",
         True,

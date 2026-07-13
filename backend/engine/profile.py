@@ -28,6 +28,7 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1566.001": "initial-access",
     "T1204": "execution",
     "T1204.002": "execution",
+    "T1204.001": "execution",
     "T1059": "execution",
     "T1059.001": "execution",
     "T1027": "execution",
@@ -111,6 +112,8 @@ def _phrase_for_tactic(
             details.append("ran a malicious .cpl disguised as a document")
         if "SYS-036" in rule_ids:
             details.append("used rundll32 to launch a script host")
+        if "SYS-037" in rule_ids:
+            details.append("executed a payload via rundll32 url.dll handlers")
         return (
             "evaded defenses (" + ", ".join(details) + ")"
             if details
