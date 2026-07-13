@@ -119,6 +119,9 @@ function incidentHtml(incident, isFresh) {
           <button class="drill" data-incident="${escapeHtml(incident.id)}">
             ${expanded ? "Hide detections" : "Show detections"}
           </button>
+          <a class="open-tab" href="/incident/${escapeHtml(incident.id)}" target="_blank" rel="noopener" title="Open full incident view in a new tab" aria-label="Open in new tab">
+            <svg class="ico"><use href="#i-external"/></svg>
+          </a>
         </div>
 
         ${members}

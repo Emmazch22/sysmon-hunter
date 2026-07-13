@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api import attack, detections, enrich, incidents, ingest, ws
+from backend.api import attack, detections, enrich, incidents, ingest, report, ws
 from backend.config import BASE_DIR, settings
 from backend.engine.attack import attack_lookup
 from backend.engine.enrichment import enrichment_service
@@ -102,6 +102,7 @@ app.include_router(incidents.router)
 app.include_router(ws.router)
 app.include_router(attack.router)
 app.include_router(enrich.router)
+app.include_router(report.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
@@ -112,6 +113,13 @@ app.mount("/static", StaticFiles(directory=str(FRONTEND / "static")), name="stat
 async def console() -> FileResponse:
     """Serve the analyst console."""
     return FileResponse(CONSOLE)
+
+
+@app.get("/incident/{incident_id}", include_in_schema=False)
+async def incident_page(incident_id: str) -> FileResponse:
+    """Serve the full-page incident view. The page reads the id from the URL and
+    fetches the incident client-side, so the same static file serves any id."""
+    return FileResponse(FRONTEND / "incident.html")
 
 
 @app.get("/health", tags=["ops"])

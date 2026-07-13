@@ -17,6 +17,40 @@ from typing import Any
 from backend.models.db import DetectionRow, IncidentRow
 from backend.models.schemas import Detection, Incident
 
+_FORENSIC_FIELDS = {
+    "User": "user",
+    "IntegrityLevel": "integrity_level",
+    "LogonId": "logon_id",
+    "ProcessId": "process_id",
+    "ParentProcessId": "parent_process_id",
+    "ParentCommandLine": "parent_command_line",
+    "CurrentDirectory": "current_directory",
+    "Hashes": "hashes",
+    "TerminalSessionId": "session_id",
+    "OriginalFileName": "original_file_name",
+    "Company": "company",
+    "Product": "product",
+    "DestinationIp": "destination_ip",
+    "DestinationPort": "destination_port",
+    "DestinationHostname": "destination_hostname",
+    "TargetImage": "target_image",
+    "TargetFilename": "target_filename",
+    "TargetObject": "registry_key",
+    "GrantedAccess": "granted_access",
+    "PipeName": "pipe_name",
+    "QueryName": "dns_query",
+}
+
+
+def _forensics(raw: dict[str, Any]) -> dict[str, Any]:
+    """Pull investigation-relevant fields out of a raw Sysmon event. Only fields
+    actually present are returned, so the block reflects what the event was."""
+    return {
+        label: raw[f]
+        for f, label in _FORENSIC_FIELDS.items()
+        if raw.get(f) not in (None, "")
+    }
+
 
 def serialize_detection(detection: Detection) -> dict[str, Any]:
     """A live detection, straight from the engine."""
@@ -32,6 +66,7 @@ def serialize_detection(detection: Detection) -> dict[str, Any]:
         "command_line": event.command_line,
         "incident_id": detection.incident_id,
         "evidence": detection.evidence,
+        "forensics": _forensics(event.raw),
         "matched_at": detection.matched_at.isoformat(),
     }
 
@@ -49,6 +84,7 @@ def serialize_detection_row(row: DetectionRow) -> dict[str, Any]:
         "command_line": row.command_line,
         "incident_id": row.incident_id,
         "evidence": row.evidence or {},
+        "forensics": _forensics(row.raw_event or {}),
         "matched_at": row.matched_at.isoformat(),
     }
 

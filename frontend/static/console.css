@@ -1328,3 +1328,26 @@ main {
 .timeline-svg {
     display: block;
 }
+
+/* Open-in-new-tab link on an incident row: leads to the full-page view. */
+.open-tab {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-mute);
+    padding: 2px;
+    transition: color .12s;
+}
+
+.open-tab:hover {
+    color: var(--struct);
+}
+
+.open-tab:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+.open-tab .ico {
+    width: 13px;
+    height: 13px;
+}

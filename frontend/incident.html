@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Incident — Sysmon Hunter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/console.css">
+    <style>
+        /* Full-page incident view. Reuses the console's variables (loaded from
+     console.css) and adds only the layout this dedicated page needs. */
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 28px 22px 80px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-mute);
+            text-decoration: none;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .back:hover {
+            color: var(--struct);
+        }
+
+        .ih-spine {
+            height: 4px;
+            width: 100%;
+            background: var(--sev);
+            margin-bottom: 16px;
+        }
+
+        .ih-title {
+            font-family: var(--display);
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.15;
+        }
+
+        .ih-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: var(--text-dim);
+            align-items: center;
+        }
+
+        .ih-sev {
+            color: var(--sev);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            font-size: 11px;
+        }
+
+        .ih-id {
+            color: var(--text-mute);
+        }
+
+        .ih-actions {
+            margin-top: 18px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            color: var(--struct);
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: color .12s, border-color .12s;
+        }
+
+        .action-btn:hover {
+            color: var(--text);
+            border-color: var(--struct);
+        }
+
+        .action-btn.primary {
+            background: var(--struct);
+            color: var(--bg);
+            border-color: var(--struct);
+        }
+
+        .action-btn.primary:hover {
+            color: var(--bg);
+            opacity: .9;
+        }
+
+        .section {
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--struct);
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+        }
+
+        .summary-cell {
+            background: var(--surface);
+            padding: 12px 14px;
+        }
+
+        .summary-label {
+            font-size: 10px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+            margin-bottom: 5px;
+        }
+
+        .summary-value {
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .det-card {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            margin-bottom: 14px;
+            position: relative;
+        }
+
+        .det-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--sev);
+        }
+
+        .det-card-head {
+            padding: 13px 16px 13px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .det-card-rule {
+            font-weight: 700;
+            color: var(--sev);
+            font-size: 13px;
+        }
+
+        .det-card-title {
+            color: var(--text-dim);
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .det-card-time {
+            float: right;
+            color: var(--text-mute);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .det-card-body {
+            padding: 14px 16px 14px 20px;
+        }
+
+        .forensic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 10px 20px;
+        }
+
+        .forensic-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .forensic-key {
+            font-size: 9px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+        }
+
+        .forensic-val {
+            font-size: 11px;
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .forensic-val.hash {
+            color: var(--attack);
+            font-size: 10px;
+        }
+
+        .loading,
+        .error {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-mute);
+        }
+
+        .error-mark {
+            font-family: var(--display);
+            color: var(--sev-critical);
+            font-size: 13px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Icon sprite (subset needed here) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-back" viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6" />
+        </symbol>
+        <symbol id="i-download" viewBox="0 0 24 24">
+            <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+        </symbol>
+        <symbol id="i-attack" viewBox="0 0 24 24">
+            <path d="M12 2v20M2 7l10 5 10-5M2 17l10 5 10-5M2 12l10 5 10-5" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
+        </symbol>
+    </svg>
+
+    <div class="page" id="page">
+        <div class="loading">Loading incident&hellip;</div>
+    </div>
+
+    <script>
+        "use strict";
+
+        const SEVERITY_VAR = {
+            critical: "var(--sev-critical)", high: "var(--sev-high)",
+            medium: "var(--sev-medium)", low: "var(--sev-low)", info: "var(--sev-info)",
+        };
+
+        const FORENSIC_LABELS = {
+            user: "User", integrity_level: "Integrity level", logon_id: "Logon ID",
+            session_id: "Session ID", process_id: "PID", parent_process_id: "Parent PID",
+            parent_command_line: "Parent command line", current_directory: "Working directory",
+            hashes: "Hashes", original_file_name: "Original filename", company: "Signer",
+            product: "Product", destination_ip: "Destination IP", destination_port: "Destination port",
+            destination_hostname: "Destination host", target_image: "Target process",
+            target_filename: "Target file", registry_key: "Registry key",
+            granted_access: "Granted access", pipe_name: "Named pipe", dns_query: "DNS query",
+        };
+
+        function esc(v) {
+            return String(v ?? "").replace(/[&<>"']/g, (c) =>
+                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+        function baseName(p) { return p ? String(p).split(/[\\/]/).pop() : "unknown"; }
+        function fmtTime(iso) {
+            if (!iso) return "unknown";
+            const d = new Date(iso);
+            return d.toLocaleString("en-GB", { hour12: false });
+        }
+
+        /** The incident id is the last path segment: /incident/{id} */
+        function incidentId() {
+            const parts = location.pathname.split("/").filter(Boolean);
+            return parts[parts.length - 1];
+        }
+
+        async function load() {
+            const id = incidentId();
+            let data;
+            try {
+                const r = await fetch(`/incidents/${id}`);
+                if (!r.ok) throw new Error(String(r.status));
+                data = await r.json();
+            } catch {
+                document.getElementById("page").innerHTML = `
+      <a class="back" href="/"><svg class="ico"><use href="#i-back"/></svg> Console</a>
+      <div class="error"><div class="error-mark">Incident not found</div>
+      <p>No incident with id ${esc(id)}.</p></div>`;
+                return;
+            }
+            render(data);
+        }
+
+        function render(inc) {
+            const sev = (inc.severity || "medium").toLowerCase();
+            const sevColor = SEVERITY_VAR[sev] || SEVERITY_VAR.medium;
+            document.documentElement.style.setProperty("--sev", sevColor);
+
+            const detections = inc.detections || [];
+
+            const summary = [
+                ["Host", inc.host],
+                ["Severity", `${sev} · score ${inc.score}`],
+                ["Detections", String(inc.detection_count ?? detections.length)],
+                ["First seen", fmtTime(inc.first_seen)],
+                ["Last seen", fmtTime(inc.last_seen)],
+                ["Process chain", (inc.chain || []).join("  →  ") || "unknown"],
+            ].map(([k, v]) => `
+    <div class="summary-cell">
+      <div class="summary-label">${esc(k)}</div>
+      <div class="summary-value">${esc(v)}</div>
+    </div>`).join("");
+
+            const techniques = (inc.techniques || []).map((t) =>
+                `<span class="chip" data-technique="${esc(t)}" role="button" tabindex="0">${esc(t)}</span>`
+            ).join(" ");
+
+            const cards = detections.map((d) => detectionCard(d)).join("");
+
+            document.getElementById("page").innerHTML = `
+    <a class="back" href="/"><svg class="ico"><use href="#i-back"/></svg> Console</a>
+
+    <div class="ih-spine"></div>
+    <div class="ih-title">${esc(inc.title || "Suspicious activity")}</div>
+    <div class="ih-meta">
+      <span class="ih-sev">${esc(sev)}</span>
+      <span>score ${esc(inc.score)}</span>
+      <span>${esc(inc.host)}</span>
+      <span class="ih-id">#${esc(inc.id)}</span>
+    </div>
+
+    <div class="ih-actions">
+      <a class="action-btn primary" href="/incidents/${esc(inc.id)}/report" target="_blank" rel="noopener">
+        <svg class="ico"><use href="#i-download"/></svg> Download PDF report
+      </a>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-clock"/></svg> Summary</div>
+      <div class="summary-grid">${summary}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-attack"/></svg> ATT&amp;CK techniques</div>
+      <div class="chips">${techniques || '<span class="summary-value">none</span>'}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Detections (${detections.length})</div>
+      ${cards}
+    </div>`;
+        }
+
+        function detectionCard(d) {
+            const sev = (d.severity || "medium").toLowerCase();
+            const sevColor = SEVERITY_VAR[sev] || SEVERITY_VAR.medium;
+            const forensics = d.forensics || {};
+
+            const forensicItems = Object.entries(forensics).map(([k, v]) => {
+                const isHash = k === "hashes";
+                return `
+      <div class="forensic-item">
+        <span class="forensic-key">${esc(FORENSIC_LABELS[k] || k)}</span>
+        <span class="forensic-val${isHash ? " hash" : ""}">${esc(v)}</span>
+      </div>`;
+            }).join("");
+
+            const cmd = d.command_line
+                ? `<div class="cmd" style="margin-bottom:12px">${esc(d.command_line)}</div>` : "";
+
+            return `
+    <div class="det-card" style="--sev:${sevColor}">
+      <div class="det-card-head">
+        <span class="det-card-time">${fmtTime(d.matched_at)}</span>
+        <div class="det-card-rule">${esc(d.rule_id)}</div>
+        <div class="det-card-title">${esc(d.title || "")}</div>
+      </div>
+      <div class="det-card-body">
+        ${cmd}
+        ${forensicItems ? `<div class="forensic-grid">${forensicItems}</div>` : '<div class="summary-value" style="color:var(--text-mute)">No additional forensic fields on this event.</div>'}
+      </div>
+    </div>`;
+        }
+
+        // Technique chips open MITRE in a new tab here (no modal on this page).
+        document.addEventListener("click", (e) => {
+            const chip = e.target.closest("[data-technique]");
+            if (chip) {
+                const t = chip.dataset.technique;
+                window.open(`https://attack.mitre.org/techniques/${t.replace(".", "/")}`, "_blank", "noopener");
+            }
+        });
+
+        load();
+    </script>
+</body>
+
+</html>
