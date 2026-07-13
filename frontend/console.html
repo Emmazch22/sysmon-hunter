@@ -116,6 +116,15 @@
                         <button class="filter" data-scope="all" aria-pressed="false">All</button>
                     </div>
                 </div>
+                <div class="search-bar">
+                    <svg class="ico search-ico">
+                        <use href="#i-recon" />
+                    </svg>
+                    <input type="text" id="search-input" class="search-input" autocomplete="off"
+                        placeholder="Search:  mimikatz   ·   host:WKSTN-FINANCE-04   ·   technique:t1003   ·   severity:critical">
+                    <button class="search-clear" id="search-clear" aria-label="Clear search" hidden>&times;</button>
+                </div>
+                <div class="search-hint" id="search-hint" hidden></div>
                 <div class="queue" id="queue">
                     <div class="empty">
                         <div class="empty-mark">Queue is clear</div>

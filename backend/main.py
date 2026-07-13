@@ -21,7 +21,16 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api import attack, detections, enrich, incidents, ingest, report, ws
+from backend.api import (
+    attack,
+    detections,
+    enrich,
+    incidents,
+    ingest,
+    report,
+    search,
+    ws,
+)
 from backend.config import BASE_DIR, settings
 from backend.engine.attack import attack_lookup
 from backend.engine.enrichment import enrichment_service
@@ -103,6 +112,7 @@ app.include_router(ws.router)
 app.include_router(attack.router)
 app.include_router(enrich.router)
 app.include_router(report.router)
+app.include_router(search.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.

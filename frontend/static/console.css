@@ -1487,3 +1487,74 @@ main {
         display: none;
     }
 }
+
+/* ---------- Search ----------
+     One box for free text and field filters, between the queue header and the
+     list. When a search is active it overrides the triage/all filter. */
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+.search-ico {
+    color: var(--text-mute);
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+}
+
+.search-input::placeholder {
+    color: var(--text-mute);
+}
+
+.search-bar:focus-within {
+    background: var(--sunken);
+}
+
+.search-bar:focus-within .search-ico {
+    color: var(--struct);
+}
+
+.search-clear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-mute);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+    flex-shrink: 0;
+}
+
+.search-clear:hover {
+    color: var(--text);
+}
+
+.search-hint {
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--sunken);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: .04em;
+}
+
+.search-parsed {
+    color: var(--struct);
+}

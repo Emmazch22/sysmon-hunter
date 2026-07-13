@@ -27,6 +27,8 @@ const state = {
     timelineFor: new Set(), // incident ids showing the timeline view instead of the list
     timelineNode: new Map(), // incidentId -> index of the expanded timeline node
     scope: "triage",        // "triage" (actionable only) or "all"
+    searchQuery: "",        // active search text; empty means no search
+    searchResults: null,    // array of incident ids matching the search, or null when not searching
 };
 
 const $ = (id) => document.getElementById(id);
@@ -416,8 +418,17 @@ function metric(value, label, accent = false) {
 
 function visibleIncidents() {
     const all = [...state.incidents.values()];
+
+    // An active search overrides the triage/all filter: when you search, you want
+    // to search everything, not just what happened to be in the current view.
+    if (state.searchResults !== null) {
+        const order = new Map(state.searchResults.map((id, i) => [id, i]));
+        return all
+            .filter((i) => order.has(i.id))
+            .sort((a, b) => order.get(a.id) - order.get(b.id));  // keep server ranking
+    }
+
     const scoped = state.scope === "triage" ? all.filter((i) => i.actionable) : all;
-    // Newest first: the analyst wants the freshest thing at the top of the queue.
     return scoped.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
 }
 
@@ -426,6 +437,15 @@ function renderQueue(freshId = null) {
     $("queue-count").textContent = list.length;
 
     if (!list.length) {
+        if (state.searchResults !== null) {
+            $("queue").innerHTML = `
+        <div class="empty">
+          <div class="empty-mark">No matches</div>
+          <p>Nothing matches <code>${escapeHtml(state.searchQuery)}</code>. Try a
+          broader term, or a filter like <code>severity:critical</code>.</p>
+        </div>`;
+            return;
+        }
         const triaging = state.scope === "triage";
         $("queue").innerHTML = `
       <div class="empty">
@@ -830,4 +850,82 @@ document.addEventListener("click", (event) => {
     if (!button) return;
     const slot = button.closest(".enrich-slot");
     enrichIndicator(button.dataset.enrich, slot);
+});
+
+
+/* ============================================================
+   Search
+
+   One box for free text and field filters. Typing runs a debounced query
+   against /search; the queue then shows only matching incidents, ranked by the
+   server. Clearing the box restores the normal triage/all view.
+   ============================================================ */
+
+let searchTimer = null;
+
+function runSearch(raw) {
+    const query = raw.trim();
+    state.searchQuery = query;
+
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) clearBtn.hidden = query.length === 0;
+
+    if (!query) {
+        state.searchResults = null;
+        hideSearchHint();
+        renderQueue();
+        return;
+    }
+
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+        try {
+            const data = await fetch(`/search?q=${encodeURIComponent(query)}`).then((r) => r.json());
+            // The search can surface incidents not currently in memory (e.g. filtered
+            // out of the triage view); fold them in so they can be rendered.
+            for (const result of data.results) {
+                state.incidents.set(result.incident.id, {
+                    ...state.incidents.get(result.incident.id),
+                    ...result.incident,
+                });
+            }
+            state.searchResults = data.results.map((r) => r.incident.id);
+            showSearchHint(data);
+            renderQueue();
+        } catch {
+            hideSearchHint();
+        }
+    }, 200);
+}
+
+function showSearchHint(data) {
+    const hint = document.getElementById("search-hint");
+    if (!hint) return;
+    const p = data.parsed;
+    const bits = [];
+    if (p.text.length) bits.push(`text: ${p.text.map(escapeHtml).join(" ")}`);
+    for (const [k, v] of Object.entries(p.filters)) bits.push(`${escapeHtml(k)}: ${escapeHtml(v)}`);
+    hint.innerHTML = `${data.total} match${data.total === 1 ? "" : "es"}` +
+        (bits.length ? ` &nbsp;·&nbsp; <span class="search-parsed">${bits.join(" &nbsp;·&nbsp; ")}</span>` : "");
+    hint.hidden = false;
+}
+
+function hideSearchHint() {
+    const hint = document.getElementById("search-hint");
+    if (hint) hint.hidden = true;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("search-input");
+    const clear = document.getElementById("search-clear");
+    if (input) input.addEventListener("input", (e) => runSearch(e.target.value));
+    if (clear) clear.addEventListener("click", () => {
+        if (input) input.value = "";
+        runSearch("");
+        if (input) input.focus();
+    });
+    // Escape clears the search when the box is focused.
+    if (input) input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { input.value = ""; runSearch(""); }
+    });
 });
