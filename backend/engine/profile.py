@@ -34,7 +34,10 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1105": "command-and-control",
     "T1218": "defense-evasion",
     "T1218.011": "defense-evasion",
+    "T1218.002": "defense-evasion",
     "T1036.005": "defense-evasion",
+    "T1059.005": "execution",
+    "T1059.007": "execution",
     "T1562.001": "defense-evasion",
     "T1685": "defense-evasion",
     "T1547.001": "persistence",
@@ -90,6 +93,8 @@ def _phrase_for_tactic(
     if tactic == "execution":
         if any(r == "SYS-002" or r == "SYS-009" for r in rule_ids):
             return "executed an obfuscated PowerShell payload in memory"
+        if "SYS-035" in rule_ids:
+            return "executed an encoded script via the Windows Script Host"
         return "executed a suspicious payload"
 
     if tactic == "defense-evasion":
@@ -102,6 +107,10 @@ def _phrase_for_tactic(
             details.append("staged a payload with a living-off-the-land binary")
         if "SYS-007" in rule_ids:
             details.append("masqueraded as a system process")
+        if "SYS-034" in rule_ids:
+            details.append("ran a malicious .cpl disguised as a document")
+        if "SYS-036" in rule_ids:
+            details.append("used rundll32 to launch a script host")
         return (
             "evaded defenses (" + ", ".join(details) + ")"
             if details

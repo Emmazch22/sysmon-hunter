@@ -1,0 +1,15 @@
+id: SYS-035
+title: Script host executing an encoded script
+event_id: 1
+severity: high
+attack: [T1059.005, T1059.007, T1027]
+description: >
+  wscript or cscript was invoked with JScript.Encode or VBScript.Encode, which
+  runs an obfuscated script. Malware uses encoded scripts to hide payloads from
+  casual inspection and signature-based tools. The script running from a .txt in
+  Temp is an additional red flag.
+detection:
+  image|endswith: ['\wscript.exe', '\cscript.exe']
+  command_line|re:
+    - '/e:(jscript|vbscript)\.encode'
+condition: all

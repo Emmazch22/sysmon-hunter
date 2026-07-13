@@ -80,6 +80,72 @@ CASES = [
         False,
         event(10, TargetImage=r"C:\W\explorer.exe", GrantedAccess="0x1410"),
     ),
+    # --- Ostap chain rules, validated against the real EVTX sample ---
+    (
+        "SYS-034",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r'"C:\Windows\system32\rundll32.exe" Shell32.dll,Control_RunDLL "C:\Users\IEUser\Downloads\Invoice@0582.cpl",',
+        ),
+    ),
+    (
+        "SYS-034",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\control.exe",
+            command_line=r'"C:\Windows\System32\control.exe" "C:\Users\IEUser\Downloads\Invoice@0582.cpl",',
+        ),
+    ),
+    (
+        "SYS-034",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r'"C:\Windows\System32\rundll32.exe" Shell32.dll,Control_RunDLL "C:\Windows\System32\main.cpl",',
+        ),
+    ),
+    (
+        "SYS-035",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\wscript.exe",
+            command_line=r'"C:\Windows\System32\wscript.exe" /e:JScript.Encode /nologo C:\Users\IEUser\AppData\Local\Temp\info.txt',
+        ),
+    ),
+    (
+        "SYS-035",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\wscript.exe",
+            command_line=r"wscript.exe C:\Scripts\backup.vbs",
+        ),
+    ),
+    (
+        "SYS-036",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\SysWOW64\rundll32.exe",
+            image=r"C:\Windows\System32\wscript.exe",
+            command_line="wscript.exe x",
+        ),
+    ),
+    (
+        "SYS-036",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\wscript.exe",
+            command_line="wscript.exe x",
+        ),
+    ),
     (
         "SYS-003",
         True,

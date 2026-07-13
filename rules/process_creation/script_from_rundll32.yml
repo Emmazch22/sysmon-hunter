@@ -1,0 +1,14 @@
+id: SYS-036
+title: Script host spawned by rundll32
+event_id: 1
+severity: high
+attack: [T1059, T1218.011]
+description: >
+  A script interpreter was launched by rundll32. rundll32 has no legitimate
+  reason to spawn wscript or cscript; this parent/child pair is a hallmark of a
+  DLL-based loader dropping to a script payload.
+detection:
+  parent_image|endswith: '\rundll32.exe'
+  image|endswith:
+    ['\wscript.exe', '\cscript.exe', '\powershell.exe', '\mshta.exe']
+condition: all

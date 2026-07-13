@@ -1,0 +1,18 @@
+id: SYS-034
+title: Control panel item (.cpl) executed from a user-writable path
+event_id: 1
+severity: high
+attack: [T1218.002]
+description: >
+  A .cpl file was executed from a download or temp directory via control.exe or
+  rundll32. A .cpl is a DLL, and attackers rename malicious DLLs to .cpl to
+  disguise them as documents (e.g. Invoice.cpl) and abuse Control_RunDLL to run
+  them. Legitimate control panel items live in System32, not in Downloads.
+detection:
+  image|endswith: ['\control.exe', '\rundll32.exe']
+  command_line|re:
+    - '\.cpl.{0,3}$'
+    - '\.cpl["'']?,'
+  command_line|re|not:
+    - '\\(system32|syswow64)\\[^\\]+\.cpl'
+condition: all
