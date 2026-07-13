@@ -169,6 +169,11 @@ def _incident_field_match(incident: dict[str, Any], query: Query) -> bool:
     return True
 
 
+def _detection_level_filters(query: Query) -> bool:
+    """True if the query has filters that only a detection can satisfy."""
+    return bool({k for k in query.filters if k in {"rule", "technique", "user"}})
+
+
 @dataclass
 class SearchHit:
     """One incident that matched, with the detections that matched inside it."""
@@ -208,6 +213,19 @@ def search_incidents(
             continue
 
         matched = [d for d in detections if _detection_matches(d, query)]
+
+        # Free text also matches the incident's title and process chain, so a
+        # process that appears in the tree (w3wp.exe, PSEXESVC.exe) but did not
+        # itself fire a rule is still findable. Field filters still require a
+        # detection, since they describe detection-level attributes.
+        if not matched and query.text_terms and not _detection_level_filters(query):
+            incident_text = (
+                incident.get("title", "") + " " + " ".join(incident.get("chain", []))
+            ).lower()
+            if all(term in incident_text for term in query.text_terms):
+                hits.append(SearchHit(incident, detections, 0))
+                continue
+
         if matched:
             hits.append(SearchHit(incident, matched, len(matched)))
 
