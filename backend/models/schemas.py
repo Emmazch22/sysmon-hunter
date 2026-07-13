@@ -276,6 +276,8 @@ class Incident(BaseModel):
     # Ancestry chain of the process that triggered the first detection, from
     # the root down to the process itself. Rendered directly by the console.
     chain: list[str] = Field(default_factory=list)
+    # Full branching process tree the incident spans (flat node records).
+    process_tree: list[dict] = Field(default_factory=list)
 
     first_seen: datetime = Field(default_factory=utcnow)
     last_seen: datetime = Field(default_factory=utcnow)

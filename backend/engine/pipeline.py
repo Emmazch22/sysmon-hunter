@@ -99,6 +99,11 @@ class Pipeline:
             incident = self.incidents.correlate(detection)
             actionable = self.incidents.is_actionable(incident)
 
+            # Capture the full branching tree the incident spans, from the live
+            # ProcessTree, before it is pruned. Refreshed on every detection so
+            # it grows as the incident does.
+            incident.process_tree = self.tree.subtree(incident.host, incident.root_guid)
+
             # Order matters: the incident row must exist before the detection
             # row that references it, or the foreign key has nothing to point at.
             await db.upsert_incident(incident, actionable=actionable)

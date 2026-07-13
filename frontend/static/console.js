@@ -24,7 +24,7 @@ const state = {
     // in place as new detections land on them.
     detections: [],         // append-only stream, oldest first
     expanded: new Set(),    // incident ids currently drilled into
-    timelineFor: new Set(), // incident ids showing the timeline view instead of the list
+    viewFor: new Map(),     // incidentId -> "list" | "timeline" | "tree"
     timelineNode: new Map(), // incidentId -> index of the expanded timeline node
     scope: "triage",        // "triage" (actionable only) or "all"
     searchQuery: "",        // active search text; empty means no search
@@ -297,6 +297,98 @@ function fmtFullTime(iso) {
     return new Date(iso).toLocaleString("en-GB", { hour12: false });
 }
 
+
+/** Build an SVG of the incident's full process tree.
+ *
+ *  Unlike the chain (the ancestry of the one process that triggered a detection),
+ *  this is every branch: a foothold that spawned several children shows all of
+ *  them. Nodes that themselves fired a detection are marked, so the analyst sees
+ *  both the shape of what ran and which parts were flagged.
+ *
+ *  Laid out as an indented tree rather than a graph -- process trees are strictly
+ *  hierarchical, and indentation reads faster than edges for depth.
+ */
+function processTreeSvg(nodes, detections) {
+    if (!nodes || !nodes.length) {
+        return '<div class="tree-empty">No process tree captured for this incident.</div>';
+    }
+
+    // Which process GUIDs fired a detection, and the worst severity each reached.
+    const flagged = {};
+    for (const d of detections || []) {
+        const g = (d.forensics && d.forensics.process_guid) || d.process_guid;
+        // detections don't carry guid in the serializer; match on image name instead
+        // as a fallback so at least the flagged styling has something to key on.
+    }
+    const flaggedNames = {};
+    for (const d of detections || []) {
+        const name = baseName(d.image);
+        const sev = (d.severity || "medium").toLowerCase();
+        const rank = ["info", "low", "medium", "high", "critical"];
+        if (!flaggedNames[name] || rank.indexOf(sev) > rank.indexOf(flaggedNames[name])) {
+            flaggedNames[name] = sev;
+        }
+    }
+
+    const byParent = {};
+    const guids = new Set(nodes.map((n) => n.guid));
+    for (const n of nodes) (byParent[n.parent_guid] ||= []).push(n);
+    const roots = nodes.filter((n) => !guids.has(n.parent_guid));
+
+    // Flatten to rows in DFS order, tracking depth, so we can render as an
+    // indented list of SVG rows of known height.
+    const rows = [];
+    const walk = (guid, depth) => {
+        const node = nodes.find((n) => n.guid === guid);
+        if (!node) return;
+        rows.push({ node, depth });
+        for (const child of byParent[guid] || []) walk(child.guid, depth + 1);
+    };
+    for (const r of roots) walk(r.guid, 0);
+
+    const rowH = 26;
+    const indent = 22;
+    const width = 560;
+    const height = rows.length * rowH + 12;
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="tree-svg" role="img" aria-label="Process tree">`;
+
+    rows.forEach((row, i) => {
+        const { node, depth } = row;
+        const x = 10 + depth * indent;
+        const y = 12 + i * rowH;
+        const sev = flaggedNames[node.name];
+        const color = sev ? `var(--sev-${sev})` : "var(--text-dim)";
+
+        // Connector: a short elbow from the parent's column down to this node.
+        if (depth > 0) {
+            const px = 10 + (depth - 1) * indent + 4;
+            svg += `<path d="M${px} ${y - rowH + 4} L${px} ${y} L${x - 4} ${y}" fill="none" stroke="var(--border-hi)" stroke-width="1"/>`;
+        }
+
+        // Node dot: filled + haloed if it fired a detection, hollow if benign.
+        if (sev) {
+            svg += `<circle cx="${x}" cy="${y}" r="4" fill="${color}"/>`;
+            if (sev === "critical") svg += `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+        } else {
+            svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="none" stroke="${color}" stroke-width="1"/>`;
+        }
+
+        // Process name, coloured by whether it was flagged.
+        const weight = sev ? "700" : "400";
+        svg += `<text x="${x + 11}" y="${y + 3.5}" fill="${sev ? color : 'var(--text)'}" font-size="11" font-weight="${weight}" font-family="monospace">${escapeHtml(node.name)}</text>`;
+    });
+
+    svg += `</svg>`;
+
+    const legend = `<div class="tree-legend">
+    <span><span class="tree-dot flagged"></span> fired a detection</span>
+    <span><span class="tree-dot benign"></span> benign (context)</span>
+  </div>`;
+
+    return svg + legend;
+}
+
 /** A compact human gap: "3s", "5m", "2h". Empty for sub-second gaps, which are
  *  noise on a timeline of attacker actions. */
 function humanGap(ms) {
@@ -307,6 +399,38 @@ function humanGap(ms) {
     if (m < 60) return `${m}m`;
     const h = Math.round(m / 60);
     return `${h}h`;
+}
+
+/** Render the incident behavior profile: a narrative summary plus the ordered
+ *  kill-chain phases. Fetched once and cached on the incident object, since it
+ *  is derived from detections that do not change after the incident closes. */
+function profileHtml(incident) {
+    if (incident._profile === undefined) {
+        // Not fetched yet: kick off the fetch and show a placeholder. The fetch
+        // re-renders when it lands.
+        incident._profile = null;
+        fetch(`/incidents/${incident.id}/profile`)
+            .then((r) => r.json())
+            .then((data) => { incident._profile = data; renderQueue(); })
+            .catch(() => { incident._profile = { summary: "", phases: [] }; });
+        return `<div class="profile profile-loading">Profiling behavior\u2026</div>`;
+    }
+    if (!incident._profile || !incident._profile.phases.length) return "";
+
+    const phases = incident._profile.phases.map((p) => `
+    <div class="profile-phase">
+      <span class="profile-tactic">${escapeHtml(p.tactic)}</span>
+      <span class="profile-phrase">${escapeHtml(p.phrase)}</span>
+      <span class="profile-tech">${(p.techniques || []).map((t) =>
+        `<span class="chip" data-technique="${escapeHtml(t)}" role="button" tabindex="0">${escapeHtml(t)}</span>`).join("")}</span>
+    </div>`).join("");
+
+    return `
+    <div class="profile">
+      <div class="profile-head">Behavior profile</div>
+      <div class="profile-summary">${escapeHtml(incident._profile.summary)}</div>
+      <div class="profile-phases">${phases}</div>
+    </div>`;
 }
 
 /** Member detections of an incident, fetched on demand.
@@ -330,17 +454,25 @@ function membersHtml(incident) {
     // A view toggle: the list is for detail, the timeline is for sequence. An
     // analyst reconstructing an attack wants to switch between "what exactly
     // fired" and "in what order it unfolded".
-    const showTimeline = state.timelineFor.has(incident.id);
-    const timeline = showTimeline
-        ? `<div class="timeline">${timelineSvg(incident._members, incident.id)}</div>`
-        : `<div class="members">${rows}</div>`;
+    const view = state.viewFor.get(incident.id) || "list";
+    let body;
+    if (view === "timeline") {
+        body = `<div class="timeline">${timelineSvg(incident._members, incident.id)}</div>`;
+    } else if (view === "tree") {
+        body = `<div class="tree">${processTreeSvg(incident.process_tree, incident._members)}</div>`;
+    } else {
+        body = `<div class="members">${rows}</div>`;
+    }
+
+    const tab = (id, label) =>
+        `<button class="view-tab${view === id ? " on" : ""}" data-view="${id}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
 
     return `
+    ${profileHtml(incident)}
     <div class="member-views">
-      <button class="view-tab${!showTimeline ? " on" : ""}" data-view="list" data-incident="${escapeHtml(incident.id)}">List</button>
-      <button class="view-tab${showTimeline ? " on" : ""}" data-view="timeline" data-incident="${escapeHtml(incident.id)}">Timeline</button>
+      ${tab("list", "List")}${tab("timeline", "Timeline")}${tab("tree", "Process tree")}
     </div>
-    ${timeline}`;
+    ${body}`;
 }
 
 /** Render the evidence panel for a detection that carries one.
@@ -764,12 +896,10 @@ document.addEventListener("click", (event) => {
         return;
     }
 
-    // Switch an expanded incident between list and timeline view.
+    // Switch an expanded incident between list / timeline / tree views.
     const tab = event.target.closest(".view-tab");
     if (tab) {
-        const id = tab.dataset.incident;
-        if (tab.dataset.view === "timeline") state.timelineFor.add(id);
-        else state.timelineFor.delete(id);
+        state.viewFor.set(tab.dataset.incident, tab.dataset.view);
         renderQueue();
     }
 });

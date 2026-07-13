@@ -36,6 +36,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from backend.engine.profile import build_profile
+
 # --- Palette, lifted from the console so the report is visibly the same tool ---
 BG = colors.HexColor("#0B0F14")
 SURFACE = colors.HexColor("#111821")
@@ -270,6 +272,35 @@ def build_incident_report(
             content_w,
         )
     )
+
+    # --- Behavior profile ---
+    profile = build_profile(incident, detections)
+    if profile["phases"]:
+        story.append(Paragraph("Behavior", styles["h2"]))
+        story.append(Paragraph(_esc(profile["summary"]), styles["body"]))
+        story.append(Spacer(1, 8))
+        phase_rows = [
+            [
+                Paragraph(_esc(p["tactic"].upper()), styles["label"]),
+                Paragraph(_esc(p["phrase"]), styles["mono"]),
+            ]
+            for p in profile["phases"]
+        ]
+        phase_table = Table(phase_rows, colWidths=[40 * mm, content_w - 40 * mm])
+        phase_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), SURFACE),
+                    ("LINEBELOW", (0, 0), (-1, -2), 0.4, BORDER),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.append(phase_table)
 
     # --- Attack timeline ---
     story.append(Paragraph("Attack timeline", styles["h2"]))

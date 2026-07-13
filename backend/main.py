@@ -27,6 +27,7 @@ from backend.api import (
     enrich,
     incidents,
     ingest,
+    profile,
     report,
     search,
     ws,
@@ -113,6 +114,7 @@ app.include_router(attack.router)
 app.include_router(enrich.router)
 app.include_router(report.router)
 app.include_router(search.router)
+app.include_router(profile.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.

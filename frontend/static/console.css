@@ -1558,3 +1558,140 @@ main {
 .search-parsed {
     color: var(--struct);
 }
+
+/* ---------- Process tree view ----------
+     The full branching tree the incident spans, as an indented SVG. Flagged
+     nodes (a process that fired a detection) are filled and coloured by
+     severity; benign context processes are hollow. */
+
+.tree {
+    margin-top: 10px;
+    padding: 12px 10px;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.tree-svg {
+    display: block;
+    min-width: 400px;
+}
+
+.tree-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 11px;
+}
+
+.tree-legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-mute);
+}
+
+.tree-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tree-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.tree-dot.flagged {
+    background: var(--sev-high);
+}
+
+.tree-dot.benign {
+    border: 1px solid var(--text-dim);
+}
+
+/* ---------- Behavior profile ----------
+     A narrative account of the incident at the top of the drill-down: what the
+     malware did, in kill-chain order. Turns "23 detections" into a story. */
+
+.profile {
+    margin: 11px 0;
+    padding: 13px 15px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--attack);
+}
+
+.profile-loading {
+    color: var(--text-mute);
+    font-style: italic;
+    font-size: 11px;
+}
+
+.profile-head {
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--attack);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.profile-summary {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.profile-phases {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.profile-phase {
+    display: grid;
+    grid-template-columns: 118px 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 5px 0;
+    border-top: 1px solid var(--border);
+}
+
+.profile-tactic {
+    font-size: 9px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+}
+
+.profile-phrase {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+}
+
+.profile-tech {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+    .profile-phase {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+
+    .profile-tech {
+        justify-content: flex-start;
+    }
+}

@@ -119,6 +119,53 @@ class ProcessTree:
         chain = self.ancestry(host, guid)
         return chain[0].guid if chain else guid
 
+    def subtree(self, host: str, root_guid: str) -> list[dict]:
+        """Export every process descended from a root, as flat node records.
+
+        This is the whole tree an incident spans, not just the ancestry chain of
+        the one process that triggered a detection -- so a foothold that spawned
+        three separate children shows all three branches, which is the real shape
+        of what the malware did.
+
+        Returned flat (each node carries its parent_guid) rather than nested, so
+        the caller can build whatever structure it needs and the result serializes
+        cleanly to JSON for storage. Benign intermediate processes are included:
+        they are the branches, and a tree with holes where the quiet processes
+        were is not a tree.
+        """
+        # Collect the descendants by walking down from the root. Build a
+        # child-index once rather than rescanning for every node.
+        children: dict[str, list[ProcessNode]] = {}
+        for (node_host, _), node in self._nodes.items():
+            if node_host != host or not node.parent_guid:
+                continue
+            children.setdefault(node.parent_guid, []).append(node)
+
+        out: list[dict] = []
+        seen: set[str] = set()
+        stack = [root_guid]
+        while stack:
+            guid = stack.pop()
+            if guid in seen:
+                continue
+            seen.add(guid)
+
+            node = self._nodes.get((host, guid))
+            if node is not None:
+                out.append(
+                    {
+                        "guid": node.guid,
+                        "parent_guid": node.parent_guid,
+                        "image": node.image,
+                        "name": node.name,
+                        "command_line": node.command_line,
+                    }
+                )
+            for child in children.get(guid, []):
+                stack.append(child.guid)
+
+        return out
+
     def prune(self, now: datetime | None = None) -> int:
         """Drop nodes not seen within the TTL. Returns how many were removed.
 
@@ -263,7 +310,11 @@ class IncidentEngine:
                 return None
             return path.replace("/", "\\").split("\\")[-1]
 
-        return [name for name in (basename(event.parent_image), basename(event.image)) if name]
+        return [
+            name
+            for name in (basename(event.parent_image), basename(event.image))
+            if name
+        ]
 
     @property
     def open_count(self) -> int:

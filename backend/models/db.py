@@ -96,6 +96,10 @@ class IncidentRow(Base):
 
     chain: Mapped[list[str]] = mapped_column(JSON, default=list)
     techniques: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Flat list of process-tree nodes spanning the incident (see correlator
+    # subtree). Stored so the full branching tree survives a restart, since the
+    # in-memory ProcessTree is pruned.
+    process_tree: Mapped[list[dict]] = mapped_column(JSON, default=list)
     actionable: Mapped[int] = mapped_column(Integer, default=0)  # SQLite has no bool
 
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -177,6 +181,7 @@ async def upsert_incident(incident: Incident, actionable: bool) -> None:
         row.score = incident.score
         row.detection_count = len(incident.detections)
         row.chain = incident.chain
+        row.process_tree = incident.process_tree
         row.techniques = incident.techniques
         row.actionable = int(actionable)
         row.last_seen = incident.last_seen
