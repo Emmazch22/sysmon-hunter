@@ -1115,3 +1115,162 @@ main {
     outline: 2px solid var(--attack);
     outline-offset: 1px;
 }
+
+/* Rendered markup inside the technique description. */
+.tech-modal-body p {
+    margin: 0 0 12px;
+}
+
+.tech-modal-body p:last-child {
+    margin-bottom: 0;
+}
+
+.tech-modal-body a {
+    color: var(--struct);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--struct) 40%, transparent);
+}
+
+.tech-modal-body a:hover {
+    border-bottom-color: var(--struct);
+}
+
+.tech-modal-body code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--sev-medium);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+}
+
+/* ---------- IOC enrichment ----------
+     Rendered inline in the beacon evidence panel when the analyst asks. The
+     verdict dot and heading follow the severity scale: a malicious IP glows the
+     same critical red as a critical detection. */
+
+.enrich-slot {
+    margin-top: 9px;
+}
+
+.enrich-btn {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--struct);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color .12s, border-color .12s;
+}
+
+.enrich-btn:hover {
+    color: var(--text);
+    border-color: var(--struct);
+}
+
+.enrich-btn:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+.enrich-loading {
+    font-size: 10px;
+    color: var(--text-mute);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+.enrich-result {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.enrich-verdict {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.enrich-provider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 4px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+
+.enrich-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.enrich-name {
+    font-weight: 700;
+    color: var(--text);
+    min-width: 74px;
+}
+
+.enrich-summary {
+    flex: 1;
+    min-width: 0;
+}
+
+.enrich-provider a {
+    color: var(--struct);
+    text-decoration: none;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.enrich-provider a:hover {
+    text-decoration: underline;
+}
+
+/* Incident title-led header. The derived title is the primary identifier;
+     the hex id drops to a small monospace tag below it, still available for
+     cross-referencing logs but no longer the thing the eye lands on first. */
+.inc-name {
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    flex: 1;
+    min-width: 0;
+}
+
+.inc-sub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    margin-top: 2px;
+}
+
+.inc-sub .inc-id {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+}
+
+.inc-sub .inc-id::before {
+    content: "#";
+    opacity: .6;
+}
+
+.inc-sub .inc-host {
+    font-size: 10px;
+    color: var(--text-dim);
+}

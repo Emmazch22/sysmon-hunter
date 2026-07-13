@@ -57,6 +57,7 @@ def serialize_incident(incident: Incident, actionable: bool) -> dict[str, Any]:
     """A live incident, straight from the correlator."""
     return {
         "id": incident.id,
+        "title": incident.title,
         "host": incident.host,
         "severity": incident.severity.value,
         "score": incident.score,
@@ -73,6 +74,7 @@ def serialize_incident_row(row: IncidentRow) -> dict[str, Any]:
     """A stored incident, replayed from the database on page load."""
     return {
         "id": row.id,
+        "title": row.title,
         "host": row.host,
         "severity": row.severity,
         "score": row.score,

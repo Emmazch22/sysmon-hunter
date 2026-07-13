@@ -98,12 +98,15 @@ function incidentHtml(incident, isFresh) {
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
-          <span class="inc-id">${escapeHtml(incident.id)}</span>
           ${badge}
-          <span class="inc-host">${escapeHtml(incident.host)}</span>
+          <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>
           </span>
+        </div>
+        <div class="inc-sub">
+          <span class="inc-id">${escapeHtml(incident.id)}</span>
+          <span class="inc-host">${escapeHtml(incident.host)}</span>
         </div>
 
         <div class="chain">${chain}</div>
@@ -174,6 +177,11 @@ function evidenceHtml(detection) {
         </div>
         <div class="evidence-list">
           <div class="row">${escapeHtml(evidence.destination)} · over ${evidence.observed_over_seconds}s</div>
+        </div>
+        <div class="enrich-slot" data-indicator="${escapeHtml((evidence.destination || "").split(":")[0])}">
+          <button class="enrich-btn" data-enrich="${escapeHtml((evidence.destination || "").split(":")[0])}">
+            Check reputation
+          </button>
         </div>
       </div>`;
     }
@@ -448,6 +456,36 @@ function techModalEls() {
     };
 }
 
+/** Render MITRE's markdown-ish description as safe HTML.
+ *
+ *  MITRE descriptions arrive with markdown links [label](url), literal <code>
+ *  tags, and (Citation: ...) noise. Rendered with textContent they show as raw
+ *  markup; rendered with innerHTML unescaped they are an XSS vector, because the
+ *  text is third-party content. So: escape everything first, then re-introduce
+ *  only the specific safe constructs -- and only http(s) links, never a
+ *  javascript: URL smuggled into a [label](...) target.
+ */
+function renderAttackText(text) {
+    let html = escapeHtml(text);
+
+    // <code> tags survive escaping as &lt;code&gt;; restore them.
+    html = html.replace(/&lt;code&gt;(.*?)&lt;\/code&gt;/g, "<code>$1</code>");
+
+    // Citation markers add nothing to a definition and clutter the prose.
+    html = html.replace(/\(Citation:[^)]*\)/g, "");
+
+    // Markdown links -> anchors. Only http(s) targets are allowed. The URL was
+    // escaped, so &amp; is restored inside href.
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (match, label, url) => {
+        const safeUrl = url.replace(/&amp;/g, "&");
+        return `<a href="${safeUrl}" target="_blank" rel="noopener">${label}</a>`;
+    });
+
+    // Blank lines become paragraph breaks.
+    html = html.replace(/\n\n+/g, "</p><p>");
+    return `<p>${html}</p>`;
+}
+
 async function openTechnique(techniqueId) {
     const el = techModalEls();
 
@@ -486,7 +524,7 @@ async function openTechnique(techniqueId) {
         .map((t) => `<span class="tactic">${escapeHtml(t.replace(/-/g, " "))}</span>`)
         .join("");
     el.body.classList.remove("loading");
-    el.body.textContent = data.description || "No description provided.";
+    el.body.innerHTML = renderAttackText(data.description || "No description provided.");
     if (data.url) el.link.href = data.url;
 }
 
@@ -515,4 +553,65 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target === overlay) closeTechnique();
     });
     document.getElementById("tech-close").addEventListener("click", closeTechnique);
+});
+
+
+/* ============================================================
+   IOC enrichment
+
+   The beacon evidence panel carries a "Check reputation" button for its
+   destination IP. Enrichment is on-demand -- the analyst asks -- so this fires
+   only on click, calls /enrich, and paints the result inline. Delegated, since
+   the panel is regenerated on every render.
+   ============================================================ */
+
+const VERDICT_COLOR = {
+    malicious: "var(--sev-critical)",
+    suspicious: "var(--sev-high)",
+    clean: "var(--sev-low)",
+    unknown: "var(--text-mute)",
+};
+
+async function enrichIndicator(indicator, slot) {
+    slot.innerHTML = `<div class="enrich-loading">Checking ${escapeHtml(indicator)}\u2026</div>`;
+
+    let data;
+    try {
+        const response = await fetch(`/enrich?indicator=${encodeURIComponent(indicator)}`);
+        if (!response.ok) throw new Error(String(response.status));
+        data = await response.json();
+    } catch {
+        slot.innerHTML = `<div class="enrich-loading">Enrichment unavailable for ${escapeHtml(indicator)}.</div>`;
+        return;
+    }
+
+    const verdictColor = VERDICT_COLOR[data.worst_verdict] || VERDICT_COLOR.unknown;
+    const rows = data.providers.map((p) => {
+        const dot = p.available ? VERDICT_COLOR[p.verdict] : "var(--text-mute)";
+        const link = p.link
+            ? `<a href="${p.link}" target="_blank" rel="noopener">view</a>`
+            : "";
+        return `
+      <div class="enrich-provider">
+        <span class="enrich-dot" style="background:${dot}"></span>
+        <span class="enrich-name">${escapeHtml(p.provider)}</span>
+        <span class="enrich-summary">${escapeHtml(p.summary)}</span>
+        ${link}
+      </div>`;
+    }).join("");
+
+    slot.innerHTML = `
+    <div class="enrich-result">
+      <div class="enrich-verdict" style="color:${verdictColor}">
+        ${escapeHtml(data.worst_verdict)} \u00b7 ${escapeHtml(indicator)}
+      </div>
+      ${rows}
+    </div>`;
+}
+
+document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-enrich]");
+    if (!button) return;
+    const slot = button.closest(".enrich-slot");
+    enrichIndicator(button.dataset.enrich, slot);
 });

@@ -99,5 +99,18 @@ class Settings(BaseSettings):
     discovery_window_minutes: int = 5
     discovery_cooldown_minutes: int = 15
 
+    # --- IOC enrichment ---
+    # Both are optional. With neither set, enrichment still runs and simply
+    # reports every provider as unavailable -- the feature degrades, it does not
+    # break. Set via HUNTER_ABUSEIPDB_API_KEY / HUNTER_VIRUSTOTAL_API_KEY, or a
+    # .env file. Never commit real keys.
+    abuseipdb_api_key: str = ""
+    virustotal_api_key: str = ""
+
+    # How long an indicator's reputation is cached. An hour is well within the
+    # window where reputation is stable, and keeps a curious analyst from
+    # spending the daily quota re-checking the same IP.
+    enrichment_cache_ttl_seconds: int = 3600
+
 
 settings = Settings()

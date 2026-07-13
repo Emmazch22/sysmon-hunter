@@ -21,9 +21,10 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api import attack, detections, incidents, ingest, ws
+from backend.api import attack, detections, enrich, incidents, ingest, ws
 from backend.config import BASE_DIR, settings
 from backend.engine.attack import attack_lookup
+from backend.engine.enrichment import enrichment_service
 from backend.engine.pipeline import pipeline
 from backend.engine.rule_loader import rule_store
 from backend.models import db
@@ -100,6 +101,7 @@ app.include_router(detections.router)
 app.include_router(incidents.router)
 app.include_router(ws.router)
 app.include_router(attack.router)
+app.include_router(enrich.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
@@ -124,6 +126,7 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "consoles_connected": ws.manager.count,
         "rule_errors": rule_store.errors,
+        "enrichment_providers": enrichment_service.providers_configured,
         "coverage_by_event_id": rule_store.coverage,
         **pipeline.stats,
     }

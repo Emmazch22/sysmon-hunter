@@ -175,6 +175,89 @@ class ProcessNode(BaseModel):
         return self.image.replace("/", "\\").split("\\")[-1]
 
 
+# ---------------------------------------------------------------------------
+# Incident titling.
+#
+# An incident identified only by a hex id forces the analyst to expand it to
+# learn what it is. A derived title fixes that: it names the *story* the
+# incident tells -- "Phishing to reconnaissance", "Credential theft" -- from the
+# tactics and signature rules present, so the queue is readable at a glance.
+# ---------------------------------------------------------------------------
+
+# Each technique maps to the tactic it serves. A title built from tactics reads
+# as a narrative an analyst recognises, not a list of rule IDs.
+_TECHNIQUE_TACTIC: dict[str, str] = {
+    "T1566": "delivery",
+    "T1566.001": "delivery",
+    "T1204": "execution",
+    "T1204.002": "execution",
+    "T1059": "execution",
+    "T1059.001": "execution",
+    "T1027": "execution",
+    "T1105": "download",
+    "T1218": "download",
+    "T1218.011": "download",
+    "T1547.001": "persistence",
+    "T1546.012": "persistence",
+    "T1685": "defense-evasion",
+    "T1562.001": "defense-evasion",
+    "T1036.005": "masquerading",
+    "T1003.001": "credential-access",
+    "T1087": "discovery",
+    "T1082": "discovery",
+    "T1016": "discovery",
+    "T1033": "discovery",
+    "T1069": "discovery",
+    "T1018": "discovery",
+    "T1057": "discovery",
+    "T1049": "discovery",
+    "T1071": "command-and-control",
+    "T1071.001": "command-and-control",
+    "T1573": "command-and-control",
+    "T1055": "injection",
+    "T1490": "impact",
+}
+
+# Rules whose presence alone names the incident -- unambiguous, high-signal
+# findings that outrank any narrative built from tactics.
+_SIGNATURE_RULES: dict[str, str] = {
+    "SYS-004": "Ransomware preparation",  # shadow copy deletion
+    "SYS-041": "Credential theft",  # LSASS access
+    "SYS-010": "Credential theft",
+    "SYS-060": "Named-pipe C2",  # Cobalt Strike / Meterpreter pipe
+    "SYS-031": "Defender tampering",
+    "BCN-001": "C2 beacon",
+    "DSC-001": "Host reconnaissance",
+}
+
+# Tactic combinations that tell a familiar multi-stage story. Ordered most
+# specific first; the first whose tactics are all present wins.
+_NARRATIVES: list[tuple[set[str], str]] = [
+    ({"delivery", "execution", "discovery"}, "Phishing to reconnaissance"),
+    ({"delivery", "execution", "command-and-control"}, "Phishing to C2"),
+    ({"credential-access", "command-and-control"}, "Credential access with C2"),
+    ({"delivery", "execution"}, "Phishing execution chain"),
+    ({"execution", "command-and-control"}, "Execution with C2"),
+    ({"discovery", "command-and-control"}, "Reconnaissance with C2"),
+    ({"credential-access", "discovery"}, "Credential access after recon"),
+]
+
+# A lone tactic, made readable for the fallback title.
+_TACTIC_LABEL: dict[str, str] = {
+    "delivery": "Phishing delivery",
+    "execution": "Suspicious execution",
+    "download": "Payload download",
+    "persistence": "Persistence",
+    "defense-evasion": "Defense evasion",
+    "masquerading": "Process masquerading",
+    "credential-access": "Credential access",
+    "discovery": "Host reconnaissance",
+    "command-and-control": "C2 communication",
+    "injection": "Process injection",
+    "impact": "Destructive activity",
+}
+
+
 class Incident(BaseModel):
     """A group of detections that share a process-tree root within a time window.
 
@@ -211,6 +294,36 @@ class Incident(BaseModel):
                 if technique not in seen:
                     seen.append(technique)
         return sorted(seen)
+
+    @property
+    def title(self) -> str:
+        """A human-readable summary of what this incident is.
+
+        Derived, never stored: it always reflects the incident's current
+        contents, so a title generated when the incident held one detection
+        updates itself as more land. Priority is narrative first (a multi-stage
+        story), then a signature rule, then the dominant single tactic.
+        """
+        tactics = {_TECHNIQUE_TACTIC.get(t) for t in self.techniques}
+        tactics.discard(None)
+
+        # 1. A multi-stage narrative whose tactics are all present.
+        for needed, name in _NARRATIVES:
+            if needed <= tactics:
+                return f"{name} on {self.host}"
+
+        # 2. A signature rule that names the incident on its own.
+        rule_ids = {d.rule_id for d in self.detections}
+        for rule_id, name in _SIGNATURE_RULES.items():
+            if rule_id in rule_ids:
+                return f"{name} on {self.host}"
+
+        # 3. The single dominant tactic, made readable.
+        if tactics:
+            label = _TACTIC_LABEL.get(sorted(tactics)[0], "Suspicious activity")
+            return f"{label} on {self.host}"
+
+        return f"Suspicious activity on {self.host}"
 
     def add(self, detection: Detection) -> None:
         """Attach a detection and update the incident's running totals."""

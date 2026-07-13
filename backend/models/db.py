@@ -85,6 +85,7 @@ class IncidentRow(Base):
     __tablename__ = "incidents"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    title: Mapped[str] = mapped_column(Text, default="")
     host: Mapped[str] = mapped_column(String(128), index=True)
     root_guid: Mapped[str] = mapped_column(String(64))
     root_image: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -168,6 +169,7 @@ async def upsert_incident(incident: Incident, actionable: bool) -> None:
             row = IncidentRow(id=incident.id, first_seen=incident.first_seen)
             session.add(row)
 
+        row.title = incident.title
         row.host = incident.host
         row.root_guid = incident.root_guid
         row.root_image = incident.root_image
