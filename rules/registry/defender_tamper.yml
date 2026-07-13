@@ -1,0 +1,16 @@
+id: SYS-031
+title: Windows Defender setting disabled via registry
+event_id: 13
+severity: high
+attack: [T1562.001]
+description: >
+  A registry write targeted a Defender control that turns off real-time
+  protection or adds a scan exclusion. Disabling defences is a standard step
+  before dropping a payload, and legitimate software has little reason to touch
+  these keys.
+detection:
+  TargetObject|re:
+    - '\\windows defender\\.*\\(disableantispyware|disablerealtimemonitoring)\b'
+    - '\\windows defender\\exclusions\\'
+    - '\\policies\\microsoft\\windows defender\\'
+condition: all

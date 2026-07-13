@@ -1,0 +1,21 @@
+id: SYS-020
+title: Scripting or LOLBin process made an outbound connection
+event_id: 3
+severity: medium
+attack: [T1071]
+description: >
+  An interpreter or living-off-the-land binary opened a network connection.
+  These tools have no routine reason to talk to the internet directly, so an
+  outbound connection from one often marks C2 or payload retrieval. Correlate
+  with the process's command line before acting.
+detection:
+  image|endswith:
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\mshta.exe'
+    - '\rundll32.exe'
+    - '\regsvr32.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\certutil.exe'
+condition: all

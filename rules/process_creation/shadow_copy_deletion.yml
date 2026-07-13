@@ -1,0 +1,16 @@
+id: SYS-004
+title: Volume shadow copies deleted
+event_id: 1
+severity: critical
+attack: [T1490]
+description: >
+  Shadow copies are being destroyed, removing the restore points a victim would
+  use to recover files. A near-universal precursor to ransomware encryption;
+  treat as an in-progress incident.
+detection:
+  command_line|re:
+    - '\bvssadmin\b.*\bdelete\b.*\bshadows\b'
+    - '\bwmic\b.*\bshadowcopy\b.*\bdelete\b'
+    - '\bwbadmin\b.*\bdelete\b.*\b(catalog|systemstatebackup)\b'
+    - '\bbcdedit\b.*\b(recoveryenabled\s+no|bootstatuspolicy\s+ignoreallfailures)\b'
+condition: all

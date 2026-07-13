@@ -1,0 +1,24 @@
+id: SYS-005
+title: Script engine spawned from a browser or mail client
+event_id: 1
+severity: high
+attack: [T1204.002, T1566]
+description: >
+  A browser or email client spawned a shell or script interpreter. Users open
+  attachments and links in these apps, so a scripting child is a strong signal
+  of a malicious document or drive-by download executing.
+detection:
+  parent_image|endswith:
+    - '\outlook.exe'
+    - '\chrome.exe'
+    - '\msedge.exe'
+    - '\firefox.exe'
+    - '\acrord32.exe'
+  image|endswith:
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\cmd.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\mshta.exe'
+condition: all

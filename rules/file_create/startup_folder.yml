@@ -1,0 +1,12 @@
+id: SYS-050
+title: File dropped into a Startup folder
+event_id: 11
+severity: high
+attack: [T1547.001]
+description: >
+  A file was written into a Start Menu Startup folder, so it will run at logon.
+  Alongside Run keys, this is a favourite persistence spot precisely because it
+  needs no registry change and no elevation.
+detection:
+  TargetFilename|re: '\\start menu\\programs\\startup\\'
+condition: all

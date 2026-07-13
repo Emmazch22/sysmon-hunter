@@ -1,0 +1,17 @@
+id: SYS-051
+title: Office application wrote a script or executable
+event_id: 11
+severity: high
+attack: [T1566.001]
+description: >
+  An Office process created a script, shortcut or executable file. Documents do
+  not normally write code to disk; when Word or Excel does, it is typically a
+  macro dropping the next stage of an intrusion.
+detection:
+  Image|endswith:
+    - '\winword.exe'
+    - '\excel.exe'
+    - '\powerpnt.exe'
+    - '\outlook.exe'
+  TargetFilename|re: '\.(exe|dll|ps1|vbs|js|hta|scr|bat|lnk)$'
+condition: all

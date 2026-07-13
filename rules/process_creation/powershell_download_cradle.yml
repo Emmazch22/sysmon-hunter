@@ -1,0 +1,20 @@
+id: SYS-009
+title: PowerShell download cradle
+event_id: 1
+severity: high
+attack: [T1059.001, T1105]
+description: >
+  A PowerShell command that fetches and runs remote code in memory -- the
+  download cradle at the heart of most PowerShell intrusions. It never touches
+  disk, so the command line is the only place to catch it.
+
+  Both fields must hold (condition: all): the process is PowerShell AND the
+  command line carries a cradle idiom. The idioms are OR-combined inside a single
+  regex alternation, so "is PowerShell" cannot satisfy the rule on its own -- an
+  earlier draft used condition:any and fired on every PowerShell process
+  regardless of its command line.
+detection:
+  image|endswith: ['\powershell.exe', '\pwsh.exe']
+  command_line|re:
+    - '\b(iex|invoke-expression)\b|\b(downloadstring|downloadfile|downloaddata)\b|\bnew-object\b.*\bnet\.webclient\b|\binvoke-webrequest\b|\biwr\b'
+condition: all

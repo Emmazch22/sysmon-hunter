@@ -1,0 +1,16 @@
+id: SYS-021
+title: Connection to a common C2 port from a non-browser process
+event_id: 3
+severity: medium
+attack: [T1571]
+description: >
+  A process that is not a browser connected to a port frequently used by C2
+  frameworks and reverse shells. Port alone is weak evidence, so this is a
+  medium lead whose worth is in correlation with the rest of the tree.
+detection:
+  DestinationPort: ["4444", "1337", "8443", "9001", "31337", "5555"]
+  image|endswith|not:
+    - '\chrome.exe'
+    - '\msedge.exe'
+    - '\firefox.exe'
+condition: all

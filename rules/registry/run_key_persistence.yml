@@ -1,0 +1,16 @@
+id: SYS-030
+title: Autorun registry key modified
+event_id: 13
+severity: high
+attack: [T1547.001]
+description: >
+  A value was written under a Run or RunOnce key, the most common persistence
+  mechanism on Windows: whatever is named here executes at every logon. Software
+  installers do this legitimately, so weigh the process and value that made the
+  change.
+detection:
+  TargetObject|re:
+    - '\\currentversion\\run\b'
+    - '\\currentversion\\runonce\b'
+    - '\\currentversion\\policies\\explorer\\run\b'
+condition: all

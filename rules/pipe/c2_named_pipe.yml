@@ -1,0 +1,17 @@
+id: SYS-060
+title: Named pipe matching a known C2 default
+event_id: 17
+severity: high
+attack: [T1071, T1055]
+description: >
+  A named pipe was created whose name matches a default used by Cobalt Strike or
+  Meterpreter for inter-process C2. Operators frequently leave these defaults
+  unchanged, which makes the pipe name a high-confidence signature.
+detection:
+  PipeName|re:
+    - '\\msagent_[0-9a-f]{2}\b'
+    - '\\status_[0-9a-f]{2}\b'
+    - '\\postex_[0-9a-f]{4}\b'
+    - '\\msf-pipe\b'
+    - '\\(interprocess|windows\.update)_[0-9a-f]+'
+condition: all

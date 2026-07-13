@@ -1,0 +1,19 @@
+id: SYS-040
+title: PowerShell engine loaded by a non-PowerShell process
+event_id: 7
+severity: high
+attack: [T1059.001]
+description: >
+  The .NET PowerShell automation assembly was loaded into a process that is not
+  powershell.exe. This is how tooling runs PowerShell without spawning it --
+  "unmanaged" or "PowerShell without PowerShell" -- to evade command-line
+  logging and any monitoring keyed on the powershell.exe image.
+detection:
+  ImageLoaded|endswith:
+    - '\system.management.automation.dll'
+    - '\system.management.automation.ni.dll'
+  Image|endswith|not:
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\powershell_ise.exe'
+condition: all

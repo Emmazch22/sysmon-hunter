@@ -1,5 +1,8 @@
-# rules/process_creation/office_spawns_shell.yml
+id: SYS-001
 title: Office application spawned a command interpreter
+event_id: 1
+severity: high
+attack: [T1566.001, T1059]
 description: >
   An Office product created a shell or scripting child process, the classic
   signature of a malicious macro following a phishing delivery.

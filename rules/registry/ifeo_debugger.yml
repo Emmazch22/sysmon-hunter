@@ -1,0 +1,12 @@
+id: SYS-032
+title: Image File Execution Options debugger set
+event_id: 13
+severity: high
+attack: [T1546.012]
+description: >
+  A Debugger value was set under Image File Execution Options. Windows launches
+  the named debugger whenever the target program starts, so this both persists
+  and hijacks execution -- the classic sticky-keys backdoor, among others.
+detection:
+  TargetObject|re: '\\image file execution options\\.*\\debugger\b'
+condition: all

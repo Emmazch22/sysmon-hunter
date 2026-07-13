@@ -1,0 +1,15 @@
+id: SYS-008
+title: rundll32 executed without a DLL argument
+event_id: 1
+severity: medium
+attack: [T1218.011]
+description: >
+  rundll32 launched with no DLL and no export to call. Legitimate use always
+  names a DLL; a bare invocation is a known pattern for process hollowing and
+  Cobalt Strike's default spawnto.
+detection:
+  image|endswith: '\rundll32.exe'
+  command_line|re|not:
+    - '\.dll\b'
+    - '\.cpl\b'
+condition: all

@@ -1,0 +1,16 @@
+id: SYS-006
+title: Executable ran from a user-writable staging path
+event_id: 1
+severity: medium
+attack: [T1204]
+description: >
+  A process executed from a directory any user can write to. Malware stages in
+  these paths because they need no elevation. Legitimate installers also use
+  TEMP, so this is a medium lead, valuable as a member of a larger incident.
+detection:
+  image|re:
+    - '\\users\\[^\\]+\\appdata\\local\\temp\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\[^\\]+\.exe'
+    - '\\programdata\\[^\\]+\.exe'
+condition: all

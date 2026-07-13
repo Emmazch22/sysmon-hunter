@@ -1,0 +1,13 @@
+id: SYS-041
+title: LSASS opened with credential-dumping access rights
+event_id: 10
+severity: critical
+attack: [T1003.001]
+description: >
+  A process opened a handle to lsass.exe with the access mask needed to read its
+  memory, where Windows keeps credentials. Outside of AV and EDR this is almost
+  always credential theft -- Mimikatz, comsvcs.dll minidump, and their kin.
+detection:
+  TargetImage|endswith: '\lsass.exe'
+  GrantedAccess: ["0x1010", "0x1410", "0x143a", "0x1438", "0x1fffff"]
+condition: all

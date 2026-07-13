@@ -1,0 +1,18 @@
+id: SYS-003
+title: LOLBin used to download a remote payload
+event_id: 1
+severity: high
+attack: [T1105, T1218]
+description: >
+  A living-off-the-land binary was invoked with arguments that fetch a remote
+  file. certutil, bitsadmin and mshta are signed Microsoft tools, so an attacker
+  uses them to stage a payload without dropping an unsigned binary an allowlist
+  would block.
+detection:
+  command_line|re:
+    - '\bcertutil\b.*urlcache.*\bhttp'
+    - '\bcertutil\b.*(verifyctl|split).*\bhttp'
+    - '\bbitsadmin\b.*transfer'
+    - '\bmshta\b.*\bhttp'
+    - '\bregsvr32\b.*/i:http'
+condition: all

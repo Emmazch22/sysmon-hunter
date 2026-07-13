@@ -1,0 +1,19 @@
+id: SYS-007
+title: System binary running from the wrong path
+event_id: 1
+severity: high
+attack: [T1036.005]
+description: >
+  A process carries the name of a core Windows binary but runs from outside
+  System32. Attackers name their payload svchost.exe to blend into a process
+  list; the path gives it away, since the real binaries only live in System32.
+detection:
+  image|endswith:
+    - '\svchost.exe'
+    - '\lsass.exe'
+    - '\services.exe'
+    - '\csrss.exe'
+    - '\winlogon.exe'
+  image|re|not:
+    - '\\windows\\(system32|syswow64)\\'
+condition: all
