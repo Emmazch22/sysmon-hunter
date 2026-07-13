@@ -15,9 +15,10 @@ The story, on WKSTN-FINANCE-04:
               └─ cmd.exe          macro drops to a shell
                   ├─ powershell.exe (cradle)      downloads stage 2
                   │   ├─ whoami / net / nltest / systeminfo   recon burst
+                  │   ├─ mimikatz.exe             credential theft (real hashes)
                   │   ├─ rundll32.exe              injected C2, beacons out
                   │   └─ reg.exe                   Run-key persistence
-                  └─ powershell.exe (lsass)        credential theft
+                  └─ powershell.exe (lsass)        second LSASS dump path
                       └─ certutil.exe              exfil staging
 
     python scripts/seed_apt.py
@@ -85,6 +86,7 @@ G = {
     "cmd": "{apt-cmd}",
     "ps_cradle": "{apt-ps-cradle}",
     "ps_lsass": "{apt-ps-lsass}",
+    "mimikatz": "{apt-mimikatz}",
     "rundll": "{apt-rundll}",
     "reg": "{apt-reg}",
     "certutil": "{apt-certutil}",
@@ -273,7 +275,40 @@ def events() -> list[dict]:
         )
         clock += 40 * (1 - random.uniform(0, 0.35))
 
-    # --- Credential theft: second powershell -> LSASS (SYS-041, critical) ---
+    # --- Credential theft: attacker drops and runs Mimikatz from the cradle ---
+    # The hashes are real Mimikatz digests, so this enriches to a confirmed
+    # malicious verdict against VirusTotal in a live demo.
+    ev.append(
+        proc(
+            70,
+            G["mimikatz"],
+            G["ps_cradle"],
+            r"C:\Users\a.morales\AppData\Local\Temp\mimikatz.exe",
+            r'mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" exit',
+            pid=7580,
+            ppid=7010,
+            integrity="High",
+            cwd=r"C:\Users\a.morales\AppData\Local\Temp",
+            hashes="SHA1=e3b6ea8c46fa831cec6f235a5cf48b38a4ae8d69,"
+            "SHA256=61c0810a23580cf492a6ba4f7654566108331e7a4134c968c2d6a05261b2d8a1",
+        )
+    )
+    # Mimikatz reaches into LSASS (SYS-041, critical)
+    ev.append(
+        raw_event(
+            10,
+            71,
+            SourceImage=r"C:\Users\a.morales\AppData\Local\Temp\mimikatz.exe",
+            SourceProcessGuid=G["mimikatz"],
+            ProcessGuid=G["mimikatz"],
+            ParentProcessGuid=G["ps_cradle"],
+            TargetImage=r"C:\Windows\System32\lsass.exe",
+            GrantedAccess="0x1410",
+            User=USER,
+        )
+    )
+
+    # --- A second path to LSASS: comsvcs.dll minidump via powershell ---
     ev.append(
         proc(
             72,
