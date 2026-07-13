@@ -1274,3 +1274,57 @@ main {
     font-size: 10px;
     color: var(--text-dim);
 }
+
+/* ---------- Incident timeline ----------
+     A sequential SVG timeline of the incident's detections. Shown as an
+     alternate view to the detection list: same data, different question --
+     the list answers "what fired", the timeline answers "in what order". */
+
+.member-views {
+    display: flex;
+    gap: 2px;
+    margin-top: 11px;
+    margin-bottom: 2px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+
+.view-tab {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 11px;
+    cursor: pointer;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.view-tab:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+.view-tab.on {
+    color: var(--bg);
+    background: var(--struct);
+    border-color: var(--struct);
+}
+
+.view-tab:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+.timeline {
+    margin-top: 10px;
+    padding: 12px 10px;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+}
+
+.timeline-svg {
+    display: block;
+}

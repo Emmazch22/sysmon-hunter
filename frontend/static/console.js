@@ -24,6 +24,7 @@ const state = {
     // in place as new detections land on them.
     detections: [],         // append-only stream, oldest first
     expanded: new Set(),    // incident ids currently drilled into
+    timelineFor: new Set(), // incident ids showing the timeline view instead of the list
     scope: "triage",        // "triage" (actionable only) or "all"
 };
 
@@ -125,6 +126,83 @@ function incidentHtml(incident, isFresh) {
     </article>`;
 }
 
+/** Build an SVG timeline of an incident's detections.
+ *
+ *  A horizontal spine with one node per detection in chronological order. The
+ *  design choice: position is *sequential*, not proportional to wall-clock time,
+ *  with the real gap printed between nodes. Proportional spacing collapses
+ *  detections that fired seconds apart -- which in an attack chain is most of
+ *  them -- into an unreadable pile. An analyst reading a chain wants the order
+ *  and the pauses ("then, 19 minutes later..."), and this shows both without
+ *  losing the fast steps.
+ *
+ *  Nodes inherit severity colour; criticals get a halo. It is the same picture
+ *  an analyst sketches on paper during triage.
+ */
+function timelineSvg(detections) {
+    if (!detections.length) return "";
+
+    const sorted = [...detections].sort(
+        (a, b) => new Date(a.matched_at) - new Date(b.matched_at)
+    );
+
+    const rowH = 46;
+    const spineX = 120;
+    const width = 440;
+    const top = 14;
+    const height = top + sorted.length * rowH + 10;
+
+    const y = (i) => top + i * rowH + rowH / 2;
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="timeline-svg" role="img" aria-label="Incident timeline">`;
+
+    // The spine: a vertical line the nodes hang from.
+    svg += `<line x1="${spineX}" y1="${y(0)}" x2="${spineX}" y2="${y(sorted.length - 1)}" stroke="var(--border-hi)" stroke-width="1"/>`;
+
+    sorted.forEach((d, i) => {
+        const sev = (d.severity || "medium").toLowerCase();
+        const color = `var(--sev-${sev})`;
+        const cy = y(i);
+
+        // Gap label between this node and the previous one.
+        if (i > 0) {
+            const gapMs = new Date(d.matched_at) - new Date(sorted[i - 1].matched_at);
+            const gap = humanGap(gapMs);
+            if (gap) {
+                svg += `<text x="${spineX}" y="${cy - rowH / 2 + 3}" fill="var(--text-mute)" font-size="8" font-family="monospace" text-anchor="middle">+${escapeHtml(gap)}</text>`;
+            }
+        }
+
+        // Timestamp on the left.
+        svg += `<text x="${spineX - 18}" y="${cy + 3}" fill="var(--text-mute)" font-size="9" font-family="monospace" text-anchor="end">${clockTime(d.matched_at)}</text>`;
+
+        // Node, with a halo for criticals so the eye lands on them first.
+        if (sev === "critical") {
+            svg += `<circle cx="${spineX}" cy="${cy}" r="9" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+        }
+        svg += `<circle cx="${spineX}" cy="${cy}" r="5" fill="${color}"/>`;
+
+        // Rule id + process to the right.
+        svg += `<text x="${spineX + 16}" y="${cy - 2}" fill="${color}" font-size="11" font-weight="700" font-family="monospace">${escapeHtml(d.rule_id)}</text>`;
+        svg += `<text x="${spineX + 16}" y="${cy + 11}" fill="var(--text-dim)" font-size="9" font-family="monospace">${escapeHtml(baseName(d.image))}</text>`;
+    });
+
+    svg += `</svg>`;
+    return svg;
+}
+
+/** A compact human gap: "3s", "5m", "2h". Empty for sub-second gaps, which are
+ *  noise on a timeline of attacker actions. */
+function humanGap(ms) {
+    const s = Math.round(ms / 1000);
+    if (s < 1) return "";
+    if (s < 60) return `${s}s`;
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.round(m / 60);
+    return `${h}h`;
+}
+
 /** Member detections of an incident, fetched on demand.
  *  Rendered from whatever is cached; the fetch fills it in and re-renders. */
 function membersHtml(incident) {
@@ -142,7 +220,21 @@ function membersHtml(incident) {
       ${d.command_line ? `<div class="cmd">${escapeHtml(d.command_line)}</div>` : ""}
       ${evidenceHtml(d)}
     </div>`).join("");
-    return `<div class="members">${rows}</div>`;
+
+    // A view toggle: the list is for detail, the timeline is for sequence. An
+    // analyst reconstructing an attack wants to switch between "what exactly
+    // fired" and "in what order it unfolded".
+    const showTimeline = state.timelineFor.has(incident.id);
+    const timeline = showTimeline
+        ? `<div class="timeline">${timelineSvg(incident._members)}</div>`
+        : `<div class="members">${rows}</div>`;
+
+    return `
+    <div class="member-views">
+      <button class="view-tab${!showTimeline ? " on" : ""}" data-view="list" data-incident="${escapeHtml(incident.id)}">List</button>
+      <button class="view-tab${showTimeline ? " on" : ""}" data-view="timeline" data-incident="${escapeHtml(incident.id)}">Timeline</button>
+    </div>
+    ${timeline}`;
 }
 
 /** Render the evidence panel for a detection that carries one.
@@ -536,6 +628,15 @@ function closeTechnique() {
 document.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-technique]");
     if (chip) openTechnique(chip.dataset.technique);
+
+    // Switch an expanded incident between list and timeline view.
+    const tab = event.target.closest(".view-tab");
+    if (tab) {
+        const id = tab.dataset.incident;
+        if (tab.dataset.view === "timeline") state.timelineFor.add(id);
+        else state.timelineFor.delete(id);
+        renderQueue();
+    }
 });
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeTechnique();
