@@ -179,14 +179,12 @@ function incidentHtml(incident, isFresh) {
     const members = expanded ? membersHtml(incident) : "";
 
     return `
-    <article class="inc${isFresh ? " fresh" : ""}${incident.status === "closed" ? " is-closed" : ""}" data-sev="${escapeHtml(severity)}">
+    <article class="inc${isFresh ? " fresh" : ""}" data-sev="${escapeHtml(severity)}">
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
           ${badge}
           <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
-          ${incident.status && incident.status !== "new" ? `<span class="inc-status-badge">${escapeHtml(incident.status.replace("_", " "))}</span>` : ""}
-          ${incident.classification ? `<span class="inc-status-badge cls-${escapeHtml(incident.classification)}">${escapeHtml({ tp: "TP", fp: "FP", tp_benign: "TP-benign", inconclusive: "inconclusive" }[incident.classification] || incident.classification)}</span>` : ""}
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>
           </span>
@@ -487,47 +485,6 @@ function humanGap(ms) {
 /** Render the incident behavior profile: a narrative summary plus the ordered
  *  kill-chain phases. Fetched once and cached on the incident object, since it
  *  is derived from detections that do not change after the incident closes. */
-/** The triage panel: status, classification, and notes. This is where an
- *  analyst works an incident -- the SOC workflow the engine cannot automate.
- *  Rendered at the top of the drill-down, above the behavior profile. */
-function triageHtml(incident) {
-    const status = incident.status || "new";
-    const cls = incident.classification || "";
-
-    const statusBtn = (value, label) =>
-        `<button class="triage-status${status === value ? " on" : ""}" data-triage-status="${value}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
-
-    const CLASSES = [
-        ["tp", "True Positive"],
-        ["fp", "False Positive"],
-        ["tp_benign", "TP - Benign"],
-        ["inconclusive", "Inconclusive"],
-    ];
-    const classBtn = ([value, label]) =>
-        `<button class="triage-class${cls === value ? " on cls-" + value : ""}" data-triage-class="${value}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
-
-    return `
-    <div class="triage">
-      <div class="triage-row">
-        <span class="triage-label">Status</span>
-        <div class="triage-btns">
-          ${statusBtn("new", "New")}${statusBtn("in_progress", "In progress")}${statusBtn("closed", "Closed")}
-        </div>
-      </div>
-      <div class="triage-row">
-        <span class="triage-label">Verdict</span>
-        <div class="triage-btns">${CLASSES.map(classBtn).join("")}</div>
-      </div>
-      <div class="triage-row triage-notes-row">
-        <span class="triage-label">Notes</span>
-        <div class="triage-notes-wrap">
-          <textarea class="triage-notes" data-incident="${escapeHtml(incident.id)}"
-            placeholder="Analyst notes\u2026 (plain text, 500 words max)">${escapeHtml(incident.notes || "")}</textarea>
-          <span class="triage-wordcount" data-for="${escapeHtml(incident.id)}">${countWords(incident.notes || "")} / 500 words</span>
-        </div>
-      </div>
-    </div>`;
-}
 
 function profileHtml(incident) {
     if (incident._profile === undefined) {
@@ -593,7 +550,6 @@ function membersHtml(incident) {
         `<button class="view-tab${view === id ? " on" : ""}" data-view="${id}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
 
     return `
-    ${triageHtml(incident)}
     ${profileHtml(incident)}
     <div class="member-views">
       ${tab("list", "List")}${tab("timeline", "Timeline")}${tab("tree", "Process tree")}
@@ -686,15 +642,7 @@ function visibleIncidents() {
             .sort((a, b) => order.get(a.id) - order.get(b.id));  // keep server ranking
     }
 
-    let scoped;
-    if (state.scope === "closed") {
-        scoped = all.filter((i) => i.status === "closed");
-    } else {
-        // Live queue: closed incidents leave it. "triage" additionally narrows to
-        // actionable; "all" shows every open incident.
-        const open = all.filter((i) => i.status !== "closed");
-        scoped = state.scope === "triage" ? open.filter((i) => i.actionable) : open;
-    }
+    const scoped = state.scope === "triage" ? all.filter((i) => i.actionable) : all;
     return scoped.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
 }
 
@@ -1252,69 +1200,6 @@ document.addEventListener("keydown", (e) => {
 
 /* ---- Triage: status, classification, notes ---- */
 
-async function patchTriage(incidentId, body) {
-    try {
-        const r = await fetch(`/incidents/${incidentId}/triage`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        if (!r.ok) return null;
-        const updated = await r.json();
-        // Merge the server's authoritative fields back into local state.
-        const existing = state.incidents.get(incidentId) || {};
-        state.incidents.set(incidentId, { ...existing, ...updated, _members: existing._members });
-        renderQueue();
-        return updated;
-    } catch {
-        return null;
-    }
-}
 
-// Status and classification buttons (delegated, since the panel re-renders).
-document.addEventListener("click", (event) => {
-    const s = event.target.closest("[data-triage-status]");
-    if (s) { patchTriage(s.dataset.incident, { status: s.dataset.triageStatus }); return; }
-    const c = event.target.closest("[data-triage-class]");
-    if (c) {
-        // Toggle off if already set to this verdict.
-        const inc = state.incidents.get(c.dataset.incident);
-        const next = (inc && inc.classification === c.dataset.triageClass) ? "" : c.dataset.triageClass;
-        patchTriage(c.dataset.incident, { classification: next });
-        return;
-    }
-});
 
 // Notes: debounced autosave on input, so typing does not fire a request per key.
-let notesTimer = null;
-document.addEventListener("input", (event) => {
-    const ta = event.target.closest(".triage-notes");
-    if (!ta) return;
-    const id = ta.dataset.incident;
-    const value = ta.value;
-    const words = countWords(value);
-
-    // Live word counter, turning red past the limit.
-    const counter = document.querySelector(`.triage-wordcount[data-for="${id}"]`);
-    if (counter) {
-        counter.textContent = `${words} / 500 words`;
-        counter.classList.toggle("over", words > 500);
-    }
-
-    clearTimeout(notesTimer);
-    // Over the limit: do not save. The server would reject it anyway; this just
-    // avoids a doomed request and keeps what the analyst has locally.
-    if (words > 500) return;
-
-    notesTimer = setTimeout(() => {
-        // Save without re-rendering the queue, so the textarea keeps focus.
-        fetch(`/incidents/${id}/triage`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ notes: value }),
-        }).then(() => {
-            const inc = state.incidents.get(id);
-            if (inc) inc.notes = value;
-        });
-    }, 600);
-});

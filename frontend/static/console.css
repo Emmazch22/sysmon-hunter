@@ -1948,3 +1948,101 @@ main {
     color: var(--sev-critical);
     font-weight: 700;
 }
+
+/* ---------- Analyst note (incident page) ---------- */
+.note-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.note-text {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 11px 13px;
+}
+
+.note-text:focus {
+    outline: none;
+    border-color: var(--struct);
+}
+
+.note-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.note-count {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+}
+
+.note-count.over {
+    color: var(--sev-critical);
+    font-weight: 700;
+}
+
+.note-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.note-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    border: 1px solid var(--border-hi);
+    background: transparent;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.note-save {
+    color: var(--struct);
+    border-color: var(--struct);
+}
+
+.note-save:hover {
+    background: var(--struct);
+    color: var(--bg);
+}
+
+.note-save:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.note-delete {
+    color: var(--sev-high);
+    border-color: color-mix(in srgb, var(--sev-high) 50%, transparent);
+}
+
+.note-delete:hover {
+    background: var(--sev-high);
+    color: var(--bg);
+}
+
+.note-status {
+    font-size: 10px;
+    letter-spacing: .05em;
+    min-height: 12px;
+}
+
+.note-status.ok {
+    color: var(--sev-low);
+}
+
+.note-status.error {
+    color: var(--sev-critical);
+}

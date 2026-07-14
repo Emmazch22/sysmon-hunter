@@ -27,10 +27,10 @@ from backend.api import (
     enrich,
     incidents,
     ingest,
+    notes,
     profile,
     report,
     search,
-    triage,
     ws,
 )
 from backend.config import BASE_DIR, settings
@@ -116,7 +116,7 @@ app.include_router(enrich.router)
 app.include_router(report.router)
 app.include_router(search.router)
 app.include_router(profile.router)
-app.include_router(triage.router)
+app.include_router(notes.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
