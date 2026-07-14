@@ -1,0 +1,17 @@
+id: SYS-077
+title: Unsigned kernel driver loaded
+event_id: 6
+severity: high
+attack: [T1211, T1562.001]
+description: >
+  A kernel driver loaded without a valid signature. Windows requires kernel
+  drivers to be signed, so an unsigned driver making it to load at all means
+  either test-signing was enabled on the host or the driver exploited a
+  loader flaw -- both are hallmarks of Bring-Your-Own-Vulnerable-Driver
+  (BYOVD), the technique ransomware operators use to load a driver with a
+  known kernel-level vulnerability and use it to blind or kill EDR before the
+  rest of the payload runs. A signed-but-vulnerable driver will not trip this
+  rule; it catches the cruder half of BYOVD, not the whole technique.
+detection:
+  Signed|equals: 'false'
+condition: all

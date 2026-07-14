@@ -1,0 +1,18 @@
+id: SYS-074
+title: Regsvr32 registering a scriptlet via scrobj.dll (Squiblydoo)
+event_id: 1
+severity: high
+attack: [T1218.010]
+description: >
+  Regsvr32 invoked scrobj.dll, Windows' scriptlet handler, rather than
+  registering a normal COM DLL. This is the Squiblydoo technique: a signed
+  Microsoft binary executes an attacker-supplied JScript/VBScript scriptlet,
+  bypassing application allowlisting that trusts regsvr32.exe by name.
+  Deliberately independent of SYS-003's `/i:http` check -- an operator who
+  stages the .sct file locally first (no URL in the command line at all)
+  still has to name scrobj.dll to run it, so that is the signal this rule
+  keys on instead.
+detection:
+  image|endswith: '\regsvr32.exe'
+  command_line|contains: 'scrobj.dll'
+condition: all

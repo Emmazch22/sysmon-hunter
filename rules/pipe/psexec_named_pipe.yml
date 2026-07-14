@@ -1,0 +1,16 @@
+id: SYS-072
+title: Named pipe matching PsExec-style remote execution
+event_id: 17
+severity: high
+attack: [T1021.002, T1569.002]
+description: >
+  A named pipe was created whose name matches the PSEXESVC service PsExec (or
+  a PsExec-compatible tool such as Impacket's psexec.py, RemCom, or Cobalt
+  Strike's jump psexec) installs on the target to relay stdin/stdout back to
+  the operator. The pipe is the tell: it exists for the lifetime of the
+  remote command, regardless of what the command itself was.
+detection:
+  PipeName|re:
+    - '\\psexesvc'
+    - '\\remcom_communicat'
+condition: all

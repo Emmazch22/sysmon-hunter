@@ -1,0 +1,18 @@
+id: SYS-073
+title: PsExec service binary executed on this host
+event_id: 1
+severity: high
+attack: [T1569.002, T1021.002]
+description: >
+  The PsExec service image (PSEXESVC.exe, installed and started by the PsExec
+  client on the target) or the client itself with its telltale -accepteula
+  flag was launched. Legitimate in many shops for remote administration, but
+  it is also one of the most common lateral-movement tools in ransomware
+  playbooks -- what makes it suspicious is never the binary, it is which
+  account launched it, from where, and what it launched next.
+detection:
+  image|endswith:
+    - '\PSEXESVC.exe'
+  command_line|contains:
+    - '-accepteula'
+condition: any

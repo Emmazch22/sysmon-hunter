@@ -1,0 +1,16 @@
+id: SYS-075
+title: Certutil used to decode or encode a local file
+event_id: 1
+severity: medium
+attack: [T1140]
+description: >
+  Certutil's undocumented -decode/-encode switches turn it into a general
+  base64 codec, which attackers use to reconstitute a payload that was
+  smuggled onto the host already base64-encoded (to slip past content
+  filters that inspect for PE headers or script signatures). Distinct from
+  SYS-003, which watches certutil being used to *fetch* a remote file over
+  HTTP -- this is the local decode step that often follows it.
+detection:
+  image|endswith: '\certutil.exe'
+  command_line|re: '-(de|en)code\b'
+condition: all

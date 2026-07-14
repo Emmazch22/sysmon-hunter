@@ -1,0 +1,17 @@
+id: SYS-076
+title: BITS job created via the Start-BitsTransfer cmdlet
+event_id: 1
+severity: medium
+attack: [T1197]
+description: >
+  PowerShell's Start-BitsTransfer cmdlet schedules a background transfer job
+  through the same BITS service bitsadmin.exe drives, but without invoking
+  bitsadmin itself -- which is what SYS-003's `bitsadmin.*transfer` pattern
+  looks for. Operators who know bitsadmin.exe is watched reach for the
+  cmdlet instead; the underlying technique (queue a download or upload that
+  survives reboots and blends in as ordinary Windows Update traffic) is the
+  same either way.
+detection:
+  image|endswith: '\powershell.exe'
+  command_line|contains: 'Start-BitsTransfer'
+condition: all

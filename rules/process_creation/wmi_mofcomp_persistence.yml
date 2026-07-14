@@ -1,0 +1,16 @@
+id: SYS-070
+title: WMI persistence staged via mofcomp or wmic
+event_id: 1
+severity: medium
+attack: [T1546.003]
+description: >
+  A MOF file was compiled with mofcomp, or wmic was used against the
+  \root\subscription namespace, to register a WMI event filter/consumer pair.
+  Both are the standard way to script WMI persistence from the command line
+  before the actual subscription events (EventID 19/20/21) land -- catching it
+  here is the earliest possible signal, before the subscription even exists.
+detection:
+  command_line|re:
+    - '\bmofcomp\b.*\.mof\b'
+    - '\bwmic\b.*root\\subscription.*\bcreate\b'
+condition: all
