@@ -4,215 +4,515 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sysmon Hunter — Detection console</title>
+    <title>Incident — Sysmon Hunter</title>
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%230B0F14%22/%3E%3Cpath%20d%3D%22M16%204l9%203.5v7c0%205.8-3.9%209.6-9%2011.5-5.1-1.9-9-5.7-9-11.5v-7L16%204z%22%20fill%3D%22none%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%222.5%22%20fill%3D%22%233FB6C8%22/%3E%3Cpath%20d%3D%22M16%2017.5v4%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/console.css">
+    <style>
+        /* Full-page incident view. Reuses the console's variables (loaded from
+     console.css) and adds only the layout this dedicated page needs. */
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 28px 22px 80px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-mute);
+            text-decoration: none;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .back:hover {
+            color: var(--struct);
+        }
+
+        .ih-spine {
+            height: 4px;
+            width: 100%;
+            background: var(--sev);
+            margin-bottom: 16px;
+        }
+
+        .ih-title {
+            font-family: var(--display);
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.15;
+        }
+
+        .ih-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: var(--text-dim);
+            align-items: center;
+        }
+
+        .ih-sev {
+            color: var(--sev);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            font-size: 11px;
+        }
+
+        .ih-id {
+            color: var(--text-mute);
+        }
+
+        .ih-actions {
+            margin-top: 18px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            color: var(--struct);
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: color .12s, border-color .12s;
+        }
+
+        .action-btn:hover {
+            color: var(--text);
+            border-color: var(--struct);
+        }
+
+        .action-btn.primary {
+            background: var(--struct);
+            color: var(--bg);
+            border-color: var(--struct);
+        }
+
+        .action-btn.primary:hover {
+            color: var(--bg);
+            opacity: .9;
+        }
+
+        .section {
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--struct);
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+        }
+
+        .summary-cell {
+            background: var(--surface);
+            padding: 12px 14px;
+        }
+
+        .summary-label {
+            font-size: 10px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+            margin-bottom: 5px;
+        }
+
+        .summary-value {
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .det-card {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            margin-bottom: 14px;
+            position: relative;
+        }
+
+        .det-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--sev);
+        }
+
+        .det-card-head {
+            padding: 13px 16px 13px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .det-card-rule {
+            font-weight: 700;
+            color: var(--sev);
+            font-size: 13px;
+        }
+
+        .det-card-title {
+            color: var(--text-dim);
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .det-card-time {
+            float: right;
+            color: var(--text-mute);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .det-card-body {
+            padding: 14px 16px 14px 20px;
+        }
+
+        .forensic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 10px 20px;
+        }
+
+        .forensic-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .forensic-key {
+            font-size: 9px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+        }
+
+        .forensic-val {
+            font-size: 11px;
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .forensic-val.hash {
+            color: var(--attack);
+            font-size: 10px;
+        }
+
+        .loading,
+        .error {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-mute);
+        }
+
+        .error-mark {
+            font-family: var(--display);
+            color: var(--sev-critical);
+            font-size: 13px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 
 <body>
 
-    <!-- Icon sprite: defined once, referenced by <use href="#id"> throughout.
-     Inline so there is no external request and the glyphs inherit currentColor. -->
+    <!-- Icon sprite (subset needed here) -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-        <symbol id="i-shield" viewBox="0 0 24 24">
-            <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" />
+        <symbol id="i-back" viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6" />
         </symbol>
-        <symbol id="i-beacon" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1l2.1-2.1M17 7l2.1-2.1" />
-        </symbol>
-        <symbol id="i-recon" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-        </symbol>
-        <symbol id="i-process" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="14" rx="1" />
-            <path d="M3 8h18M7 12h6" />
-        </symbol>
-        <symbol id="i-alert" viewBox="0 0 24 24">
-            <path d="M12 3l9 16H3l9-16z" />
-            <path d="M12 10v4M12 17v.5" />
-        </symbol>
-        <symbol id="i-stream" viewBox="0 0 24 24">
-            <path d="M4 6h16M4 12h16M4 18h10" />
+        <symbol id="i-download" viewBox="0 0 24 24">
+            <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
         </symbol>
         <symbol id="i-attack" viewBox="0 0 24 24">
             <path d="M12 2v20M2 7l10 5 10-5M2 17l10 5 10-5M2 12l10 5 10-5" />
         </symbol>
-        <symbol id="i-pulse" viewBox="0 0 24 24">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        <symbol id="i-note" viewBox="0 0 24 24">
+            <path d="M4 4h16v13l-4 3H4z" />
+            <path d="M8 9h8M8 13h5" />
         </symbol>
-        <symbol id="i-external" viewBox="0 0 24 24">
-            <path d="M14 4h6v6M20 4l-8 8M18 13v6a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h6" />
-        </symbol>
-        <symbol id="i-layers" viewBox="0 0 24 24">
-            <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5" />
+        <symbol id="i-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
         </symbol>
     </svg>
 
-    <header>
-        <div class="brand">
-            <svg class="ico ico-lg" style="color:var(--struct)">
-                <use href="#i-shield" />
-            </svg>
-            Sysmon <span>Hunter</span>
-        </div>
-        <nav class="routes" aria-label="API endpoints">
-            <a href="/api/docs" target="_blank" rel="noopener">API</a>
-            <a href="/incidents" target="_blank" rel="noopener">Raw</a>
-            <a href="/health" target="_blank" rel="noopener">Health</a>
-        </nav>
-        <div class="engine" id="engine">engine: starting</div>
-        <div class="link">
-            <span class="led" id="led"></span>
-            <span id="link-state">connecting</span>
-        </div>
-    </header>
-
-    <main>
-
-        <section class="stats">
-            <div class="stat">
-                <div class="stat-label">Incidents</div>
-                <div class="stat-value" id="s-incidents">0</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Needs triage</div>
-                <div class="stat-value" id="s-actionable">0</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Detections</div>
-                <div class="stat-value" id="s-detections">0</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Hosts</div>
-                <div class="stat-value" id="s-hosts">0</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Techniques</div>
-                <div class="stat-value" id="s-techniques">0</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Last event</div>
-                <div class="stat-value small" id="s-last">--:--:--</div>
-            </div>
-        </section>
-
-        <div class="col">
-            <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title">
-                        <svg class="ico">
-                            <use href="#i-layers" />
-                        </svg>
-                        Incident queue <b id="queue-count">0</b>
-                    </div>
-                    <div class="filters" role="group" aria-label="Filter incidents">
-                        <button class="filter" data-scope="triage" aria-pressed="true">Needs triage</button>
-                        <button class="filter" data-scope="all" aria-pressed="false">All</button>
-                    </div>
-                </div>
-                <div class="search-bar">
-                    <svg class="ico search-ico">
-                        <use href="#i-recon" />
-                    </svg>
-                    <input type="text" id="search-input" class="search-input" autocomplete="off"
-                        placeholder="Search:  mimikatz   ·   host:WKSTN-FINANCE-04   ·   technique:t1003   ·   severity:critical">
-                    <button class="search-clear" id="search-clear" aria-label="Clear search" hidden>&times;</button>
-                </div>
-                <div class="search-hint" id="search-hint" hidden></div>
-                <div class="queue" id="queue">
-                    <div class="empty">
-                        <div class="empty-mark">Queue is clear</div>
-                        <p>
-                            The engine is listening. Send telemetry to <code>POST /ingest</code>,
-                            or fire an atomic on the lab VM to see a chain build.
-                        </p>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <aside class="col">
-            <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title">
-                        <svg class="ico">
-                            <use href="#i-stream" />
-                        </svg>
-                        Detection stream
-                    </div>
-                    <div class="panel-note" id="stream-count">0</div>
-                </div>
-                <div class="stream" id="stream">
-                    <div class="empty empty-sm">
-                        <p>Nothing yet.</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title">
-                        <svg class="ico">
-                            <use href="#i-pulse" />
-                        </svg>
-                        Severity
-                    </div>
-                </div>
-                <div class="bars" id="bars"></div>
-            </section>
-
-            <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title">
-                        <svg class="ico">
-                            <use href="#i-attack" />
-                        </svg>
-                        ATT&CK techniques
-                    </div>
-                </div>
-                <div id="techniques">
-                    <div class="empty empty-sm">
-                        <p>None observed.</p>
-                    </div>
-                </div>
-            </section>
-        </aside>
-
-    </main>
-
-    <!-- Technique detail modal: populated from /attack/{id} on chip click. -->
-    <div class="tech-overlay" id="tech-overlay" role="dialog" aria-modal="true" aria-labelledby="tech-name">
-        <div class="tech-modal">
-            <div class="tech-modal-head">
-                <span class="tech-modal-id" id="tech-id">T0000</span>
-                <div class="tech-modal-titles">
-                    <div class="tech-modal-name" id="tech-name"></div>
-                    <div class="tech-modal-tactics" id="tech-tactics"></div>
-                </div>
-                <button class="tech-close" id="tech-close" aria-label="Close">&times;</button>
-            </div>
-            <div class="tech-modal-body" id="tech-body"></div>
-            <div class="tech-modal-foot">
-                <span>Source: MITRE ATT&CK</span>
-                <a id="tech-link" href="https://attack.mitre.org" target="_blank" rel="noopener">
-                    View on attack.mitre.org
-                    <svg class="ico">
-                        <use href="#i-attack" />
-                    </svg>
-                </a>
-            </div>
-        </div>
+    <div class="page" id="page">
+        <div class="loading">Loading incident&hellip;</div>
     </div>
 
-    <script src="/static/console.js"></script>
+    <script>
+        "use strict";
+
+        const SEVERITY_VAR = {
+            critical: "var(--sev-critical)", high: "var(--sev-high)",
+            medium: "var(--sev-medium)", low: "var(--sev-low)", info: "var(--sev-info)",
+        };
+
+        const FORENSIC_LABELS = {
+            user: "User", integrity_level: "Integrity level", logon_id: "Logon ID",
+            session_id: "Session ID", process_id: "PID", parent_process_id: "Parent PID",
+            parent_command_line: "Parent command line", current_directory: "Working directory",
+            hashes: "Hashes", original_file_name: "Original filename", company: "Signer",
+            product: "Product", destination_ip: "Destination IP", destination_port: "Destination port",
+            destination_hostname: "Destination host", target_image: "Target process",
+            target_filename: "Target file", registry_key: "Registry key",
+            granted_access: "Granted access", pipe_name: "Named pipe", dns_query: "DNS query",
+        };
+
+        function esc(v) {
+            return String(v ?? "").replace(/[&<>"']/g, (c) =>
+                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+        function baseName(p) { return p ? String(p).split(/[\\/]/).pop() : "unknown"; }
+        function fmtTime(iso) {
+            if (!iso) return "unknown";
+            const d = new Date(iso);
+            return d.toLocaleString("en-GB", { hour12: false });
+        }
+
+        /** The incident id is the last path segment: /incident/{id} */
+        function incidentId() {
+            const parts = location.pathname.split("/").filter(Boolean);
+            return parts[parts.length - 1];
+        }
+
+        async function load() {
+            const id = incidentId();
+            let data;
+            try {
+                const r = await fetch(`/incidents/${id}`);
+                if (!r.ok) throw new Error(String(r.status));
+                data = await r.json();
+            } catch {
+                document.getElementById("page").innerHTML = `
+      <a class="back" href="/"><svg class="ico"><use href="#i-back"/></svg> Console</a>
+      <div class="error"><div class="error-mark">Incident not found</div>
+      <p>No incident with id ${esc(id)}.</p></div>`;
+                return;
+            }
+            render(data);
+        }
+
+        function render(inc) {
+            const sev = (inc.severity || "medium").toLowerCase();
+            const sevColor = SEVERITY_VAR[sev] || SEVERITY_VAR.medium;
+            document.documentElement.style.setProperty("--sev", sevColor);
+
+            const detections = inc.detections || [];
+
+            const summary = [
+                ["Host", inc.host],
+                ["Severity", `${sev} · score ${inc.score}`],
+                ["Detections", String(inc.detection_count ?? detections.length)],
+                ["First seen", fmtTime(inc.first_seen)],
+                ["Last seen", fmtTime(inc.last_seen)],
+                ["Process chain", (inc.chain || []).join("  →  ") || "unknown"],
+            ].map(([k, v]) => `
+    <div class="summary-cell">
+      <div class="summary-label">${esc(k)}</div>
+      <div class="summary-value">${esc(v)}</div>
+    </div>`).join("");
+
+            const techniques = (inc.techniques || []).map((t) =>
+                `<span class="chip" data-technique="${esc(t)}" role="button" tabindex="0">${esc(t)}</span>`
+            ).join(" ");
+
+            const cards = detections.map((d) => detectionCard(d)).join("");
+
+            document.getElementById("page").innerHTML = `
+    <a class="back" href="/"><svg class="ico"><use href="#i-back"/></svg> Console</a>
+
+    <div class="ih-spine"></div>
+    <div class="ih-title">${esc(inc.title || "Suspicious activity")}</div>
+    <div class="ih-meta">
+      <span class="ih-sev">${esc(sev)}</span>
+      <span>score ${esc(inc.score)}</span>
+      <span>${esc(inc.host)}</span>
+      <span class="ih-id">#${esc(inc.id)}</span>
+    </div>
+
+    <div class="ih-actions">
+      <a class="action-btn primary" href="/incidents/${esc(inc.id)}/report" target="_blank" rel="noopener">
+        <svg class="ico"><use href="#i-download"/></svg> Download PDF report
+      </a>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-clock"/></svg> Summary</div>
+      <div class="summary-grid">${summary}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-attack"/></svg> ATT&amp;CK techniques</div>
+      <div class="chips">${techniques || '<span class="summary-value">none</span>'}</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-note"/></svg> Analyst note</div>
+      <div class="note-box">
+        <textarea id="note-text" class="note-text" placeholder="Add a note for this incident&hellip; (plain text, 500 words max)">${esc(inc.notes || "")}</textarea>
+        <div class="note-bar">
+          <span class="note-count" id="note-count">${countWords(inc.notes || "")} / 500 words</span>
+          <div class="note-actions">
+            <button class="note-btn note-delete" id="note-delete"${inc.notes ? "" : " hidden"}>Delete</button>
+            <button class="note-btn note-save" id="note-save">Save note</button>
+          </div>
+        </div>
+        <span class="note-status" id="note-status"></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Detections (${detections.length})</div>
+      ${cards}
+    </div>`;
+
+            wireNotes(inc.id);
+        }
+
+        /** Word count for the 500-word limit. */
+        function countWords(text) {
+            const t = String(text || "").trim();
+            return t ? t.split(/\s+/).length : 0;
+        }
+
+        /** Wire the note editor: live counter, save, and delete. The note is attached to
+         *  the incident and persists until the analyst changes or deletes it. */
+        function wireNotes(incidentId) {
+            const ta = document.getElementById("note-text");
+            const count = document.getElementById("note-count");
+            const save = document.getElementById("note-save");
+            const del = document.getElementById("note-delete");
+            const status = document.getElementById("note-status");
+            if (!ta) return;
+
+            const setStatus = (msg, isError) => {
+                status.textContent = msg;
+                status.className = "note-status" + (isError ? " error" : " ok");
+                if (msg) setTimeout(() => { status.textContent = ""; }, 3000);
+            };
+
+            ta.addEventListener("input", () => {
+                const words = countWords(ta.value);
+                count.textContent = `${words} / 500 words`;
+                count.classList.toggle("over", words > 500);
+                save.disabled = words > 500;
+            });
+
+            save.addEventListener("click", async () => {
+                if (countWords(ta.value) > 500) return;
+                try {
+                    const r = await fetch(`/incidents/${incidentId}/notes`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ notes: ta.value }),
+                    });
+                    if (!r.ok) throw new Error();
+                    setStatus("Note saved.", false);
+                    del.hidden = !ta.value;
+                } catch {
+                    setStatus("Could not save note.", true);
+                }
+            });
+
+            del.addEventListener("click", async () => {
+                try {
+                    const r = await fetch(`/incidents/${incidentId}/notes`, { method: "DELETE" });
+                    if (!r.ok) throw new Error();
+                    ta.value = "";
+                    count.textContent = "0 / 500 words";
+                    count.classList.remove("over");
+                    del.hidden = true;
+                    setStatus("Note deleted.", false);
+                } catch {
+                    setStatus("Could not delete note.", true);
+                }
+            });
+        }
+
+        function detectionCard(d) {
+            const sev = (d.severity || "medium").toLowerCase();
+            const sevColor = SEVERITY_VAR[sev] || SEVERITY_VAR.medium;
+            const forensics = d.forensics || {};
+
+            const forensicItems = Object.entries(forensics).map(([k, v]) => {
+                const isHash = k === "hashes";
+                return `
+      <div class="forensic-item">
+        <span class="forensic-key">${esc(FORENSIC_LABELS[k] || k)}</span>
+        <span class="forensic-val${isHash ? " hash" : ""}">${esc(v)}</span>
+      </div>`;
+            }).join("");
+
+            const cmd = d.command_line
+                ? `<div class="cmd" style="margin-bottom:12px">${esc(d.command_line)}</div>` : "";
+
+            return `
+    <div class="det-card" style="--sev:${sevColor}">
+      <div class="det-card-head">
+        <span class="det-card-time">${fmtTime(d.matched_at)}</span>
+        <div class="det-card-rule">${esc(d.rule_id)}</div>
+        <div class="det-card-title">${esc(d.title || "")}</div>
+      </div>
+      <div class="det-card-body">
+        ${cmd}
+        ${forensicItems ? `<div class="forensic-grid">${forensicItems}</div>` : '<div class="summary-value" style="color:var(--text-mute)">No additional forensic fields on this event.</div>'}
+      </div>
+    </div>`;
+        }
+
+        // Technique chips open MITRE in a new tab here (no modal on this page).
+        document.addEventListener("click", (e) => {
+            const chip = e.target.closest("[data-technique]");
+            if (chip) {
+                const t = chip.dataset.technique;
+                window.open(`https://attack.mitre.org/techniques/${t.replace(".", "/")}`, "_blank", "noopener");
+            }
+        });
+
+        load();
+    </script>
 </body>
 
 </html>

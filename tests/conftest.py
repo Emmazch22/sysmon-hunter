@@ -93,12 +93,7 @@ def make_rule(
 
 @pytest_asyncio.fixture
 async def tmp_db(tmp_path, monkeypatch):
-    """Throwaway SQLite database with the schema created, for tests that write.
-
-    Points the app's engine and Session at a temp file and creates the tables,
-    so a test calling upsert_incident / update_incident_triage has real tables
-    to hit -- and never touches the developer's real hunter.db.
-    """
+    """Throwaway SQLite database with the schema created, for tests that write."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"

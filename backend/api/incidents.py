@@ -25,33 +25,13 @@ async def list_incidents(
         description="Only incidents that crossed the score threshold, carry a "
         "critical detection, or hold three or more detections.",
     ),
-    view: str = Query(
-        default="open",
-        description="'open' hides closed incidents (the live queue); 'closed' "
-        "shows only closed ones (the Closed tab); 'all' shows everything.",
-    ),
 ) -> dict[str, Any]:
     """Most recent incidents, newest first.
 
     Newest-first here, unlike detections: an analyst opening the console wants
-    the freshest incident at the top of the queue, not the bottom. Closed
-    incidents leave the live queue but stay in the database, reachable via the
-    Closed view and search.
+    the freshest incident at the top of the queue, not the bottom.
     """
-    status_filter = None
-    exclude = None
-    if view == "closed":
-        status_filter = "closed"
-    elif view == "open":
-        exclude = "closed"
-    # view == "all" leaves both None
-
-    rows = await db.list_incidents(
-        limit=limit,
-        actionable_only=actionable_only,
-        status=status_filter,
-        exclude_status=exclude,
-    )
+    rows = await db.list_incidents(limit=limit, actionable_only=actionable_only)
     return {
         "returned": len(rows),
         "items": [serialize_incident_row(row) for row in rows],

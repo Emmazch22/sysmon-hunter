@@ -789,7 +789,7 @@ async function bootstrap() {
     try {
         const [health, incidents, detections] = await Promise.all([
             fetch("/health").then((r) => r.json()),
-            fetch("/incidents?view=all&limit=300").then((r) => r.json()),
+            fetch("/incidents?limit=300").then((r) => r.json()),
             fetch("/detections?limit=300").then((r) => r.json()),
         ]);
 
