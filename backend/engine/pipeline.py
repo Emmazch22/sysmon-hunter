@@ -32,6 +32,18 @@ class Pipeline:
     """Stateful detection pipeline for a single collector."""
 
     def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        """(Re)build every piece of in-memory engine state from scratch.
+
+        Used both at construction and after an analyst wipes the database from
+        the console. The two must go together: if the database were cleared
+        but the live ProcessTree, IncidentEngine and detectors were left as
+        they were, the engine would keep correlating new events against
+        processes and incidents whose records no longer exist -- new
+        detections would land on stale, now-invisible incident ids.
+        """
         self.tree = ProcessTree(ttl=timedelta(minutes=settings.process_ttl_minutes))
         self.incidents = IncidentEngine(
             tree=self.tree,

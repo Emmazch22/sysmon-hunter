@@ -835,6 +835,23 @@ function connect() {
             }
             state.incidents.set(data.id, data);
             renderQueue(data.id);
+        } else if (type === "reset") {
+            // The server wiped the database (see /admin/database). Every
+            // connected console gets this, not just the one that clicked
+            // reset, so no analyst is left staring at a stale queue.
+            state.incidents.clear();
+            state.detections = [];
+            state.expanded.clear();
+            state.viewFor.clear();
+            state.timelineNode.clear();
+            state.searchResults = null;
+            $("s-last").textContent = "--:--:--";
+            renderQueue();
+            renderStream();
+            fetch("/health").then((r) => r.json()).then((health) => {
+                $("engine").textContent =
+                    `engine: ${health.rules_loaded} rules · ${health.processes_tracked} processes tracked`;
+            }).catch(() => { });
         }
         renderStats();
     };
@@ -862,6 +879,67 @@ document.querySelectorAll(".filter").forEach((button) => {
 
 bootstrap();
 connect();
+
+/* ============================================================
+   Settings menu
+
+   One destructive action today: wipe the database. Confirmed with a native
+   dialog because there is no undo -- every detection and incident is just
+   gone, on every connected console (see the "reset" branch in connect()).
+   ============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    const btn = $("settings-btn");
+    const menu = $("settings-menu");
+    const resetBtn = $("reset-db-btn");
+    if (!btn || !menu) return;
+
+    const closeMenu = () => {
+        menu.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+    };
+
+    btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const opening = menu.hidden;
+        menu.hidden = !opening;
+        btn.setAttribute("aria-expanded", String(opening));
+    });
+
+    menu.addEventListener("click", (event) => event.stopPropagation());
+
+    document.addEventListener("click", () => closeMenu());
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeMenu();
+    });
+
+    if (resetBtn) {
+        resetBtn.addEventListener("click", async () => {
+            closeMenu();
+            const ok = confirm(
+                "Reset the database?\n\nThis permanently deletes every detection " +
+                "and incident on record. This cannot be undone."
+            );
+            if (!ok) return;
+
+            resetBtn.disabled = true;
+            resetBtn.textContent = "Resetting…";
+            try {
+                const res = await fetch("/admin/database", { method: "DELETE" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                // The UI itself clears via the "reset" websocket broadcast, not
+                // here -- that way this tab and every other open console update
+                // the same way, from the same event.
+            } catch (err) {
+                alert("Reset failed: " + err.message);
+            } finally {
+                resetBtn.disabled = false;
+                resetBtn.innerHTML =
+                    '<svg class="ico"><use href="#i-trash"/></svg> Reset database';
+            }
+        });
+    }
+});
 
 /* ============================================================
    Technique detail modal

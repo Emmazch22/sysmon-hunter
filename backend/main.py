@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.api import (
+    admin,
     attack,
     detections,
     enrich,
@@ -117,6 +118,7 @@ app.include_router(report.router)
 app.include_router(search.router)
 app.include_router(profile.router)
 app.include_router(notes.router)
+app.include_router(admin.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.

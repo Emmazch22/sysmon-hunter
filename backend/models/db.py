@@ -23,6 +23,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    delete,
     inspect,
     select,
 )
@@ -247,3 +248,21 @@ async def count_detections() -> int:
     async with Session() as session:
         result = await session.execute(select(DetectionRow.id))
         return len(result.scalars().all())
+
+
+async def reset_database() -> None:
+    """Delete every detection and incident.
+
+    This clears the tables rather than deleting `data/hunter.db` off disk.
+    The file sits behind an open connection pool and its schema is owned by
+    Alembic (see `init_db`), so unlinking it while the server is running would
+    leave the engine pointed at a file with no tables until someone runs the
+    migration by hand -- a live 500 dressed up as a "reset". Truncating both
+    tables in one transaction reaches the same end an analyst wants -- an
+    empty console -- without either problem, and needs no restart.
+    """
+    async with Session() as session:
+        await session.execute(delete(DetectionRow))
+        await session.execute(delete(IncidentRow))
+        await session.commit()
+    log.warning("Database reset: all detections and incidents deleted")

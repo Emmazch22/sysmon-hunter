@@ -220,6 +220,91 @@ nav.routes a:focus-visible {
     }
 }
 
+/* ---------- Settings menu ----------
+     A single gear button at the far right corner of the header. Its dropdown
+     currently holds one destructive action -- deliberately isolated behind an
+     extra click and a confirmation, since nothing about it is undoable. */
+
+.settings {
+    position: relative;
+}
+
+.settings-btn {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim);
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color .12s, border-color .12s;
+}
+
+.settings-btn:hover,
+.settings-btn[aria-expanded="true"] {
+    color: var(--struct);
+    border-color: var(--struct);
+}
+
+.settings-btn:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
+}
+
+.settings-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 190px;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+    z-index: 40;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-align: left;
+    cursor: pointer;
+    transition: color .12s, background .12s;
+}
+
+.settings-item:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.settings-item:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: -2px;
+}
+
+.settings-item.settings-danger {
+    color: var(--sev-high);
+}
+
+.settings-item.settings-danger:hover {
+    color: var(--bg);
+    background: var(--sev-critical);
+}
+
+.settings-item:disabled {
+    opacity: .5;
+    cursor: wait;
+}
+
 /* ---------- Layout ---------- */
 
 main {
