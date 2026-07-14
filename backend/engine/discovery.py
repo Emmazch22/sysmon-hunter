@@ -221,6 +221,14 @@ class DiscoveryDetector:
         techniques = sorted(burst.techniques.keys())
         examples = [example for _, _, example in burst.techniques.values()]
 
+        # The burst is a *set* of recon commands, not one. Attaching the single
+        # command line of whichever event happened to confirm the burst is
+        # misleading -- it makes the detection look like it fired on that one
+        # command. The full list lives in the evidence panel, so the detection's
+        # own command_line is cleared to avoid showing an arbitrary (and possibly
+        # unrelated) command in the row.
+        burst_event = event.model_copy(update={"command_line": None})
+
         log.info(
             "Discovery burst on %s: %d distinct recon techniques in %.0fs",
             burst.host,
@@ -236,7 +244,7 @@ class DiscoveryDetector:
             ),
             severity=severity,
             attack=techniques,
-            event=event,
+            event=burst_event,
             matched_at=event.timestamp,
             evidence={
                 "distinct_techniques": count,

@@ -267,6 +267,9 @@
         <symbol id="i-attack" viewBox="0 0 24 24">
             <path d="M12 2v20M2 7l10 5 10-5M2 17l10 5 10-5M2 12l10 5 10-5" />
         </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+            <path d="M12 3l8 3v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3z" />
+        </symbol>
         <symbol id="i-note" viewBox="0 0 24 24">
             <path d="M4 4h16v13l-4 3H4z" />
             <path d="M8 9h8M8 13h5" />
@@ -388,6 +391,8 @@
       <div class="chips">${techniques || '<span class="summary-value">none</span>'}</div>
     </div>
 
+    ${indicatorsHtml(inc.indicators)}
+
     <div class="section">
       <div class="section-title"><svg class="ico"><use href="#i-note"/></svg> Analyst note</div>
       <div class="note-box">
@@ -409,6 +414,67 @@
     </div>`;
 
             wireNotes(inc.id);
+        }
+
+        /** Render the Key Indicators panel: the actionable summary of the incident --
+         *  who was hit, what to block, what to clean, and whether privileges escalated.
+         *  Empty sections are omitted so the panel only shows what the incident has. */
+        function indicatorsHtml(ind) {
+            if (!ind) return "";
+            const blocks = [];
+
+            if (ind.privilege_escalation) {
+                blocks.push(`
+      <div class="ind-block ind-alert">
+        <div class="ind-label">Privilege escalation</div>
+        <div class="ind-value">${esc(ind.privilege_escalation.from)} &rarr; <b>${esc(ind.privilege_escalation.to)}</b> integrity</div>
+      </div>`);
+            }
+            if ((ind.users || []).length) {
+                blocks.push(`
+      <div class="ind-block">
+        <div class="ind-label">Users involved</div>
+        <div class="ind-value">${ind.users.map(esc).join(", ")}</div>
+      </div>`);
+            }
+            if ((ind.destinations || []).length) {
+                const dests = ind.destinations.map((d) =>
+                    `<div class="ind-ioc"><span>${esc(d.ip)}:${esc(d.port)}</span>${d.hostname ? `<span class="ind-sub">${esc(d.hostname)}</span>` : ""}</div>`
+                ).join("");
+                blocks.push(`
+      <div class="ind-block">
+        <div class="ind-label">C2 destinations</div>
+        <div class="ind-value">${dests}</div>
+      </div>`);
+            }
+            if ((ind.hashes || []).length) {
+                const rows = ind.hashes.map((h) => `
+      <div class="ind-ioc ind-hash">
+        <span class="ind-hash-img">${esc(h.image)}</span>
+        <span class="ind-hash-val">${esc(h.sha256)}</span>
+        <button class="ind-enrich" data-hash="${esc(h.sha256)}">check VT</button>
+        <span class="ind-verdict" data-for="${esc(h.sha256)}"></span>
+      </div>`).join("");
+                blocks.push(`
+      <div class="ind-block">
+        <div class="ind-label">File hashes (SHA256)</div>
+        <div class="ind-value">${rows}</div>
+      </div>`);
+            }
+            if ((ind.registry_persistence || []).length) {
+                blocks.push(`
+      <div class="ind-block">
+        <div class="ind-label">Persistence</div>
+        <div class="ind-value">${ind.registry_persistence.map((k) => `<div class="ind-ioc">${esc(k)}</div>`).join("")}</div>
+      </div>`);
+            }
+
+            if (!blocks.length) return "";
+            return `
+    <div class="section">
+      <div class="section-title"><svg class="ico"><use href="#i-shield"/></svg> Key indicators</div>
+      <div class="ind-grid">${blocks.join("")}</div>
+    </div>`;
         }
 
         /** Word count for the 500-word limit. */
@@ -508,6 +574,28 @@
             if (chip) {
                 const t = chip.dataset.technique;
                 window.open(`https://attack.mitre.org/techniques/${t.replace(".", "/")}`, "_blank", "noopener");
+            }
+        });
+
+
+        // Enrich a hash from the Key Indicators panel against VirusTotal.
+        document.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".ind-enrich");
+            if (!btn) return;
+            const hash = btn.dataset.hash;
+            const verdict = document.querySelector(`.ind-verdict[data-for="${hash}"]`);
+            btn.disabled = true;
+            verdict.textContent = "checking\u2026";
+            verdict.className = "ind-verdict";
+            try {
+                const data = await fetch(`/enrich?indicator=${encodeURIComponent(hash)}`).then((r) => r.json());
+                const v = data.worst_verdict || "unknown";
+                verdict.textContent = v;
+                verdict.className = "ind-verdict verdict-" + v;
+            } catch {
+                verdict.textContent = "unavailable";
+            } finally {
+                btn.disabled = false;
             }
         });
 

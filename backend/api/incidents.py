@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 
 from backend.api.serializers import serialize_detection_row, serialize_incident_row
+from backend.engine.indicators import build_indicators
 from backend.models import db
 
 router = APIRouter(tags=["incidents"])
@@ -29,7 +30,9 @@ async def list_incidents(
     """Most recent incidents, newest first.
 
     Newest-first here, unlike detections: an analyst opening the console wants
-    the freshest incident at the top of the queue, not the bottom.
+    the freshest incident at the top of the queue, not the bottom. Closed
+    incidents leave the live queue but stay in the database, reachable via the
+    Closed view and search.
     """
     rows = await db.list_incidents(limit=limit, actionable_only=actionable_only)
     return {
@@ -56,7 +59,9 @@ async def get_incident(incident_id: str) -> dict[str, Any]:
         )
 
     detections = await db.get_incident_detections(incident_id)
+    serialized = [serialize_detection_row(row) for row in detections]
     return {
         **serialize_incident_row(incident),
-        "detections": [serialize_detection_row(row) for row in detections],
+        "detections": serialized,
+        "indicators": build_indicators(serialized),
     }
