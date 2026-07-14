@@ -12,10 +12,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-import pytest_asyncio
 
 from backend.engine.correlator import IncidentEngine, ProcessTree
-from backend.models import db as _db
 from backend.models.schemas import Event, Rule, Severity
 
 
@@ -91,19 +89,29 @@ def make_rule(
     )
 
 
+import pytest_asyncio
+
+
 @pytest_asyncio.fixture
 async def tmp_db(tmp_path, monkeypatch):
-    """Throwaway SQLite database with the schema created, for tests that write."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    """An isolated on-disk database per test, with the schema created."""
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+
+    from backend.models import db as dbmod
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.run_sync(_db.Base.metadata.create_all)
-
-    monkeypatch.setattr(_db, "engine", engine)
+        await conn.run_sync(dbmod.Base.metadata.create_all)
+    monkeypatch.setattr(dbmod, "engine", engine)
     monkeypatch.setattr(
-        _db, "Session", async_sessionmaker(engine, expire_on_commit=False)
+        dbmod,
+        "Session",
+        async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False),
     )
     yield
     await engine.dispose()
