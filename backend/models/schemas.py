@@ -203,6 +203,8 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1562.001": "defense-evasion",
     "T1036.005": "masquerading",
     "T1003.001": "credential-access",
+    "T1552.001": "credential-access",
+    "T1003": "credential-access",
     "T1087": "discovery",
     "T1082": "discovery",
     "T1016": "discovery",
@@ -223,6 +225,7 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
 _SIGNATURE_RULES: dict[str, str] = {
     "SYS-004": "Ransomware preparation",  # shadow copy deletion
     "SYS-041": "Credential theft",  # LSASS access
+    "SYS-038": "IIS credential theft",  # appcmd password dump
     "SYS-010": "Credential theft",
     "SYS-060": "Named-pipe C2",  # Cobalt Strike / Meterpreter pipe
     "SYS-031": "Defender tampering",

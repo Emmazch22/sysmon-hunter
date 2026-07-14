@@ -44,6 +44,8 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1547.001": "persistence",
     "T1546.012": "persistence",
     "T1003.001": "credential-access",
+    "T1552.001": "credential-access",
+    "T1003": "credential-access",
     "T1087": "discovery",
     "T1082": "discovery",
     "T1016": "discovery",
@@ -131,6 +133,8 @@ def _phrase_for_tactic(
         return "performed host reconnaissance"
 
     if tactic == "credential-access":
+        if "SYS-038" in rule_ids:
+            return "harvested IIS application-pool credentials via appcmd"
         return "accessed credential material from LSASS memory"
 
     if tactic == "persistence":

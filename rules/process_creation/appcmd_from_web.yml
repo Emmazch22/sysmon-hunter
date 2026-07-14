@@ -1,0 +1,15 @@
+id: SYS-039
+title: appcmd executed by a web server worker or script host
+event_id: 1
+severity: medium
+attack: [T1552.001]
+description: >
+  IIS administration tool appcmd was launched by w3wp (the IIS worker) or a
+  script interpreter. Legitimate administration runs appcmd interactively; a web
+  worker or an encoded PowerShell parent indicates the tool is being driven by a
+  compromised web application enumerating server configuration.
+detection:
+  image|endswith: '\appcmd.exe'
+  parent_image|endswith:
+    ['\w3wp.exe', '\powershell.exe', '\pwsh.exe', '\cmd.exe']
+condition: all

@@ -82,6 +82,54 @@ CASES = [
     ),
     # --- Ostap chain rules, validated against the real EVTX sample ---
     # --- WinPwnage url.dll LOLBin, validated against the real EVTX sample ---
+    # --- IIS appcmd credential discovery, validated against the real EVTX ---
+    (
+        "SYS-038",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\appcmd.exe",
+            command_line=r"appcmd list apppool /text:processmodel.password",
+        ),
+    ),
+    (
+        "SYS-038",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\appcmd.exe",
+            command_line=r"appcmd list vdir /text:password",
+        ),
+    ),
+    (
+        "SYS-038",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\appcmd.exe",
+            command_line=r"appcmd list apppool /text:physicalpath",
+        ),
+    ),
+    (
+        "SYS-039",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\appcmd.exe",
+            parent_image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="appcmd list apppool",
+        ),
+    ),
+    (
+        "SYS-039",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\appcmd.exe",
+            parent_image=r"C:\Windows\explorer.exe",
+            command_line="appcmd list apppool",
+        ),
+    ),
     (
         "SYS-037",
         True,

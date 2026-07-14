@@ -1,0 +1,17 @@
+id: SYS-038
+title: IIS credentials extracted via appcmd
+event_id: 1
+severity: high
+attack: [T1552.001, T1003]
+description: >
+  appcmd.exe was used to read application pool or virtual directory credentials
+  from IIS configuration. The processmodel.password / processmodel.username and
+  vdir password fields expose the plaintext identities IIS runs under, and an
+  attacker who has compromised a web app dumps them to move laterally or escalate.
+  No administrator retrieves these via the command line in bulk.
+detection:
+  image|endswith: '\appcmd.exe'
+  command_line|re:
+    - "/text:.*(password|username)"
+    - 'list\s+(apppool|vdir|config).*processmodel\.(password|username)'
+condition: all
