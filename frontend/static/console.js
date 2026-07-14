@@ -45,6 +45,87 @@ function escapeHtml(value) {
 }
 
 /** Reduce a full Windows path to the executable name. */
+
+/* ============================================================
+   Base64 decoding
+
+   Attackers hide payloads in base64 constantly -- PowerShell -enc, encoded
+   commands, config blobs. When a command line contains a base64 run, a small
+   "decode" button is shown next to it; clicking it decodes and shows the result
+   in a popup. Decoding is client-side: it is analysis, not something the server
+   needs to do.
+   ============================================================ */
+
+const B64_RE = /[A-Za-z0-9+/]{16,}={0,2}/g;
+
+/** Is this substring plausibly base64 worth offering to decode? Rejects hashes,
+ *  low-variety padding, and anything not a clean base64 run. */
+function looksLikeBase64(s) {
+    if (s.length < 16 || s.length % 4 !== 0) return false;
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(s)) return false;
+    if (/^[0-9a-f]+$/i.test(s) && s.length <= 64) return false;  // likely a hash
+    if (new Set(s).size < 8) return false;                        // e.g. AAAA...
+    return true;
+}
+
+/** Decode a base64 string, auto-detecting UTF-16LE (PowerShell -enc) vs UTF-8.
+ *  Returns {text, printable, isUtf16} or null on failure. */
+function decodeBase64(s) {
+    try {
+        const bytes = Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+        let nulls = 0;
+        for (let i = 1; i < bytes.length; i += 2) if (bytes[i] === 0) nulls++;
+        const isUtf16 = bytes.length > 4 && nulls > bytes.length / 4;
+        const text = isUtf16
+            ? new TextDecoder("utf-16le").decode(bytes)
+            : new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+        const printable = [...text].filter((c) => {
+            const code = c.charCodeAt(0);
+            return code === 9 || code === 10 || code === 13 || (code >= 32 && code < 127) || code > 160;
+        }).length;
+        return { text, printable: printable / (text.length || 1) > 0.8, isUtf16 };
+    } catch {
+        return null;
+    }
+}
+
+/** Find every base64 run in a string worth offering to decode. */
+function findBase64(text) {
+    const hits = [];
+    for (const m of String(text).matchAll(B64_RE)) {
+        if (looksLikeBase64(m[0])) hits.push(m[0]);
+    }
+    return hits;
+}
+
+// Cache of base64 strings by a short id, so the click handler can retrieve the
+// full value without stuffing it into a DOM attribute.
+const b64Cache = new Map();
+let b64Counter = 0;
+
+/** Render a command line, escaped, with a "decode" button after each base64 run
+ *  it contains. Use this everywhere a command line is shown. */
+function renderCommand(text) {
+    const escaped = escapeHtml(text);
+    const hits = findBase64(text);
+    if (!hits.length) return escaped;
+
+    // Append one decode button per distinct base64 run found.
+    const buttons = [...new Set(hits)].map((b64) => {
+        const id = "b64_" + (b64Counter++);
+        b64Cache.set(id, b64);
+        return `<button class="b64-btn" data-b64="${id}" title="Decode base64">&#9660; decode</button>`;
+    }).join("");
+
+    return `${escaped} ${buttons}`;
+}
+
+/** Word count for the notes limit -- splits on whitespace, ignoring empties. */
+function countWords(text) {
+    const t = String(text || "").trim();
+    return t ? t.split(/\s+/).length : 0;
+}
+
 function baseName(path) {
     if (!path) return "unknown";
     const parts = String(path).split(/[\\/]/);
@@ -98,12 +179,14 @@ function incidentHtml(incident, isFresh) {
     const members = expanded ? membersHtml(incident) : "";
 
     return `
-    <article class="inc${isFresh ? " fresh" : ""}" data-sev="${escapeHtml(severity)}">
+    <article class="inc${isFresh ? " fresh" : ""}${incident.status === "closed" ? " is-closed" : ""}" data-sev="${escapeHtml(severity)}">
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
           ${badge}
           <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
+          ${incident.status && incident.status !== "new" ? `<span class="inc-status-badge">${escapeHtml(incident.status.replace("_", " "))}</span>` : ""}
+          ${incident.classification ? `<span class="inc-status-badge cls-${escapeHtml(incident.classification)}">${escapeHtml({ tp: "TP", fp: "FP", tp_benign: "TP-benign", inconclusive: "inconclusive" }[incident.classification] || incident.classification)}</span>` : ""}
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>
           </span>
@@ -248,9 +331,9 @@ function timelineDetail(d) {
     push("DNS query", f.dns_query);
 
     const cmd = d.command_line
-        ? `<div class="tl-detail-cmd">${escapeHtml(d.command_line)}</div>` : "";
+        ? `<div class="tl-detail-cmd">${renderCommand(d.command_line)}</div>` : "";
     const parentCmd = f.parent_command_line
-        ? `<div class="tl-detail-parentcmd"><span class="tl-detail-key">Parent cmd</span>${escapeHtml(f.parent_command_line)}</div>` : "";
+        ? `<div class="tl-detail-parentcmd"><span class="tl-detail-key">Parent cmd</span>${renderCommand(f.parent_command_line)}</div>` : "";
     // Hashes get a "Check" button: the strongest hash present is looked up on
     // VirusTotal. A flagged hash is the strongest signal the tool can surface --
     // it turns "a process ran" into "a known-malicious binary executed".
@@ -404,6 +487,48 @@ function humanGap(ms) {
 /** Render the incident behavior profile: a narrative summary plus the ordered
  *  kill-chain phases. Fetched once and cached on the incident object, since it
  *  is derived from detections that do not change after the incident closes. */
+/** The triage panel: status, classification, and notes. This is where an
+ *  analyst works an incident -- the SOC workflow the engine cannot automate.
+ *  Rendered at the top of the drill-down, above the behavior profile. */
+function triageHtml(incident) {
+    const status = incident.status || "new";
+    const cls = incident.classification || "";
+
+    const statusBtn = (value, label) =>
+        `<button class="triage-status${status === value ? " on" : ""}" data-triage-status="${value}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
+
+    const CLASSES = [
+        ["tp", "True Positive"],
+        ["fp", "False Positive"],
+        ["tp_benign", "TP - Benign"],
+        ["inconclusive", "Inconclusive"],
+    ];
+    const classBtn = ([value, label]) =>
+        `<button class="triage-class${cls === value ? " on cls-" + value : ""}" data-triage-class="${value}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
+
+    return `
+    <div class="triage">
+      <div class="triage-row">
+        <span class="triage-label">Status</span>
+        <div class="triage-btns">
+          ${statusBtn("new", "New")}${statusBtn("in_progress", "In progress")}${statusBtn("closed", "Closed")}
+        </div>
+      </div>
+      <div class="triage-row">
+        <span class="triage-label">Verdict</span>
+        <div class="triage-btns">${CLASSES.map(classBtn).join("")}</div>
+      </div>
+      <div class="triage-row triage-notes-row">
+        <span class="triage-label">Notes</span>
+        <div class="triage-notes-wrap">
+          <textarea class="triage-notes" data-incident="${escapeHtml(incident.id)}"
+            placeholder="Analyst notes\u2026 (plain text, 500 words max)">${escapeHtml(incident.notes || "")}</textarea>
+          <span class="triage-wordcount" data-for="${escapeHtml(incident.id)}">${countWords(incident.notes || "")} / 500 words</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function profileHtml(incident) {
     if (incident._profile === undefined) {
         // Not fetched yet: kick off the fetch and show a placeholder. The fetch
@@ -447,7 +572,7 @@ function membersHtml(incident) {
       <span class="member-id">${escapeHtml(d.rule_id)}</span>
       <span class="member-title">${escapeHtml(d.title)}</span>
       <span class="member-time">${clockTime(d.matched_at)}</span>
-      ${d.command_line ? `<div class="cmd">${escapeHtml(d.command_line)}</div>` : ""}
+      ${d.command_line ? `<div class="cmd">${renderCommand(d.command_line)}</div>` : ""}
       ${evidenceHtml(d)}
     </div>`).join("");
 
@@ -468,6 +593,7 @@ function membersHtml(incident) {
         `<button class="view-tab${view === id ? " on" : ""}" data-view="${id}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
 
     return `
+    ${triageHtml(incident)}
     ${profileHtml(incident)}
     <div class="member-views">
       ${tab("list", "List")}${tab("timeline", "Timeline")}${tab("tree", "Process tree")}
@@ -551,8 +677,8 @@ function metric(value, label, accent = false) {
 function visibleIncidents() {
     const all = [...state.incidents.values()];
 
-    // An active search overrides the triage/all filter: when you search, you want
-    // to search everything, not just what happened to be in the current view.
+    // An active search overrides the scope filter: when you search, you want to
+    // search everything -- open and closed -- not just the current view.
     if (state.searchResults !== null) {
         const order = new Map(state.searchResults.map((id, i) => [id, i]));
         return all
@@ -560,7 +686,15 @@ function visibleIncidents() {
             .sort((a, b) => order.get(a.id) - order.get(b.id));  // keep server ranking
     }
 
-    const scoped = state.scope === "triage" ? all.filter((i) => i.actionable) : all;
+    let scoped;
+    if (state.scope === "closed") {
+        scoped = all.filter((i) => i.status === "closed");
+    } else {
+        // Live queue: closed incidents leave it. "triage" additionally narrows to
+        // actionable; "all" shows every open incident.
+        const open = all.filter((i) => i.status !== "closed");
+        scoped = state.scope === "triage" ? open.filter((i) => i.actionable) : open;
+    }
     return scoped.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
 }
 
@@ -707,7 +841,7 @@ async function bootstrap() {
     try {
         const [health, incidents, detections] = await Promise.all([
             fetch("/health").then((r) => r.json()),
-            fetch("/incidents?limit=200").then((r) => r.json()),
+            fetch("/incidents?view=all&limit=300").then((r) => r.json()),
             fetch("/detections?limit=300").then((r) => r.json()),
         ]);
 
@@ -1058,4 +1192,129 @@ document.addEventListener("DOMContentLoaded", () => {
     if (input) input.addEventListener("keydown", (e) => {
         if (e.key === "Escape") { input.value = ""; runSearch(""); }
     });
+});
+
+/* ---- Base64 decode popup ---- */
+
+function showB64Popup(encoded, decoded, button) {
+    // Remove any existing popup.
+    document.querySelectorAll(".b64-popup").forEach((p) => p.remove());
+
+    const popup = document.createElement("div");
+    popup.className = "b64-popup";
+
+    if (!decoded) {
+        popup.innerHTML = `<div class="b64-popup-head">Decode failed</div>
+      <div class="b64-popup-body">This is not valid base64.</div>`;
+    } else {
+        const encoding = decoded.isUtf16 ? "UTF-16LE (PowerShell -enc)" : "UTF-8";
+        const warn = decoded.printable ? "" :
+            `<div class="b64-warn">Output looks binary, not text - showing best effort.</div>`;
+        popup.innerHTML = `
+      <div class="b64-popup-head">
+        Decoded <span class="b64-enc">${escapeHtml(encoding)}</span>
+        <button class="b64-close" aria-label="Close">&times;</button>
+      </div>
+      ${warn}
+      <div class="b64-popup-body">${escapeHtml(decoded.text)}</div>
+      <div class="b64-popup-src">${escapeHtml(encoded.slice(0, 60))}${encoded.length > 60 ? "..." : ""}</div>`;
+    }
+
+    document.body.appendChild(popup);
+
+    // Position near the button, kept within the viewport.
+    const rect = button.getBoundingClientRect();
+    popup.style.top = `${window.scrollY + rect.bottom + 6}px`;
+    const left = window.scrollX + rect.left;
+    popup.style.left = `${Math.min(left, window.scrollX + window.innerWidth - 380)}px`;
+
+    const close = popup.querySelector(".b64-close");
+    if (close) close.addEventListener("click", () => popup.remove());
+}
+
+// Delegated: decode button click, and dismiss on outside click / Escape.
+document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-b64]");
+    if (btn) {
+        event.stopPropagation();
+        const encoded = b64Cache.get(btn.dataset.b64);
+        showB64Popup(encoded, encoded ? decodeBase64(encoded) : null, btn);
+        return;
+    }
+    if (!event.target.closest(".b64-popup")) {
+        document.querySelectorAll(".b64-popup").forEach((p) => p.remove());
+    }
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") document.querySelectorAll(".b64-popup").forEach((p) => p.remove());
+});
+
+
+/* ---- Triage: status, classification, notes ---- */
+
+async function patchTriage(incidentId, body) {
+    try {
+        const r = await fetch(`/incidents/${incidentId}/triage`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!r.ok) return null;
+        const updated = await r.json();
+        // Merge the server's authoritative fields back into local state.
+        const existing = state.incidents.get(incidentId) || {};
+        state.incidents.set(incidentId, { ...existing, ...updated, _members: existing._members });
+        renderQueue();
+        return updated;
+    } catch {
+        return null;
+    }
+}
+
+// Status and classification buttons (delegated, since the panel re-renders).
+document.addEventListener("click", (event) => {
+    const s = event.target.closest("[data-triage-status]");
+    if (s) { patchTriage(s.dataset.incident, { status: s.dataset.triageStatus }); return; }
+    const c = event.target.closest("[data-triage-class]");
+    if (c) {
+        // Toggle off if already set to this verdict.
+        const inc = state.incidents.get(c.dataset.incident);
+        const next = (inc && inc.classification === c.dataset.triageClass) ? "" : c.dataset.triageClass;
+        patchTriage(c.dataset.incident, { classification: next });
+        return;
+    }
+});
+
+// Notes: debounced autosave on input, so typing does not fire a request per key.
+let notesTimer = null;
+document.addEventListener("input", (event) => {
+    const ta = event.target.closest(".triage-notes");
+    if (!ta) return;
+    const id = ta.dataset.incident;
+    const value = ta.value;
+    const words = countWords(value);
+
+    // Live word counter, turning red past the limit.
+    const counter = document.querySelector(`.triage-wordcount[data-for="${id}"]`);
+    if (counter) {
+        counter.textContent = `${words} / 500 words`;
+        counter.classList.toggle("over", words > 500);
+    }
+
+    clearTimeout(notesTimer);
+    // Over the limit: do not save. The server would reject it anyway; this just
+    // avoids a doomed request and keeps what the analyst has locally.
+    if (words > 500) return;
+
+    notesTimer = setTimeout(() => {
+        // Save without re-rendering the queue, so the textarea keeps focus.
+        fetch(`/incidents/${id}/triage`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes: value }),
+        }).then(() => {
+            const inc = state.incidents.get(id);
+            if (inc) inc.notes = value;
+        });
+    }, 600);
 });

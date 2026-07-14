@@ -1695,3 +1695,256 @@ main {
         justify-content: flex-start;
     }
 }
+
+/* ---------- Base64 decode ---------- */
+
+.b64-btn {
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--attack);
+    color: var(--attack);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .04em;
+    padding: 0 5px;
+    margin-left: 4px;
+    vertical-align: middle;
+    white-space: nowrap;
+    transition: background .12s, color .12s;
+}
+
+.b64-btn:hover {
+    background: var(--attack);
+    color: var(--bg);
+}
+
+.b64-btn:focus-visible {
+    outline: 2px solid var(--attack);
+    outline-offset: 1px;
+}
+
+.b64-popup {
+    position: absolute;
+    z-index: 200;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-left: 3px solid var(--attack);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, .55);
+}
+
+.b64-popup-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 700;
+}
+
+.b64-enc {
+    color: var(--attack);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.b64-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-mute);
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+.b64-close:hover {
+    color: var(--text);
+}
+
+.b64-popup-body {
+    padding: 11px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.b64-popup-src {
+    padding: 6px 12px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-mute);
+    word-break: break-all;
+    background: var(--sunken);
+}
+
+.b64-warn {
+    padding: 6px 12px;
+    font-size: 10px;
+    color: var(--sev-medium);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Triage panel ----------
+     Where the analyst works an incident: status, verdict, notes. The SOC
+     workflow the engine cannot automate. */
+
+.triage {
+    margin: 11px 0;
+    padding: 12px 15px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.triage-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.triage-label {
+    flex: 0 0 62px;
+    padding-top: 4px;
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+}
+
+.triage-btns {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.triage-status,
+.triage-class {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .04em;
+    padding: 4px 10px;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.triage-status:hover,
+.triage-class:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+.triage-status.on {
+    background: var(--struct);
+    color: var(--bg);
+    border-color: var(--struct);
+}
+
+/* Verdict colours: TP red, FP muted, benign amber, inconclusive neutral. */
+.triage-class.on {
+    color: var(--bg);
+    font-weight: 700;
+}
+
+.triage-class.on.cls-tp {
+    background: var(--sev-critical);
+    border-color: var(--sev-critical);
+}
+
+.triage-class.on.cls-fp {
+    background: var(--text-mute);
+    border-color: var(--text-mute);
+}
+
+.triage-class.on.cls-tp_benign {
+    background: var(--sev-medium);
+    border-color: var(--sev-medium);
+}
+
+.triage-class.on.cls-inconclusive {
+    background: var(--text-dim);
+    border-color: var(--text-dim);
+}
+
+.triage-notes-row {
+    align-items: stretch;
+}
+
+.triage-notes {
+    flex: 1;
+    min-height: 46px;
+    resize: vertical;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 9px;
+    line-height: 1.5;
+}
+
+.triage-notes:focus {
+    outline: none;
+    border-color: var(--struct);
+}
+
+.triage-notes::placeholder {
+    color: var(--text-mute);
+}
+
+/* A closed incident's row carries a subtle marker. */
+.inc.is-closed {
+    opacity: .7;
+}
+
+.inc-status-badge {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    border: 1px solid var(--border-hi);
+    padding: 1px 6px;
+    margin-left: 6px;
+}
+
+/* Notes word counter */
+.triage-notes-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.triage-wordcount {
+    font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: .05em;
+    align-self: flex-end;
+}
+
+.triage-wordcount.over {
+    color: var(--sev-critical);
+    font-weight: 700;
+}

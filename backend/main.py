@@ -18,7 +18,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.api import (
@@ -30,6 +30,7 @@ from backend.api import (
     profile,
     report,
     search,
+    triage,
     ws,
 )
 from backend.config import BASE_DIR, settings
@@ -115,6 +116,7 @@ app.include_router(enrich.router)
 app.include_router(report.router)
 app.include_router(search.router)
 app.include_router(profile.router)
+app.include_router(triage.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
@@ -125,6 +127,22 @@ app.mount("/static", StaticFiles(directory=str(FRONTEND / "static")), name="stat
 async def console() -> FileResponse:
     """Serve the analyst console."""
     return FileResponse(CONSOLE)
+
+
+_FAVICON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+    '<rect width="32" height="32" rx="6" fill="#0B0F14"/>'
+    '<path d="M16 4l9 3.5v7c0 5.8-3.9 9.6-9 11.5-5.1-1.9-9-5.7-9-11.5v-7L16 4z" '
+    'fill="none" stroke="#3FB6C8" stroke-width="2" stroke-linejoin="round"/>'
+    '<circle cx="16" cy="15" r="2.5" fill="#3FB6C8"/>'
+    '<path d="M16 17.5v4" stroke="#3FB6C8" stroke-width="2" stroke-linecap="round"/></svg>'
+)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> Response:
+    """Serve the shield favicon as SVG, so browsers stop 404-ing on /favicon.ico."""
+    return Response(content=_FAVICON, media_type="image/svg+xml")
 
 
 @app.get("/incident/{incident_id}", include_in_schema=False)

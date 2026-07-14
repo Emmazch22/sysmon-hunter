@@ -102,6 +102,15 @@ class IncidentRow(Base):
     process_tree: Mapped[list[dict]] = mapped_column(JSON, default=list)
     actionable: Mapped[int] = mapped_column(Integer, default=0)  # SQLite has no bool
 
+    # --- SOC triage state ---
+    # An incident's lifecycle: new -> in_progress -> closed. Set by the analyst,
+    # not the engine, so upsert must never overwrite it -- see upsert_incident.
+    status: Mapped[str] = mapped_column(String(16), default="new", index=True)
+    # Analyst verdict, set at any point: tp, fp, tp_benign, inconclusive, or "".
+    classification: Mapped[str] = mapped_column(String(16), default="")
+    # Free-text analyst notes, persisted and shown in the report.
+    notes: Mapped[str] = mapped_column(Text, default="")
+
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -199,15 +208,56 @@ async def list_detections(limit: int = 100) -> list[DetectionRow]:
 
 
 async def list_incidents(
-    limit: int = 50, actionable_only: bool = False
+    limit: int = 50,
+    actionable_only: bool = False,
+    status: str | None = None,
+    exclude_status: str | None = None,
 ) -> list[IncidentRow]:
-    """Most recent incidents, newest first (the console leads with the worst)."""
+    """Most recent incidents, newest first (the console leads with the worst).
+
+    `status` filters to one lifecycle state; `exclude_status` drops one (used to
+    keep closed incidents out of the live queue). They are separate params
+    because the queue wants "everything except closed" while the Closed tab wants
+    "only closed" -- two different filters, not one.
+    """
     async with Session() as session:
         stmt = select(IncidentRow).order_by(IncidentRow.last_seen.desc()).limit(limit)
         if actionable_only:
             stmt = stmt.where(IncidentRow.actionable == 1)
+        if status is not None:
+            stmt = stmt.where(IncidentRow.status == status)
+        if exclude_status is not None:
+            stmt = stmt.where(IncidentRow.status != exclude_status)
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+
+async def update_incident_triage(
+    incident_id: str,
+    status: str | None = None,
+    classification: str | None = None,
+    notes: str | None = None,
+) -> IncidentRow | None:
+    """Update an incident's analyst-owned fields. Returns the row, or None if
+    the incident does not exist.
+
+    Only the fields passed are changed, so setting a note does not reset the
+    status. These columns belong to the analyst and are never touched by the
+    engine's upsert -- this is the only path that writes them.
+    """
+    async with Session() as session:
+        row = await session.get(IncidentRow, incident_id)
+        if row is None:
+            return None
+        if status is not None:
+            row.status = status
+        if classification is not None:
+            row.classification = classification
+        if notes is not None:
+            row.notes = notes
+        await session.commit()
+        await session.refresh(row)
+        return row
 
 
 async def get_incident_detections(incident_id: str) -> list[DetectionRow]:

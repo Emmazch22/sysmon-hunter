@@ -102,6 +102,9 @@ def serialize_incident(incident: Incident, actionable: bool) -> dict[str, Any]:
         "process_tree": incident.process_tree,
         "techniques": incident.techniques,
         "actionable": actionable,
+        "status": "new",
+        "classification": "",
+        "notes": "",
         "first_seen": incident.first_seen.isoformat(),
         "last_seen": incident.last_seen.isoformat(),
     }
@@ -120,6 +123,9 @@ def serialize_incident_row(row: IncidentRow) -> dict[str, Any]:
         "process_tree": row.process_tree or [],
         "techniques": row.techniques or [],
         "actionable": bool(row.actionable),
+        "status": row.status or "new",
+        "classification": row.classification or "",
+        "notes": row.notes or "",
         "first_seen": row.first_seen.isoformat(),
         "last_seen": row.last_seen.isoformat(),
     }
