@@ -24,9 +24,17 @@ FIELD_MAP: dict[str, str] = {
     "ParentProcessGuid": "parent_process_guid",
     "ProcessId": "process_id",
     "User": "user",
-    # Sysmon EventID 8/10 describe a *target* process. Mapping it onto `image`
-    # would be wrong -- the target is not the actor -- so these stay in raw and
-    # rules address them by their Sysmon names (TargetImage, SourceImage).
+    # EventID 8 (CreateRemoteThread) and 10 (ProcessAccess) name the *acting*
+    # process with Source* fields, not Image/ProcessGuid. The source IS the
+    # actor -- mimikatz.exe reaching into lsass.exe -- so it is promoted to the
+    # same attributes a normal process-creation event uses, which is what lets
+    # the correlator attach the access to the process tree and the console show
+    # "mimikatz.exe accessed LSASS" instead of an anonymous handle. The target
+    # stays in raw (TargetImage) for rules to match on.
+    "SourceImage": "image",
+    "SourceProcessGuid": "process_guid",
+    "SourceProcessGUID": "process_guid",  # real Sysmon EVTX uses GUID uppercase
+    "SourceProcessId": "process_id",
 }
 
 
@@ -98,10 +106,7 @@ def normalize(payload: dict[str, Any]) -> Event:
             fields.pop("process_id")
 
     raw_event_id = (
-        winlog.get("event_id")
-        or payload.get("EventID")
-        or data.get("EventID")
-        or 0
+        winlog.get("event_id") or payload.get("EventID") or data.get("EventID") or 0
     )
     try:
         event_id = int(raw_event_id)
