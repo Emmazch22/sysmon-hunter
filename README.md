@@ -13,67 +13,82 @@ encoded command" is a lead. The same detection sitting under a `WINWORD.EXE`
 root, next to a recon burst and an outbound beacon, with a Mimikatz hash
 confirmed malicious by VirusTotal, is an incident an analyst can act on now.
 
+Every detection rule in this project was written and validated against real
+malware telemetry — see [Detection engineering](#detection-engineering).
+
 ![Console](docs/01_console.png)
 
 ---
 
 ## What it does
 
-- **Rule-based detection** — 20 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 26 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 7 Sysmon event types (process
   creation, network, registry, image load, process access, file create, named
   pipes). Indexed by EventID so only relevant rules run per event.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
-  full chain: `WINWORD.EXE -> cmd.exe -> powershell.exe`.
+  full branching tree.
 - **Statistical beacon detection** — finds periodic C2 callbacks no single-event
   rule can see, robust to the jitter every modern C2 applies.
 - **Reconnaissance-burst detection** — flags clusters of *distinct* ATT&CK
   discovery techniques in one process tree.
+- **Behavior profiling** — turns an incident's detections into a kill-chain
+  narrative: "gained initial access through a phishing document, executed an
+  obfuscated PowerShell payload, harvested credentials from LSASS, beaconed to
+  C2 every ~35s."
 - **Derived incident titles** — each incident is named from its contents:
   "Phishing to reconnaissance", "Credential access with C2", "Ransomware
-  preparation" — readable at a glance without expanding a row.
+  preparation".
 - **IOC enrichment** — IPs, domains and file hashes against AbuseIPDB and
   VirusTotal, on demand, cached, degrading gracefully with no API keys.
-- **Live console** — WebSocket feed, incident queue, interactive attack timeline,
-  clickable ATT&CK techniques with MITRE descriptions, full-page incident view,
-  PDF reports, and search.
+- **Analyst notes** — a free-text note per incident, on its full-page view.
+- **Live console** — WebSocket feed, incident queue, three incident views (list,
+  interactive timeline, full process tree), clickable ATT&CK techniques with
+  MITRE descriptions, inline base64 decoding, PDF reports, and search.
 
 ---
 
 ## The console
 
-### Incident detail with process chain and forensics
+### Incident detail: behavior profile, chain, and detections
 
-Expanding an incident shows every detection, its command line, and the full
-forensic context — who ran it, with what privileges, and the hashes for
-pivoting.
+Expanding an incident leads with a plain-language behavior profile, then the
+process chain and every detection with its full forensic context — who ran it,
+with what privileges, and the hashes for pivoting.
 
-![Incident](docs/02_incident_expanded.png)
+![Incident](docs/02_incident.png)
+
+### Full process tree
+
+Beyond the linear chain: the complete branching tree the incident spans. A
+foothold that spawned several children shows every branch. Nodes that fired a
+detection are coloured by severity; benign context processes are hollow.
+
+![Process tree](docs/03_process_tree.png)
 
 ### Interactive attack timeline
 
 The timeline places each detection in sequence with the real time gap between
-steps. Clicking a node opens a forensic detail popup: process, parent, user,
-integrity level, hashes, and — for a binary — a one-click VirusTotal hash lookup.
+steps. Clicking a node opens a forensic popup: process, parent, user, integrity
+level, hashes, and — for a binary — a one-click VirusTotal hash lookup.
 
-![Timeline](docs/03_timeline.png)
+![Timeline](docs/04_timeline.png)
 
-### ATT&CK techniques, in context
+### Full-page incident view with analyst notes
 
-Every technique chip opens its official MITRE description, fetched from a local
-copy of the ATT&CK STIX dataset — no leaving the console to look up what
-T1003.001 means.
+Each incident has a dedicated page with a summary, ATT&CK techniques, a
+plain-text analyst note (500-word limit), and every detection with forensics and
+a base64 decode button for encoded command lines.
 
-![MITRE](docs/04_mitre_modal.png)
+![Incident page](docs/05_incident_page.png)
 
-### Search
+### ATT&CK techniques in context
 
-One box for free text and field filters: `mimikatz`, `host:FIN-WS-07`,
-`technique:t1003`, `severity:critical lsass`. An incident matches if any of its
-detections — or its title and process chain — match.
+Every technique chip opens its official MITRE description, from a local copy of
+the ATT&CK STIX dataset — no leaving the console to look up what T1003.001 means.
 
-![Search](docs/05_search.png)
+![MITRE](docs/06_mitre_modal.png)
 
 ---
 
@@ -117,6 +132,30 @@ EVTX replay script, and pytest with no server at all.
 
 ---
 
+## Detection engineering
+
+Every rule in the corpus was written and validated against real malware
+telemetry, not synthetic fixtures. The workflow, repeated for each sample:
+replay a known-bad `.evtx`, find what fires (or doesn't), analyse the gap, write
+the rule, and validate it against the sample — true positives fire, legitimate
+activity stays quiet.
+
+Rules built this way from real samples include:
+
+- **Ostap loader** (`.cpl` disguised as an invoice → encoded JScript): a control
+  panel item run from a user-writable path, an encoded script host, and a script
+  host spawned by rundll32.
+- **WinPwnage** (`rundll32 url.dll,OpenURL` / `FileProtocolHandler`): a LOLBAS
+  execution technique that runs payloads through the shell's protocol handlers.
+- **IIS credential discovery** (`appcmd list apppool /text:processmodel.password`):
+  dumping application-pool credentials in plaintext.
+
+The same process surfaced a normalizer bug: EventID 8/10 name the acting process
+with `Source*` fields, not `Image`/`ProcessGuid` — so credential-dumping and
+injection detections were not capturing *who* did it. Fixed and tested.
+
+---
+
 ## Design decisions
 
 The choices below are what separate this from a `grep` over event logs. Each is
@@ -150,10 +189,6 @@ provider degrades to "unavailable" without a key. Private IPs are never sent to 
 third party. Hashes prefer SHA256 over MD5, since MD5 collisions are cheap enough
 that malware authors produce them deliberately.
 
-**One serializer, two paths.** The console loads history over REST and receives
-live updates over WebSocket, both from a single serializer — so a rendered row
-cannot tell which path it arrived on.
-
 ---
 
 ## Getting started
@@ -171,43 +206,34 @@ python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 - Console: <http://localhost:8000>
 - API docs: <http://localhost:8000/api/docs>
-- Health: <http://localhost:8000/health>
 
 ### See it populated
-
-Two seed scripts fill the console with realistic incidents:
 
 ```bash
 python scripts/seed_apt.py    # one deep multi-stage intrusion (score 172)
 python scripts/seed_demo.py   # eight varied incidents across the kill chain
 ```
 
-`seed_apt.py` builds a full intrusion on one host — phishing -> recon -> Mimikatz
-(with real hashes) -> LSASS -> beacon -> persistence -> exfil — as a single
-correlated incident with a deep process tree. `seed_demo.py` adds lateral
-movement to a domain controller, an IIS web shell, browser credential theft, and
-a complete ransomware sequence.
+### Analyse a real sample
+
+Replay a Sysmon `.evtx` — from a lab VM, or the
+[EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES) corpus,
+where each file is one ATT&CK technique:
+
+```bash
+pip install evtx
+python scripts/replay_evtx.py --file samples/sysmon_credential_access.evtx
+```
 
 ### Optional: IOC enrichment
 
-Enrichment works without keys (every provider simply reports unavailable). For
-live reputation, add free API keys to a `.env` file:
+Works without keys (every provider reports unavailable). For live reputation,
+add free API keys to a `.env` file:
 
 ```
 HUNTER_ABUSEIPDB_API_KEY=...    # https://www.abuseipdb.com/register
 HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 ```
-
-### Replay real telemetry
-
-```bash
-pip install evtx
-python scripts/replay_evtx.py --file samples/lateral_movement.evtx
-```
-
-Point it at an `.evtx` from a lab VM or the
-[EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES) corpus,
-where each file is one ATT&CK technique.
 
 ---
 
@@ -215,14 +241,12 @@ where each file is one ATT&CK technique.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 163 tests
+python -m pytest        # 199 tests
 ```
 
-The suite is worth reading as documentation: each design decision above has a
-test named for it. The negative tests in `test_beacon.py` — human browsing,
-page-load bursts — are the ones that decide whether the beacon detector is usable
-on a real network, and are where two real design bugs were caught during
-development.
+The suite doubles as documentation: each design decision has a test named for
+it, and every shipped rule is validated against a true positive it must catch
+and a true negative it must ignore.
 
 ---
 
@@ -234,8 +258,7 @@ docker compose up --build
 
 Multi-stage build: the runtime image carries only the app and its virtualenv, not
 the build tooling. Runs as an unprivileged user, self-migrates on start, and
-health-checks `/health`. Rules are mounted read-only for hot-reload; the database
-lives on a named volume across rebuilds.
+health-checks `/health`.
 
 ---
 
@@ -247,32 +270,19 @@ sysmon-hunter/
 │   ├── main.py              FastAPI app, lifespan, background sweep
 │   ├── config.py            all tunables
 │   ├── api/                 ingest, detections, incidents, attack, enrich,
-│   │                        report, search, ws, serializers
+│   │                        report, search, notes, ws, serializers
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, enrichment, search,
-│   │                        report, pipeline
+│   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   20 YAML detection rules, by EventID
+├── rules/                   26 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   163 tests
+└── tests/                   199 tests
 ```
-
----
-
-## Lab setup
-
-To generate live telemetry rather than replaying it:
-
-- A Windows VM with [Sysmon](https://learn.microsoft.com/sysinternals/downloads/sysmon)
-  and a config such as [SwiftOnSecurity's](https://github.com/SwiftOnSecurity/sysmon-config).
-- [Winlogbeat](https://www.elastic.co/beats/winlogbeat) shipping the Sysmon
-  channel to `POST /ingest`.
-- [Atomic Red Team](https://github.com/redcanaryco/invoke-atomicredteam) to fire
-  the ATT&CK technique behind each rule and confirm it triggers.
 
 ---
 
