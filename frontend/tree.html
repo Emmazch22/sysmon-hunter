@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Process tree — Sysmon Hunter</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%230B0F14%22/%3E%3Cpath%20d%3D%22M16%204l9%203.5v7c0%205.8-3.9%209.6-9%2011.5-5.1-1.9-9-5.7-9-11.5v-7L16%204z%22%20fill%3D%22none%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%222.5%22%20fill%3D%22%233FB6C8%22/%3E%3Cpath%20d%3D%22M16%2017.5v4%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/console.css">
+    <style>
+        /* Full-screen process-tree viewer. Reuses the console's design tokens and
+         the .tl-detail / .tree-detail-* card styles from console.css, and adds
+         only the viewport/pan/zoom chrome this dedicated page needs. */
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        header.tp-head {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 11px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-wrap: wrap;
+        }
+
+        .tp-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-mute);
+            text-decoration: none;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            flex: 0 0 auto;
+        }
+
+        .tp-back:hover {
+            color: var(--struct);
+        }
+
+        .tp-title {
+            font-family: var(--display);
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 420px;
+        }
+
+        .tp-meta {
+            display: flex;
+            gap: 14px;
+            font-size: 11px;
+            color: var(--text-dim);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .tp-sev {
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            font-size: 10px;
+            color: var(--sev);
+        }
+
+        .tp-spacer {
+            flex: 1;
+        }
+
+        .tp-main {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+
+        .tp-viewport {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/22px 22px,
+                var(--bg);
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .tp-viewport.dragging {
+            cursor: grabbing;
+        }
+
+        .tp-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+        }
+
+        .tp-canvas svg {
+            display: block;
+        }
+
+        .tp-legend {
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            z-index: 5;
+            display: flex;
+            gap: 16px;
+            padding: 8px 12px;
+            background: color-mix(in srgb, var(--surface) 88%, transparent);
+            border: 1px solid var(--border);
+            font-size: 10px;
+            color: var(--text-mute);
+            backdrop-filter: blur(2px);
+        }
+
+        .tp-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tp-toolbar {
+            position: absolute;
+            right: 16px;
+            bottom: 16px;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 6px;
+            background: color-mix(in srgb, var(--surface) 88%, transparent);
+            border: 1px solid var(--border);
+            padding: 8px;
+        }
+
+        .tp-tool-btn {
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 14px;
+            line-height: 1;
+            width: 30px;
+            height: 26px;
+            cursor: pointer;
+            transition: color .12s, border-color .12s;
+        }
+
+        .tp-tool-btn:hover {
+            color: var(--text);
+            border-color: var(--struct);
+        }
+
+        .tp-zoom-pct {
+            text-align: center;
+            font-size: 9px;
+            color: var(--text-mute);
+            font-family: var(--mono);
+            padding-top: 2px;
+        }
+
+        .tp-hint {
+            position: absolute;
+            left: 16px;
+            bottom: 16px;
+            z-index: 5;
+            font-size: 10px;
+            color: var(--text-mute);
+            background: color-mix(in srgb, var(--surface) 80%, transparent);
+            padding: 5px 9px;
+            border: 1px solid var(--border);
+        }
+
+        .tp-side {
+            width: 380px;
+            flex: 0 0 auto;
+            border-left: 1px solid var(--border);
+            background: var(--surface);
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .tp-side .tl-detail {
+            margin-bottom: 10px;
+        }
+
+        .tp-side .tl-detail::before {
+            display: none;
+        }
+
+        .tp-side-empty {
+            color: var(--text-mute);
+            font-size: 11px;
+            text-align: center;
+            padding: 60px 12px;
+            border: 1px dashed var(--border-hi);
+        }
+
+        .tp-side-head {
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .loading,
+        .error {
+            margin: auto;
+            text-align: center;
+            color: var(--text-mute);
+            padding: 40px;
+        }
+
+        .error-mark {
+            font-family: var(--display);
+            color: var(--sev-critical);
+            font-size: 13px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .tp-side {
+                position: fixed;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 20;
+                box-shadow: -14px 0 40px rgba(0, 0, 0, .5);
+            }
+
+            .tp-title {
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-back" viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6" />
+        </symbol>
+    </svg>
+
+    <div id="page" style="display:flex; flex-direction:column; height:100%;">
+        <div class="loading">Loading process tree&hellip;</div>
+    </div>
+
+    <script>
+        "use strict";
+
+        const SEVERITY_VAR = {
+            critical: "var(--sev-critical)", high: "var(--sev-high)",
+            medium: "var(--sev-medium)", low: "var(--sev-low)", info: "var(--sev-info)",
+        };
+        const SEV_RANK = ["info", "low", "medium", "high", "critical"];
+        const FORENSIC_LABELS = {
+            user: "User", integrity_level: "Integrity level", logon_id: "Logon ID",
+            session_id: "Session ID", process_id: "PID", parent_process_id: "Parent PID",
+            current_directory: "Working directory", hashes: "Hashes",
+            destination_ip: "Destination IP", destination_port: "Destination port",
+            destination_hostname: "Destination host", target_image: "Target process",
+            target_filename: "Target file", registry_key: "Registry key",
+            granted_access: "Granted access", pipe_name: "Named pipe", dns_query: "DNS query",
+        };
+
+        function esc(v) {
+            return String(v ?? "").replace(/[&<>"']/g, (c) =>
+                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+        function baseName(p) { return p ? String(p).split(/[\\/]/).pop() : "unknown"; }
+        function fmtTime(iso) {
+            if (!iso) return "";
+            return new Date(iso).toLocaleString("en-GB", { hour12: false });
+        }
+
+        /** /incident/{id}/tree -- the id is the second-to-last path segment. */
+        function incidentId() {
+            const parts = location.pathname.split("/").filter(Boolean);
+            const i = parts.indexOf("incident");
+            return i >= 0 ? parts[i + 1] : parts[0];
+        }
+
+        async function load() {
+            const id = incidentId();
+            let data;
+            try {
+                const r = await fetch(`/incidents/${id}`);
+                if (!r.ok) throw new Error(String(r.status));
+                data = await r.json();
+            } catch {
+                document.getElementById("page").innerHTML = `
+        <div class="error">
+          <div class="error-mark">Incident not found</div>
+          <p>No incident with id ${esc(id)}.</p>
+          <p><a class="tp-back" href="/">&larr; Back to console</a></p>
+        </div>`;
+                return;
+            }
+            render(id, data);
+        }
+
+        function render(id, inc) {
+            const sev = (inc.severity || "medium").toLowerCase();
+            document.documentElement.style.setProperty("--sev", SEVERITY_VAR[sev] || SEVERITY_VAR.medium);
+
+            document.getElementById("page").innerHTML = `
+      <header class="tp-head">
+        <a class="tp-back" href="/incident/${esc(id)}"><svg class="ico"><use href="#i-back"/></svg> Incident</a>
+        <div class="tp-title">${esc(inc.title || "Suspicious activity")}</div>
+        <div class="tp-meta">
+          <span class="tp-sev">${esc(sev)}</span>
+          <span>score ${esc(inc.score)}</span>
+          <span>${esc(inc.host)}</span>
+          <span>${(inc.detections || []).length} detection${(inc.detections || []).length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="tp-spacer"></div>
+      </header>
+      <div class="tp-main">
+        <div class="tp-viewport" id="viewport">
+          <div class="tp-legend">
+            <span><span class="tree-dot flagged"></span> fired a detection</span>
+            <span><span class="tree-dot benign"></span> benign (context)</span>
+          </div>
+          <div class="tp-canvas" id="canvas"></div>
+          <div class="tp-toolbar">
+            <button class="tp-tool-btn" id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+            <button class="tp-tool-btn" id="zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
+            <button class="tp-tool-btn" id="zoom-fit" title="Fit to screen" aria-label="Fit to screen">&#8983;</button>
+            <div class="tp-zoom-pct" id="zoom-pct">100%</div>
+          </div>
+          <div class="tp-hint">Scroll to zoom &middot; drag to pan &middot; click a node for detail</div>
+        </div>
+        <aside class="tp-side" id="side">
+          <div class="tp-side-empty">Click a process node to see its full detail here.</div>
+        </aside>
+      </div>`;
+
+            initTree(inc.process_tree || [], inc.detections || []);
+        }
+
+        /* ---------- Tree data + rendering ---------- */
+
+        let selectedGuid = null;
+        let treeRows = [];
+        let treeByGuid = {};
+        let treeFlaggedNames = {};
+        let treeWidth = 640;
+        let treeHeight = 200;
+
+        function worstSeverity(dets) {
+            let worst = null;
+            for (const d of dets) {
+                const sev = (d.severity || "medium").toLowerCase();
+                if (!worst || SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(worst)) worst = sev;
+            }
+            return worst;
+        }
+
+        function initTree(nodes, detections) {
+            const canvas = document.getElementById("canvas");
+            if (!nodes.length) {
+                canvas.innerHTML = `<div style="padding:40px;color:var(--text-mute);font-size:12px;">No process tree captured for this incident.</div>`;
+                return;
+            }
+
+            treeByGuid = {};
+            for (const d of detections) {
+                if (!d.process_guid) continue;
+                (treeByGuid[d.process_guid] ||= []).push(d);
+            }
+            treeFlaggedNames = {};
+            for (const d of detections) {
+                if (d.process_guid) continue;
+                const name = baseName(d.image);
+                const sev = (d.severity || "medium").toLowerCase();
+                if (!treeFlaggedNames[name] || SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(treeFlaggedNames[name])) {
+                    treeFlaggedNames[name] = sev;
+                }
+            }
+
+            const guids = new Set(nodes.map((n) => n.guid));
+            const byParent = {};
+            const nodeByGuid = new Map(nodes.map((n) => [n.guid, n]));
+            for (const n of nodes) (byParent[n.parent_guid] ||= []).push(n);
+            const roots = nodes.filter((n) => !guids.has(n.parent_guid));
+
+            treeRows = [];
+            const walk = (guid, depth) => {
+                const node = nodeByGuid.get(guid);
+                if (!node) return;
+                treeRows.push({ node, depth });
+                for (const child of byParent[guid] || []) walk(child.guid, depth + 1);
+            };
+            for (const r of roots) walk(r.guid, 0);
+
+            drawTree();
+            setupViewport();
+            fitToView();
+        }
+
+        function drawTree() {
+            const rowH = 34;
+            const indent = 30;
+            const startX = 20;
+
+            let maxRight = 300;
+            for (const { node, depth } of treeRows) {
+                const textX = startX + depth * indent + 14;
+                const approxWidth = textX + (node.name || "").length * 7.6 + 40;
+                if (approxWidth > maxRight) maxRight = approxWidth;
+            }
+            treeWidth = Math.min(maxRight, 2400);
+            treeHeight = treeRows.length * rowH + 24;
+
+            let svg = `<svg width="${treeWidth}" height="${treeHeight}" viewBox="0 0 ${treeWidth} ${treeHeight}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Process tree">`;
+
+            treeRows.forEach((row, i) => {
+                const { node, depth } = row;
+                const x = startX + depth * indent;
+                const y = 20 + i * rowH;
+                const matched = treeByGuid[node.guid] || [];
+                const sev = matched.length ? worstSeverity(matched) : treeFlaggedNames[node.name];
+                const color = sev ? `var(--sev-${sev})` : "var(--text-dim)";
+                const isSelected = selectedGuid === node.guid;
+
+                if (depth > 0) {
+                    const px = startX + (depth - 1) * indent + 5;
+                    svg += `<path d="M${px} ${y - rowH + 5} L${px} ${y} L${x - 5} ${y}" fill="none" stroke="var(--border-hi)" stroke-width="1.2"/>`;
+                }
+
+                if (isSelected) {
+                    svg += `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${color}" stroke-width="1.6"/>`;
+                }
+                if (sev) {
+                    svg += `<circle cx="${x}" cy="${y}" r="5" fill="${color}"/>`;
+                    if (sev === "critical" && !isSelected) svg += `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+                } else {
+                    svg += `<circle cx="${x}" cy="${y}" r="4.5" fill="none" stroke="${color}" stroke-width="1.2"/>`;
+                }
+
+                const weight = sev ? "700" : "400";
+                svg += `<text x="${x + 14}" y="${y + 4.5}" fill="${sev ? color : 'var(--text)'}" font-size="13" font-weight="${weight}" font-family="monospace">${esc(node.name)}</text>`;
+
+                svg += `<rect x="0" y="${y - rowH / 2}" width="${treeWidth}" height="${rowH}" fill="transparent" data-tree-node="${esc(node.guid)}"><title>Click for detail</title></rect>`;
+            });
+
+            svg += `</svg>`;
+            document.getElementById("canvas").innerHTML = svg;
+        }
+
+        function selectNode(guid) {
+            selectedGuid = guid;
+            drawTree();
+            const row = treeRows.find((r) => r.node.guid === guid);
+            const side = document.getElementById("side");
+            if (!row) {
+                side.innerHTML = `<div class="tp-side-empty">Click a process node to see its full detail here.</div>`;
+                return;
+            }
+            const matched = treeByGuid[guid] || [];
+            side.innerHTML = `<div class="tp-side-head">Process detail</div>${nodeDetailHtml(row.node, matched)}`;
+        }
+
+        function nodeDetailHtml(node, matched) {
+            const rows = [];
+            const push = (label, value) => {
+                if (value) rows.push(
+                    `<div class="tl-detail-row"><span class="tl-detail-key">${esc(label)}</span>` +
+                    `<span class="tl-detail-val">${esc(value)}</span></div>`
+                );
+            };
+            push("Process", node.name);
+            push("Full path", node.image);
+            push("GUID", node.guid);
+            push("Parent GUID", node.parent_guid);
+            push("First seen", fmtTime(node.first_seen));
+            push("Last seen", fmtTime(node.last_seen));
+
+            const cmd = node.command_line ? `<div class="tl-detail-cmd">${esc(node.command_line)}</div>` : "";
+
+            let headSev = "info";
+            for (const d of matched) {
+                const sev = (d.severity || "medium").toLowerCase();
+                if (SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(headSev)) headSev = sev;
+            }
+
+            const identity = `
+        <div class="tl-detail" data-sev="${esc(headSev)}">
+          <div class="tl-detail-grid">${rows.join("")}</div>
+          ${cmd}
+        </div>`;
+
+            if (!matched.length) {
+                return `${identity}<div class="tree-detail-note">No detection fired on this process &mdash; benign context.</div>`;
+            }
+
+            const fired = matched
+                .slice()
+                .sort((a, b) => new Date(a.matched_at) - new Date(b.matched_at))
+                .map(detectionDetailHtml)
+                .join("");
+
+            return `${identity}
+        <div class="tree-detail-fired-head">Fired ${matched.length} detection${matched.length === 1 ? "" : "s"}</div>
+        ${fired}`;
+        }
+
+        function detectionDetailHtml(d) {
+            const f = d.forensics || {};
+            const rows = [];
+            const push = (label, value) => {
+                if (value) rows.push(
+                    `<div class="tl-detail-row"><span class="tl-detail-key">${esc(label)}</span>` +
+                    `<span class="tl-detail-val">${esc(value)}</span></div>`
+                );
+            };
+            push("Rule", `${d.rule_id} — ${d.title || ""}`);
+            push("Time", fmtTime(d.matched_at));
+            push("Process", d.image);
+            push("Parent", d.parent_image);
+            push("User", f.user);
+            push("Integrity", f.integrity_level);
+            push("PID", f.process_id);
+            push("Parent PID", f.parent_process_id);
+            push("Working dir", f.current_directory);
+            push("Logon ID", f.logon_id);
+            push("Session", f.session_id);
+            push("Destination", f.destination_ip
+                ? `${f.destination_ip}:${f.destination_port || "?"}${f.destination_hostname ? ` (${f.destination_hostname})` : ""}`
+                : "");
+            push("Target", f.target_image);
+            push("Access", f.granted_access);
+            push("Registry key", f.registry_key);
+            push("Named pipe", f.pipe_name);
+            push("DNS query", f.dns_query);
+
+            const cmd = d.command_line ? `<div class="tl-detail-cmd">${esc(d.command_line)}</div>` : "";
+            const parentCmd = f.parent_command_line
+                ? `<div class="tl-detail-parentcmd"><span class="tl-detail-key">Parent cmd</span>${esc(f.parent_command_line)}</div>` : "";
+            const hashes = f.hashes
+                ? `<div class="tl-detail-row" style="grid-column:1/-1"><span class="tl-detail-key">Hashes</span><span class="tl-detail-val hash">${esc(f.hashes)}</span></div>`
+                : "";
+            const techniques = (d.attack || [])
+                .map((t) => `<span class="chip" data-technique="${esc(t)}" role="button" tabindex="0">${esc(t)}</span>`)
+                .join(" ");
+
+            return `
+        <div class="tl-detail" data-sev="${esc((d.severity || "medium").toLowerCase())}">
+          <div class="tl-detail-grid">${rows.join("")}${hashes}</div>
+          ${cmd}
+          ${parentCmd}
+          ${techniques ? `<div class="tl-detail-tech">${techniques}</div>` : ""}
+        </div>`;
+        }
+
+        /* ---------- Pan + zoom ---------- */
+
+        const MIN_SCALE = 0.15;
+        const MAX_SCALE = 5;
+        const view = { scale: 1, x: 0, y: 0 };
+
+        function applyTransform() {
+            const canvas = document.getElementById("canvas");
+            canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+            const pct = document.getElementById("zoom-pct");
+            if (pct) pct.textContent = `${Math.round(view.scale * 100)}%`;
+        }
+
+        function clampScale(s) {
+            return Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+        }
+
+        function zoomAt(mx, my, factor) {
+            const newScale = clampScale(view.scale * factor);
+            view.x = mx - (mx - view.x) * (newScale / view.scale);
+            view.y = my - (my - view.y) * (newScale / view.scale);
+            view.scale = newScale;
+            applyTransform();
+        }
+
+        function zoomByButton(factor) {
+            const vp = document.getElementById("viewport");
+            const rect = vp.getBoundingClientRect();
+            zoomAt(rect.width / 2, rect.height / 2, factor);
+        }
+
+        function fitToView() {
+            const vp = document.getElementById("viewport");
+            if (!vp) return;
+            const rect = vp.getBoundingClientRect();
+            const pad = 48;
+            const scale = clampScale(Math.min(
+                (rect.width - pad * 2) / treeWidth,
+                (rect.height - pad * 2) / treeHeight,
+                1
+            ));
+            view.scale = scale;
+            view.x = (rect.width - treeWidth * scale) / 2;
+            view.y = Math.max(20, (rect.height - treeHeight * scale) / 2);
+            applyTransform();
+        }
+
+        function setupViewport() {
+            const vp = document.getElementById("viewport");
+
+            vp.addEventListener("wheel", (e) => {
+                e.preventDefault();
+                const rect = vp.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+                zoomAt(mx, my, factor);
+            }, { passive: false });
+
+            let panning = false;
+            let moved = false;
+            let startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+
+            vp.addEventListener("pointerdown", (e) => {
+                if (e.button !== 0) return;
+                panning = true;
+                moved = false;
+                startX = e.clientX;
+                startY = e.clientY;
+                startPanX = view.x;
+                startPanY = view.y;
+                vp.setPointerCapture(e.pointerId);
+                vp.classList.add("dragging");
+            });
+
+            vp.addEventListener("pointermove", (e) => {
+                if (!panning) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.hypot(dx, dy) > 4) moved = true;
+                view.x = startPanX + dx;
+                view.y = startPanY + dy;
+                applyTransform();
+            });
+
+            const endPan = (e) => {
+                if (!panning) return;
+                panning = false;
+                vp.classList.remove("dragging");
+                if (!moved) {
+                    const el = document.elementFromPoint(e.clientX, e.clientY);
+                    const hit = el && el.closest("[data-tree-node]");
+                    if (hit) selectNode(hit.dataset.treeNode);
+                }
+            };
+            vp.addEventListener("pointerup", endPan);
+            vp.addEventListener("pointercancel", () => { panning = false; vp.classList.remove("dragging"); });
+
+            document.getElementById("zoom-in").addEventListener("click", () => zoomByButton(1.25));
+            document.getElementById("zoom-out").addEventListener("click", () => zoomByButton(1 / 1.25));
+            document.getElementById("zoom-fit").addEventListener("click", fitToView);
+
+            window.addEventListener("resize", fitToView);
+
+            document.addEventListener("keydown", (e) => {
+                if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+                if (e.key === "+" || e.key === "=") zoomByButton(1.25);
+                else if (e.key === "-" || e.key === "_") zoomByButton(1 / 1.25);
+                else if (e.key === "0") fitToView();
+            });
+        }
+
+        // Technique chips open MITRE in a new tab.
+        document.addEventListener("click", (e) => {
+            const chip = e.target.closest("[data-technique]");
+            if (chip) {
+                const t = chip.dataset.technique;
+                window.open(`https://attack.mitre.org/techniques/${t.replace(".", "/")}`, "_blank", "noopener");
+            }
+        });
+
+        load();
+    </script>
+</body>
+
+</html>

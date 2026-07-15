@@ -154,6 +154,18 @@ async def incident_page(incident_id: str) -> FileResponse:
     return FileResponse(FRONTEND / "incident.html")
 
 
+@app.get("/incident/{incident_id}/tree", include_in_schema=False)
+async def incident_tree_page(incident_id: str) -> FileResponse:
+    """Serve the full-screen, pannable/zoomable process-tree view.
+
+    Same pattern as /incident/{id}: a static page that reads the id from the
+    URL and fetches the incident client-side. Split into its own route (rather
+    than a mode toggle on the incident page) because it wants the whole
+    viewport for panning and zooming, which a page carrying the summary,
+    indicators, and notes editor cannot spare."""
+    return FileResponse(FRONTEND / "tree.html")
+
+
 @app.get("/health", tags=["ops"])
 async def health() -> dict[str, Any]:
     """Engine status.

@@ -277,7 +277,7 @@ function timelineSvg(detections, incidentId) {
         // A transparent hit area spanning the whole row, so the click target is the
         // entire band, not just the 5px dot. The chevron hints it is expandable.
         svg += `<rect x="0" y="${cy - rowH / 2}" width="${width}" height="${rowH}" fill="transparent" style="cursor:pointer" data-timeline-node="${i}" data-incident="${escapeHtml(incidentId)}"><title>Click for detail</title></rect>`;
-        svg += `<text x="${width - 8}" y="${cy + 3}" fill="var(--text-mute)" font-size="10" text-anchor="end" style="pointer-events:none">${isSelected ? "\u25be" : "\u203a"}</text>`;
+        svg += `<text x="${width - 8}" y="${cy + 3}" fill="var(--text-mute)" font-size="10" text-anchor="end" style="pointer-events:none">${isSelected ? "▾" : "›"}</text>`;
     });
 
     svg += `</svg>`;
@@ -593,7 +593,7 @@ function profileHtml(incident) {
             .then((r) => r.json())
             .then((data) => { incident._profile = data; renderQueue(); })
             .catch(() => { incident._profile = { summary: "", phases: [] }; });
-        return `<div class="profile profile-loading">Profiling behavior\u2026</div>`;
+        return `<div class="profile profile-loading">Profiling behavior…</div>`;
     }
     if (!incident._profile || !incident._profile.phases.length) return "";
 
@@ -618,7 +618,7 @@ function profileHtml(incident) {
 function membersHtml(incident) {
     if (!incident._members) {
         return `<div class="members"><div class="member">
-              <span class="member-title">Loading detections&hellip;</span>
+              <span class="member-title">Loading detections…</span>
             </div></div>`;
     }
     const rows = incident._members.map((d) => `
@@ -647,10 +647,19 @@ function membersHtml(incident) {
     const tab = (id, label) =>
         `<button class="view-tab${view === id ? " on" : ""}" data-view="${id}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
 
+    // Full-screen tree, in a new tab: the inline tree is capped to a compact
+    // column so it fits beside the detection list, which runs out of room fast
+    // on a deep or wide chain. The dedicated page trades that constraint for
+    // the whole viewport, plus pan and zoom to navigate it.
+    const openTree = view === "tree"
+        ? `<a class="open-tab tree-open-tab" href="/incident/${escapeHtml(incident.id)}/tree" target="_blank" rel="noopener" title="Open process tree full-screen in a new tab" aria-label="Open process tree in a new tab"><svg class="ico"><use href="#i-external"/></svg> Open in new tab</a>`
+        : "";
+
     return `
     ${profileHtml(incident)}
     <div class="member-views">
       ${tab("list", "List")}${tab("timeline", "Timeline")}${tab("tree", "Process tree")}
+      ${openTree}
     </div>
     ${body}`;
 }
@@ -892,7 +901,7 @@ async function bootstrap() {
         ]);
 
         $("engine").textContent =
-            `engine: ${health.rules_loaded} rules \u00b7 ${health.processes_tracked} processes tracked`;
+            `engine: ${health.rules_loaded} rules · ${health.processes_tracked} processes tracked`;
 
         for (const incident of incidents.items || []) {
             state.incidents.set(incident.id, incident);
@@ -1101,7 +1110,7 @@ async function openTechnique(techniqueId) {
     el.id.textContent = techniqueId;
     el.name.textContent = "";
     el.tactics.innerHTML = "";
-    el.body.textContent = "Loading technique detail\u2026";
+    el.body.textContent = "Loading technique detail…";
     el.body.classList.add("loading");
     el.link.href = `https://attack.mitre.org/techniques/${techniqueId.replace(".", "/")}`;
     el.overlay.classList.add("open");
@@ -1211,7 +1220,7 @@ const VERDICT_COLOR = {
 };
 
 async function enrichIndicator(indicator, slot) {
-    slot.innerHTML = `<div class="enrich-loading">Checking ${escapeHtml(indicator)}\u2026</div>`;
+    slot.innerHTML = `<div class="enrich-loading">Checking ${escapeHtml(indicator)}…</div>`;
 
     let data;
     try {
@@ -1241,7 +1250,7 @@ async function enrichIndicator(indicator, slot) {
     slot.innerHTML = `
     <div class="enrich-result">
       <div class="enrich-verdict" style="color:${verdictColor}">
-        ${escapeHtml(data.worst_verdict)} \u00b7 ${escapeHtml(indicator)}
+        ${escapeHtml(data.worst_verdict)} · ${escapeHtml(indicator)}
       </div>
       ${rows}
     </div>`;
