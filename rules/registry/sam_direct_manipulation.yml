@@ -1,0 +1,21 @@
+id: SYS-091
+title: Local account or administrators-group membership changed in the SAM hive
+event_id: 13
+severity: medium
+attack: [T1136.001, T1098]
+description: >
+  lsass.exe wrote a value under SAM\Domains\Account\Users\Names (a local
+  account was created, renamed, or its RID entry touched) or
+  SAM\Domains\Builtin\Aliases (membership of a builtin group, most often
+  Administrators, changed). Every local-account and group-membership change
+  ultimately lands here regardless of whether it came from net.exe, the
+  Computer Management UI, or direct registry manipulation, which makes it a
+  reliable backstop for T1136.001/T1098 even when the tool that triggered it
+  is unlogged or living-off-the-land. Routine admin activity produces this
+  too, so weigh it against who made the change and through what.
+detection:
+  image|endswith: '\lsass.exe'
+  TargetObject|contains:
+    - '\SAM\Domains\Account\Users\Names\'
+    - '\SAM\Domains\Builtin\Aliases\'
+condition: all

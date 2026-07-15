@@ -1,0 +1,17 @@
+id: SYS-085
+title: Port forwarding rule added via netsh
+event_id: 13
+severity: high
+attack: [T1090.001]
+description: >
+  netsh wrote a value under services\PortProxy -- the persistent, service-level
+  port-forwarding table netsh interface portproxy configures. A v4tov4 (or
+  v4tov6/v6tov4) rule here relays traffic from one host:port to another without
+  a proxy tool ever touching disk, which is exactly what it takes to tunnel RDP
+  or SMB through a compromised host onto an internal network the attacker
+  cannot reach directly. Legitimate use exists (NAT/load-balancing setups) but
+  is uncommon enough on an endpoint to be worth a look every time.
+detection:
+  image|endswith: '\netsh.exe'
+  TargetObject|contains: '\PortProxy\'
+condition: all

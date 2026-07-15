@@ -1,0 +1,17 @@
+id: SYS-082
+title: Credential dumping via comsvcs.dll MiniDump export
+event_id: 1
+severity: critical
+attack: [T1003.001]
+description: >
+  rundll32 invoked comsvcs.dll's undocumented MiniDump export directly from the
+  command line. This DLL exists to let Windows Error Reporting dump a crashing
+  process; calling its export manually is not something WER or any other
+  legitimate component does; it is the built-in, no-extra-binary alternative to
+  Task Manager's "Create dump file" that lets an attacker dump lsass.exe (or
+  any other process, as a dry run) without dropping procdump or Mimikatz. The
+  target process ID appears in the command line itself.
+detection:
+  image|endswith: '\rundll32.exe'
+  command_line|re: '\bcomsvcs\.dll\s*,\s*minidump\b'
+condition: all

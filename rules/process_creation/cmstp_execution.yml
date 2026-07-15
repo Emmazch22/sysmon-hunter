@@ -1,0 +1,16 @@
+id: SYS-084
+title: cmstp executed with a silent or auto-install flag
+event_id: 1
+severity: high
+attack: [T1218.003]
+description: >
+  cmstp.exe (the Connection Manager Profile Installer) ran with /s or /au, the
+  flags that install a .inf profile without any UI. A malicious .inf can point
+  cmstp at an arbitrary command or a COM-hijacking DLL, and because cmstp is a
+  signed Microsoft binary that (depending on OS version) auto-elevates, this is
+  a documented LOLBAS technique for both UAC bypass and AppLocker-evading code
+  execution. Interactive, legitimate use of cmstp does not pass these flags.
+detection:
+  image|endswith: '\cmstp.exe'
+  command_line|re: '\s/(s|au)\b'
+condition: all

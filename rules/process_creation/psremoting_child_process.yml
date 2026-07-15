@@ -1,0 +1,15 @@
+id: SYS-090
+title: Process spawned by the PowerShell remoting host
+event_id: 1
+severity: medium
+attack: [T1021.006]
+description: >
+  wsmprovhost.exe -- the host WinRM starts to service an incoming PowerShell
+  remoting session -- spawned a child process. Every command a remote operator
+  runs over Enter-PSSession or Invoke-Command lands here, so this is the
+  marker that a command actually executed through PS Remoting. Legitimate
+  remote administration produces this constantly, so it is a lead to check the
+  child process and the session's source IP against, not a verdict on its own.
+detection:
+  parent_image|endswith: '\wsmprovhost.exe'
+condition: all

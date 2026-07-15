@@ -1,0 +1,18 @@
+id: SYS-088
+title: IIS worker process spawned a command shell
+event_id: 1
+severity: critical
+attack: [T1505.003]
+description: >
+  w3wp.exe -- the IIS application-pool worker process -- spawned cmd.exe,
+  powershell.exe, or a script host. A web application has no legitimate reason
+  to launch a shell; this parent/child pair is the textbook signature of a
+  webshell (or a deserialization/command-injection exploit) reaching the OS
+  through the web server, and it runs as whatever the app pool identity is,
+  which is often more privileged than the anonymous web request that triggered
+  it.
+detection:
+  parent_image|endswith: '\w3wp.exe'
+  image|endswith:
+    ['\cmd.exe', '\powershell.exe', '\pwsh.exe', '\cscript.exe', '\wscript.exe']
+condition: all

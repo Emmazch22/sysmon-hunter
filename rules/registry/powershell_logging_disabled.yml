@@ -1,0 +1,17 @@
+id: SYS-086
+title: PowerShell script block logging disabled via registry
+event_id: 13
+severity: high
+attack: [T1562.001]
+description: >
+  A value under the PowerShell ScriptBlockLogging or Transcription policy keys
+  was written -- the two controls that record what a PowerShell session
+  actually executed. Flipping these off before running an obfuscated payload
+  is a documented pattern: it does not stop PowerShell from running, it just
+  blinds the log an analyst would otherwise use to see what ran. Correlate
+  with the process that made the change and what runs immediately after.
+detection:
+  TargetObject|re:
+    - '\\powershell\\scriptblocklogging\\'
+    - '\\powershell\\transcription\\'
+condition: all

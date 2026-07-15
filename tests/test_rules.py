@@ -166,6 +166,37 @@ CASES = [
             command_line=r"rundll32.exe shell32.dll,Control_RunDLL desk.cpl",
         ),
     ),
+    # --- SYS-037 extension: three more LOLBAS exports, each validated against
+    # a real EVTX (exec_sysmon_1_11_lolbin_rundll32_zipfldr_RouteTheCall.evtx,
+    # exec_sysmon_1_lolbin_rundll32_advpack_RegisterOCX.evtx,
+    # exec_sysmon_1_rundll32_pcwutl_LaunchApplication.evtx). ---
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"C:\Windows\System32\rundll32.exe zipfldr.dll,RouteTheCall c:\Windows\System32\calc.exe",
+        ),
+    ),
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"C:\Windows\System32\rundll32.exe  advpack.dll,RegisterOCX c:\Windows\System32\calc.exe",
+        ),
+    ),
+    (
+        "SYS-037",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"C:\Windows\System32\rundll32.exe  pcwutl.dll,LaunchApplication c:\Windows\system32\calc.exe",
+        ),
+    ),
     (
         "SYS-034",
         True,
@@ -394,10 +425,13 @@ CASES = [
         ),
     ),
     ("SYS-070", False, event(1, command_line=r"wmic os get caption")),
-    # --- WMI persistence: consumer registration (SYS-071) ---
-    ("SYS-071", True, event(20, Type="CommandLineEventConsumer")),
-    ("SYS-071", True, event(20, Type="ActiveScriptEventConsumer")),
-    ("SYS-071", False, event(20, Type="LogFileEventConsumer")),
+    # --- WMI persistence: consumer registration (SYS-071), validated against
+    # sysmon_20_21_1_CommandLineEventConsumer.evtx and wmighost_sysmon_20_21_1.evtx:
+    # real Sysmon reports Type as the human-readable label ("Command Line",
+    # "Script"), not the WMI class name the rule originally checked for. ---
+    ("SYS-071", True, event(20, Type="Command Line")),
+    ("SYS-071", True, event(20, Type="Script")),
+    ("SYS-071", False, event(20, Type="Log File")),
     # --- PsExec named pipe (SYS-072) ---
     ("SYS-072", True, event(17, PipeName=r"\PSEXESVC")),
     ("SYS-072", True, event(17, PipeName=r"\PSEXESVC-1a2b-stdin")),
@@ -565,6 +599,257 @@ CASES = [
         "SYS-081",
         False,
         event(11, TargetFilename=r"C:\Users\d.reyes\Documents\Q3_Forecast.xlsx"),
+    ),
+    # --- Credential dumping via comsvcs.dll MiniDump (SYS-082), validated
+    # against sysmon_10_1_memdump_comsvcs_minidump.evtx: rundll32 calling the
+    # MiniDump export directly, target PID and dump path on the command line. ---
+    (
+        "SYS-082",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"rundll32 C:\windows\system32\comsvcs.dll, MiniDump 4868 C:\Windows\System32\notepad.bin full",
+        ),
+    ),
+    (
+        "SYS-082",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\rundll32.exe",
+            command_line=r"rundll32.exe  url.dll,OpenURL file://C:/Windows/system32/calc.exe",
+        ),
+    ),
+    # --- Fileless UAC bypass via registry hijack (SYS-083), validated against
+    # three real samples: Sysmon_13_1_UACBypass_SDCLTBypass.evtx (exefile
+    # shell\runas\command\IsolatedCommand), sysmon_1_13_UACBypass_AppPath_
+    # Control.evtx (App Paths\control.exe), and
+    # sysmon_13_1_compmgmtlauncherUACBypass.evtx (mscfile shell\open\command). ---
+    (
+        "SYS-083",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetObject=r"HKU\S-1-5-21-1_CLASSES\exefile\shell\runas\command\IsolatedCommand",
+            Details=r"C:\Windows\System32\cmd.exe /c notepad.exe",
+        ),
+    ),
+    (
+        "SYS-083",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetObject=r"HKU\S-1-5-21-1\Software\Microsoft\Windows\CurrentVersion\App Paths\control.exe\(Default)",
+            Details=r"C:\windows\system32\cmd.exe",
+        ),
+    ),
+    (
+        "SYS-083",
+        True,
+        event(
+            13,
+            image=r"c:\python27\python.exe",
+            TargetObject=r"HKU\S-1-5-21-1_CLASSES\mscfile\shell\open\command\(Default)",
+            Details=r"c:\Windows\System32\cmd.exe",
+        ),
+    ),
+    (
+        "SYS-083",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\System32\reg.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\SomeApp",
+            Details=r"C:\Program Files\App\app.exe",
+        ),
+    ),
+    # --- CMSTP silent/auto-install execution (SYS-084), validated against
+    # sysmon_1_13_11_cmstp_ini_uacbypass.evtx: cmstp.exe /au against a
+    # WinPwnage-crafted .ini, a documented UAC-bypass and LOLBAS technique. ---
+    (
+        "SYS-084",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmstp.exe",
+            command_line=r'"C:\Windows\System32\cmstp.exe" /au c:\users\ieuser\appdata\local\temp\tmp.ini',
+        ),
+    ),
+    (
+        "SYS-084",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmstp.exe",
+            command_line=r'"C:\Windows\System32\cmstp.exe" C:\Users\ieuser\Documents\legit.CMP',
+        ),
+    ),
+    # --- netsh portproxy port forwarding (SYS-085), validated against
+    # de_portforward_netsh_rdp_sysmon_13_1.evtx: netsh writing a v4tov4 relay
+    # rule that tunnels a listener port through to a remote RDP endpoint. ---
+    (
+        "SYS-085",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\netsh.exe",
+            TargetObject=r"HKLM\System\CurrentControlSet\services\PortProxy\v4tov4\tcp\1.2.3.4/8001",
+            Details="1.2.3.5/3389",
+        ),
+    ),
+    (
+        "SYS-085",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\netsh.exe",
+            TargetObject=r"HKLM\System\CurrentControlSet\services\SharedAccess\Parameters\FirewallPolicy",
+        ),
+    ),
+    # --- PowerShell script block logging disabled (SYS-086), validated against
+    # de_PsScriptBlockLogging_disabled_sysmon12_13.evtx: reg.exe zeroing the
+    # EnableScriptBlockLogging policy value. ---
+    (
+        "SYS-086",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=r"HKLM\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging\EnableScriptBlockLogging",
+            Details="DWORD (0x00000000)",
+        ),
+    ),
+    (
+        "SYS-086",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\SomeApp",
+        ),
+    ),
+    # --- PowerShell CLM lockdown policy removed (SYS-087), validated against
+    # DE_Powershell_CLM_Disabled_Sysmon_12.evtx: powershell.exe deleting its own
+    # __PSLockdownPolicy environment value. ---
+    (
+        "SYS-087",
+        True,
+        event(
+            12,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            EventType="DeleteValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\Control\SESSION MANAGER\Environment\__PSLockdownPolicy",
+        ),
+    ),
+    (
+        "SYS-087",
+        False,
+        event(
+            12,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            EventType="CreateKey",
+            TargetObject=r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer",
+        ),
+    ),
+    # --- IIS worker process spawning a shell (SYS-088), validated against
+    # LM_typical_IIS_webshell_sysmon_1_10_traces.evtx: w3wp.exe running the
+    # DefaultAppPool identity spawning cmd.exe /c net user. ---
+    (
+        "SYS-088",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            parent_image=r"C:\Windows\System32\inetsrv\w3wp.exe",
+            command_line=r'"c:\windows\system32\cmd.exe" /c net user',
+        ),
+    ),
+    (
+        "SYS-088",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\inetsrv\w3wp.exe",
+            parent_image=r"C:\Windows\System32\services.exe",
+        ),
+    ),
+    # --- SQL Server spawning a shell / xp_cmdshell (SYS-089), validated
+    # against sysmon_1_exec_via_sql_xpcmdshell.evtx: sqlservr.exe (running as
+    # the sqlsvc service account) spawning cmd.exe. ---
+    (
+        "SYS-089",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            parent_image=r"C:\Program Files\Microsoft SQL Server\MSSQL10.SQLEXPRESS\MSSQL\Binn\sqlservr.exe",
+            command_line=r'"C:\Windows\system32\cmd.exe" /c set > c:\users\public\netstat.txt',
+        ),
+    ),
+    (
+        "SYS-089",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files\Microsoft SQL Server\MSSQL10.SQLEXPRESS\MSSQL\Binn\sqlservr.exe",
+            parent_image=r"C:\Windows\System32\services.exe",
+        ),
+    ),
+    # --- Process spawned by the PS Remoting host (SYS-090), validated against
+    # LM_PowershellRemoting_sysmon_1_wsmprovhost.evtx: wsmprovhost.exe (the
+    # WinRM session host) spawning a command a remote operator sent. ---
+    (
+        "SYS-090",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\HOSTNAME.EXE",
+            parent_image=r"C:\Windows\System32\wsmprovhost.exe",
+        ),
+    ),
+    (
+        "SYS-090",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\HOSTNAME.EXE",
+            parent_image=r"C:\Windows\System32\cmd.exe",
+        ),
+    ),
+    # --- Direct SAM manipulation (SYS-091), validated against
+    # sysmon_local_account_creation_and_added_admingroup_12_13.evtx: lsass.exe
+    # writing a new account's Names entry, then the Administrators alias. ---
+    (
+        "SYS-091",
+        True,
+        event(
+            13,
+            image=r"C:\windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\Names\support\(Default)",
+            Details="Binary Data",
+        ),
+    ),
+    (
+        "SYS-091",
+        True,
+        event(
+            13,
+            image=r"C:\windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Builtin\Aliases\00000220\C",
+            Details="Binary Data",
+        ),
+    ),
+    (
+        "SYS-091",
+        False,
+        event(
+            13,
+            image=r"C:\windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\F",
+        ),
     ),
 ]
 

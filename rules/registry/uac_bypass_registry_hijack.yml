@@ -1,0 +1,21 @@
+id: SYS-083
+title: Fileless UAC bypass via auto-elevate registry hijack
+event_id: 13
+severity: high
+attack: [T1548.002]
+description: >
+  A value was written under a per-user Classes command handler
+  (...\shell\open\command, ...\shell\runas\command\IsolatedCommand) or under
+  CurrentVersion\App Paths. This is the mechanism behind most fileless UAC
+  bypasses -- fodhelper, sdclt, eventvwr, compmgmtlauncher, computerdefaults,
+  and control.exe's App Paths hijack all work the same way: plant a command
+  handler in the user's own registry hive, then launch a binary Windows
+  auto-elevates without a prompt, which looks up the handler and runs the
+  attacker's command with the elevated token instead. The trigger binary
+  varies; the registry hijack it depends on does not, which is what this rule
+  keys on rather than any one auto-elevate binary's name.
+detection:
+  TargetObject|re:
+    - '\\shell\\(open|runas)\\command\\(isolatedcommand|\(default\))$'
+    - '\\currentversion\\app paths\\[^\\]+\\\(default\)$'
+condition: all

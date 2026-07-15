@@ -1,0 +1,17 @@
+id: SYS-087
+title: PowerShell Constrained Language Mode lockdown policy removed
+event_id: 12
+severity: high
+attack: [T1562.001]
+description: >
+  The __PSLockdownPolicy environment value under Session Manager\Environment
+  was deleted. This value is what puts PowerShell into Constrained Language
+  Mode, which blocks COM access, Add-Type, and most of what an in-memory
+  offensive PowerShell toolkit needs. Deleting it (rather than never setting
+  it) is a defense-evasion step: it only makes sense on a host where CLM was
+  actively enforced, and removing it clears the way for the same class of
+  payload the policy existed to stop.
+detection:
+  EventType|equals: DeleteValue
+  TargetObject|contains: '__PSLockdownPolicy'
+condition: all

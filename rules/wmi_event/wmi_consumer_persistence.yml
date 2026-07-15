@@ -4,7 +4,7 @@ event_id: 20
 severity: high
 attack: [T1546.003]
 description: >
-  A WmiEventConsumer was registered as a CommandLineEventConsumer or
+  A WmiEventConsumer was registered as a CommandLineEventConsumer or an
   ActiveScriptEventConsumer -- the two consumer types that run arbitrary
   commands or script when their bound filter fires. This is the standard
   fileless persistence mechanism: no scheduled task, no run key, no service,
@@ -12,8 +12,12 @@ description: >
   (commonly "process started" or "every N seconds"). Legitimate software
   occasionally registers CommandLineEventConsumers too, so this is a lead to
   correlate against what Destination actually runs, not an automatic verdict.
+  Validated against two real Sysmon captures: Sysmon reports the consumer's
+  Type as the human-readable label ("Command Line", "Script"), not the WMI
+  class name -- the rule originally checked for the class name itself and
+  never fired against real telemetry as a result.
 detection:
   Type|equals:
-    - CommandLineEventConsumer
-    - ActiveScriptEventConsumer
+    - Command Line
+    - Script
 condition: all

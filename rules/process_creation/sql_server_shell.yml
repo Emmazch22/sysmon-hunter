@@ -1,0 +1,16 @@
+id: SYS-089
+title: SQL Server process spawned a command shell
+event_id: 1
+severity: critical
+attack: [T1059.003, T1190]
+description: >
+  sqlservr.exe spawned cmd.exe or powershell.exe -- the process-execution half
+  of xp_cmdshell, the built-in stored procedure that runs OS commands with the
+  SQL Server service account's privileges. It is disabled by default and
+  legitimate DBA use is rare enough that any invocation deserves review; as an
+  attack path it is a direct line from a SQL injection or exposed instance to
+  full command execution on the host.
+detection:
+  parent_image|endswith: '\sqlservr.exe'
+  image|endswith: ['\cmd.exe', '\powershell.exe', '\pwsh.exe']
+condition: all

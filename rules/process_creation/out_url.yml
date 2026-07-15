@@ -1,16 +1,22 @@
 id: SYS-037
-title: rundll32 executing a URL or file handler via url.dll
+title: rundll32 invoking a known LOLBAS DLL export
 event_id: 1
 severity: high
 attack: [T1218.011, T1204.001]
 description: >
-  rundll32 invoked url.dll or ieframe.dll with OpenURL or FileProtocolHandler.
-  These exported functions open a URL or launch a file through the shell's
-  protocol handlers, and attackers abuse them to execute payloads (binaries,
-  HTAs, scripts) while hiding behind a signed Microsoft binary. This is a
-  documented LOLBAS technique with no legitimate use in this form.
+  rundll32 invoked one of a documented set of DLL exports that LOLBAS lists as
+  code-execution primitives: url.dll/ieframe.dll/shdocvw.dll's OpenURL or
+  FileProtocolHandler (open a URL or launch a file through the shell's
+  protocol handlers), zipfldr.dll's RouteTheCall, advpack.dll's RegisterOCX or
+  LaunchINFSection, and pcwutl.dll's LaunchApplication -- all of which end up
+  running an arbitrary target passed on the command line. Attackers use these
+  to execute payloads while hiding behind a signed Microsoft binary; none of
+  them see legitimate use in this form.
 detection:
   image|endswith: '\rundll32.exe'
   command_line|re:
     - '\b(url|ieframe|shdocvw)\.dll\s*,\s*(openurl|fileprotocolhandler)'
+    - '\bzipfldr\.dll\s*,\s*routethecall'
+    - '\badvpack\.dll\s*,\s*(registerocx|launchinfsection)'
+    - '\bpcwutl\.dll\s*,\s*launchapplication'
 condition: all

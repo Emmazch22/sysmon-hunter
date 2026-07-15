@@ -24,7 +24,7 @@ malware telemetry — see [Detection engineering](#detection-engineering).
 
 ## What it does
 
-- **Rule-based detection** — 38 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 48 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 9 Sysmon event types (process
   creation, network, registry, image load, process access, file create, named
   pipes, driver load, WMI event). Indexed by EventID so only relevant rules run
@@ -185,6 +185,20 @@ The same process surfaced a normalizer bug: EventID 8/10 name the acting process
 with `Source*` fields, not `Image`/`ProcessGuid` — so credential-dumping and
 injection detections were not capturing *who* did it. Fixed and tested.
 
+A later pass replayed 166 real "sysmon"-named samples from the
+[EVTX-ATTACK-SAMPLES](https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES)
+corpus against the full rule set and added ten more rules for the gaps that
+surfaced: LSASS dumping via `comsvcs.dll`'s MiniDump export, the fileless
+UAC-bypass registry hijack behind fodhelper/sdclt/eventvwr-style techniques,
+CMSTP silent execution, `netsh` port forwarding, PowerShell logging tampering
+(script block logging and Constrained Language Mode), an IIS worker process
+or SQL Server spawning a shell, PowerShell-remoting child processes, and
+direct SAM-hive account/group manipulation. The same pass caught a rule that
+had never fired against real telemetry: SYS-071's WMI event-consumer check
+compared `Type` against the WMI class name, but Sysmon actually reports the
+human-readable label ("Command Line", "Script") — fixed and validated against
+two real captures.
+
 ---
 
 ## Design decisions
@@ -273,7 +287,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 242 tests
+python -m pytest        # 251 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -308,14 +322,14 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   38 YAML detection rules, by EventID
+├── rules/                   48 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, replay_evtx,
 │                            fetch_attack
 ├── docs/                    screenshots
-└── tests/                   242 tests
+└── tests/                   251 tests
 ```
 
 ---
