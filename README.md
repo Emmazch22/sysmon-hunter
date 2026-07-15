@@ -1,11 +1,13 @@
 # Sysmon Hunter
 
+**v0.2.0**
+
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
 ATT&CK-mapped rules, reconstructs the process tree to correlate related
-detections into incidents, detects C2 beaconing statistically, and enriches
-indicators against external reputation sources — all streamed to a dark SOC
-console.
+detections into incidents, detects C2 beaconing and ransomware activity
+statistically, and enriches indicators against external reputation sources —
+all streamed to a dark SOC console.
 
 This is a detection-engineering project. The interesting part is not that it
 matches rules, but *what it does with a match*. A lone "PowerShell ran an
@@ -22,10 +24,16 @@ malware telemetry — see [Detection engineering](#detection-engineering).
 
 ## What it does
 
-- **Rule-based detection** — 26 YAML rules with Sigma-compatible matching
-  semantics, mapped to MITRE ATT&CK, across 7 Sysmon event types (process
+- **Rule-based detection** — 38 YAML rules with Sigma-compatible matching
+  semantics, mapped to MITRE ATT&CK, across 9 Sysmon event types (process
   creation, network, registry, image load, process access, file create, named
-  pipes). Indexed by EventID so only relevant rules run per event.
+  pipes, driver load, WMI event). Indexed by EventID so only relevant rules run
+  per event.
+- **Ransomware detection** — a dropped ransom note (matched against the
+  near-universal "how to decrypt / restore your files" naming convention) and
+  mass file writes with a known ransomware encryption extension (`.locked`,
+  `.encrypted`, `.crypt`, `.wcry`, and others), alongside the shadow-copy
+  deletion and recovery-disabling commands that typically precede them.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -42,10 +50,19 @@ malware telemetry — see [Detection engineering](#detection-engineering).
   preparation".
 - **IOC enrichment** — IPs, domains and file hashes against AbuseIPDB and
   VirusTotal, on demand, cached, degrading gracefully with no API keys.
-- **Analyst notes** — a free-text note per incident, on its full-page view.
+- **Analyst notes** — a free-text note per incident (500-word limit), on its
+  full-page view.
+- **Full-text and field search** — one search box, free text plus
+  `host:` / `severity:` / `technique:` / `rule:` / `user:` / `command_line:` /
+  `actionable:` filters, mixed freely in a single query.
+- **PDF incident reports** — a self-contained, print-ready report per incident
+  (summary, kill-chain narrative, process chain, every detection's forensics,
+  and key indicators), generated server-side with no headless browser.
 - **Live console** — WebSocket feed, incident queue, three incident views (list,
-  interactive timeline, full process tree), clickable ATT&CK techniques with
-  MITRE descriptions, inline base64 decoding, PDF reports, and search.
+  interactive timeline, full process tree), a dedicated full-screen process-tree
+  viewer (opens in a new tab, with click-drag panning and scroll-wheel zoom),
+  clickable ATT&CK techniques with MITRE descriptions, inline base64 decoding of
+  encoded command lines, and a database-reset control in the settings menu.
 
 ---
 
@@ -64,6 +81,9 @@ with what privileges, and the hashes for pivoting.
 Beyond the linear chain: the complete branching tree the incident spans. A
 foothold that spawned several children shows every branch. Nodes that fired a
 detection are coloured by severity; benign context processes are hollow.
+"Open in new tab" hands the same tree to a dedicated full-screen page with
+click-and-drag panning, scroll-wheel zoom, and zoom-to-fit — built for tracing
+a wide or deep tree that the inline column cannot show at once.
 
 ![Process tree](docs/03_process_tree.png)
 
@@ -149,6 +169,17 @@ Rules built this way from real samples include:
   execution technique that runs payloads through the shell's protocol handlers.
 - **IIS credential discovery** (`appcmd list apppool /text:processmodel.password`):
   dumping application-pool credentials in plaintext.
+- **FTP LOLBAS execution** (`ftp.exe -s:script`): a built-in Windows binary
+  running an arbitrary script file to move data or execute commands.
+- **WMI-actor registry persistence**: a Run key written by `WmiPrvSE.exe`,
+  the WMI provider host — a favored way to plant persistence without a
+  suspicious parent process.
+
+Detections whose evidence is a file, not a process, get the same forensic
+treatment: SYS-080 (ransom note dropped) and SYS-081 (ransomware-extension
+write) surface the exact matched file path — the ransom note's location, or
+each `.locked` file — everywhere a detection's detail is shown, since a
+file-write detection has no command line to fall back on.
 
 The same process surfaced a normalizer bug: EventID 8/10 name the acting process
 with `Source*` fields, not `Image`/`ProcessGuid` — so credential-dumping and
@@ -211,7 +242,8 @@ python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 python scripts/seed_apt.py    # one deep multi-stage intrusion (score 172)
-python scripts/seed_demo.py   # eight varied incidents across the kill chain
+python scripts/seed_demo.py   # varied incidents across the kill chain
+python scripts/seed_rw.py     # a full ransomware chain in one incident
 ```
 
 ### Analyse a real sample
@@ -241,7 +273,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 199 tests
+python -m pytest        # 242 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -270,18 +302,20 @@ sysmon-hunter/
 │   ├── main.py              FastAPI app, lifespan, background sweep
 │   ├── config.py            all tunables
 │   ├── api/                 ingest, detections, incidents, attack, enrich,
-│   │                        report, search, notes, ws, serializers
+│   │                        report, search, notes, admin, ws, serializers
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, enrichment, search,
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   26 YAML detection rules, by EventID
-├── frontend/                console.html, incident.html, static/{css,js}
+├── rules/                   38 YAML detection rules, by EventID
+├── frontend/                console.html, incident.html, tree.html,
+│                            static/{css,js}
 ├── migrations/              Alembic
-├── scripts/                 seed_apt, seed_demo, replay_evtx, fetch_attack
+├── scripts/                 seed_apt, seed_demo, seed_rw, replay_evtx,
+│                            fetch_attack
 ├── docs/                    screenshots
-└── tests/                   199 tests
+└── tests/                   242 tests
 ```
 
 ---
