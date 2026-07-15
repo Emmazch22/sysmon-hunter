@@ -33,7 +33,8 @@ The story, on HQ-FILES-03:
                           ├─ vssadmin.exe    shadow copies deleted
                           ├─ wbadmin.exe     backup catalog deleted
                           ├─ bcdedit.exe     Windows recovery disabled
-                          └─ (file writes)   mass rename to .locked + ransom note
+                          └─ (file writes)   mass rename to .locked (SYS-081) +
+                                              ransom note dropped (SYS-080)
 
     (unlinked to the tree above -- no ProcessGuid in real telemetry)
     WmiEventConsumer registered      persistence, survives reboot
@@ -278,10 +279,12 @@ def events() -> list[dict]:
                     integrity="High"))
 
     # Mass rename to .locked, across the directories a real crypto-locker
-    # would prioritise. No single rule fires on this -- the engine has no
-    # encryption-speed detector -- but it is exactly what an analyst would
-    # see appended to the timeline once the encryptor starts, and it is what
-    # actually makes an incident "ransomware" rather than "intrusion".
+    # would prioritise. Each write matches SYS-081 on its own -- the engine
+    # still has no encryption-speed/volume detector, so this is six separate
+    # per-file detections rather than one "mass encryption" finding, but that
+    # is exactly what an analyst would see appended to the timeline once the
+    # encryptor starts, and it is what actually makes an incident
+    # "ransomware" rather than "intrusion".
     targets = [
         r"C:\Users\d.reyes\Documents\Q3_Forecast.xlsx.locked",
         r"C:\Users\d.reyes\Documents\Board_Minutes.docx.locked",
@@ -294,7 +297,7 @@ def events() -> list[dict]:
         ev.append(raw_event(11, 156 + i * 2, Image=r"C:\Users\d.reyes\AppData\Local\Temp\svchost.exe",
                               ProcessGuid=G["payload"], TargetFilename=path))
 
-    # The ransom note, dropped last.
+    # The ransom note, dropped last (SYS-080).
     ev.append(raw_event(11, 170, Image=r"C:\Users\d.reyes\AppData\Local\Temp\svchost.exe",
                           ProcessGuid=G["payload"],
                           TargetFilename=r"C:\Users\d.reyes\Desktop\HOW_TO_RECOVER_FILES.txt"))

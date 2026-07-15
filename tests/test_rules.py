@@ -526,6 +526,46 @@ CASES = [
             parent_image=r"C:\Windows\explorer.exe",
         ),
     ),
+    # --- Ransom note dropped (SYS-080): the near-universal "how to
+    # decrypt/recover" filename convention. ---
+    (
+        "SYS-080",
+        True,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Desktop\HOW_TO_RECOVER_FILES.txt"),
+    ),
+    (
+        "SYS-080",
+        True,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Desktop\_readme.txt"),
+    ),
+    (
+        "SYS-080",
+        True,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Desktop\DECRYPT_INSTRUCTIONS.html"),
+    ),
+    (
+        "SYS-080",
+        False,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Documents\Q3_Forecast.xlsx"),
+    ),
+    # --- File written with a ransomware encryption extension (SYS-081):
+    # fires per file, on the extension alone -- exactly what seed_rw.py's
+    # mass-rename phase exercises. ---
+    (
+        "SYS-081",
+        True,
+        event(11, TargetFilename=r"C:\Shares\Finance\AP_Ledger.xlsx.locked"),
+    ),
+    (
+        "SYS-081",
+        True,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Documents\Board_Minutes.docx.crypted"),
+    ),
+    (
+        "SYS-081",
+        False,
+        event(11, TargetFilename=r"C:\Users\d.reyes\Documents\Q3_Forecast.xlsx"),
+    ),
 ]
 
 

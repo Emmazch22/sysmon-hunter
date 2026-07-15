@@ -1,0 +1,25 @@
+id: SYS-081
+title: File written with a known ransomware encryption extension
+event_id: 11
+severity: critical
+attack: [T1486]
+description: >
+  A file was written whose name ends in an extension specific to a known
+  ransomware encryptor (.locked, .encrypted, .crypt, .crypted, .locky,
+  .cerber, .wcry, .wncry). Unlike a generic "many files changed fast"
+  heuristic -- which this engine does not implement, since it has no
+  file-system rate sensor -- this fires per file, on the exact evidence an
+  analyst would point to on a share full of newly-unreadable documents. A
+  single hit is worth investigating; several in the same tree in quick
+  succession is the encryptor actively running.
+detection:
+  TargetFilename|endswith:
+    - .locked
+    - .encrypted
+    - .crypt
+    - .crypted
+    - .locky
+    - .cerber
+    - .wcry
+    - .wncry
+condition: all

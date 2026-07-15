@@ -1,0 +1,17 @@
+id: SYS-080
+title: Ransom note dropped
+event_id: 11
+severity: critical
+attack: [T1486, T1491.001]
+description: >
+  A file was written whose name matches the near-universal ransom-note
+  convention: "how to decrypt/recover/restore", "decrypt instructions",
+  "restore files", "your files are encrypted", or the *_readme.txt/.html
+  pattern nearly every ransomware family drops in one form or another. This
+  file is not the attack -- the encryptor already ran by the time it lands --
+  but nothing else in the chain announces "this is ransomware, now" as
+  unambiguously as the note itself. Seeing this fire is the clearest possible
+  signal to stop triage and start containment.
+detection:
+  TargetFilename|re: '(?i)(how.?to.?(decrypt|recover|restore)|decrypt.?(instructions|files)|restore.?files|recovery.?instructions|your.?files.?(are.?)?encrypted|_readme\.(txt|html|hta))'
+condition: all
