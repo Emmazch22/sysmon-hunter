@@ -42,6 +42,11 @@ class TestQueryParsing:
         assert parse_query("").is_empty
         assert parse_query("   ").is_empty
 
+    def test_command_line_filter_parses(self) -> None:
+        q = parse_query("command_line:encodedcommand")
+        assert q.filters == {"command_line": "encodedcommand"}
+        assert q.text_terms == []
+
 
 def _incident(id, host, severity, actionable=True):
     return {
@@ -152,6 +157,23 @@ class TestSearch:
     def test_no_match_returns_empty(self) -> None:
         incidents, detections = self._fixture()
         assert search_incidents(incidents, detections, parse_query("nonexistent")) == []
+
+    def test_command_line_filter_matches(self) -> None:
+        incidents, detections = self._fixture()
+        hits = search_incidents(
+            incidents, detections, parse_query("command_line:sekurlsa")
+        )
+        assert [h.incident["id"] for h in hits] == ["i1"]
+
+    def test_command_line_filter_is_scoped_to_the_command_line(self) -> None:
+        """Unlike free text, command_line: must not fall back to the title --
+        that scoping is the entire reason to use it over a bare search term."""
+        incidents, detections = self._fixture()
+        # "beacon" is in i2's title ("C2 beacon") but not in any command line.
+        assert search_incidents(
+            incidents, detections, parse_query("command_line:beacon")
+        ) == []
+        assert search_incidents(incidents, detections, parse_query("beacon"))
 
     def test_hits_carry_matched_detections(self) -> None:
         """A hit reports which detections matched, so the UI can show why."""

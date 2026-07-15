@@ -6,13 +6,25 @@ freely:
     mimikatz                      free text: match anywhere
     host:FIN-WS-07                a field filter
     powershell severity:critical  both at once
+    command_line:encodedcommand   scoped to the command line only
 
 Free text matches across everything an analyst might remember about an
 incident -- a process name, a fragment of a command line, a hash, a rule id, the
-title. Field filters (host:, severity:, technique:, rule:, user:) narrow
-precisely. An incident matches if any of its detections match, so searching a
-command-line fragment surfaces the whole incident it belongs to, not an orphaned
-detection.
+title. Field filters (host:, severity:, technique:, rule:, user:,
+command_line:) narrow precisely. An incident matches if any of its detections
+match, so searching a command-line fragment surfaces the whole incident it
+belongs to, not an orphaned detection.
+
+Every field filter is a substring match, not an exact one -- `host:fin-ws`
+finds `FIN-WS-07`, `command_line:encodedcommand` finds a command line with
+that word anywhere in it. There is no separate wildcard syntax (`*x*` and
+similar): substring-by-default already gives the same result, and a second
+matching convention just for one field is one more thing an analyst has to
+remember under pressure. `command_line:` exists mainly to scope a search that
+free text alone would over-match -- free text already searches the command
+line along with everything else, so `command_line:powershell` narrows to hits
+where the term is specifically in the command line, not merely in the title
+or the user field.
 
 The parser is deliberately small and predictable. A SOC analyst under pressure
 needs a search box whose behaviour they can guess, not a query language they have
@@ -37,6 +49,7 @@ FIELD_FILTERS = {
     "rule",  # matches a rule id
     "user",  # matches the forensic user field
     "actionable",  # true/false
+    "command_line",  # substring match against a detection's command line
 }
 
 
@@ -145,6 +158,9 @@ def _detection_matches(detection: dict[str, Any], query: Query) -> bool:
         elif key == "user":
             if value not in str(forensics.get("user", "")).lower():
                 return False
+        elif key == "command_line":
+            if value not in str(detection.get("command_line", "") or "").lower():
+                return False
 
     return True
 
@@ -169,9 +185,16 @@ def _incident_field_match(incident: dict[str, Any], query: Query) -> bool:
     return True
 
 
+# Filters that describe a single detection rather than the incident as a
+# whole. Kept in one place: `search_incidents` and `_detection_level_filters`
+# both need this set, and having it live in two spots is exactly how a future
+# filter (like command_line was) ends up handled in one but not the other.
+DETECTION_LEVEL_FILTERS = {"rule", "technique", "user", "command_line"}
+
+
 def _detection_level_filters(query: Query) -> bool:
     """True if the query has filters that only a detection can satisfy."""
-    return bool({k for k in query.filters if k in {"rule", "technique", "user"}})
+    return bool({k for k in query.filters if k in DETECTION_LEVEL_FILTERS})
 
 
 @dataclass
@@ -205,9 +228,7 @@ def search_incidents(
 
         # A severity/actionable/host-only query with no text or detection-level
         # filters matches the incident wholesale -- no need to find a detection.
-        detection_level = query.text_terms or {
-            k for k in query.filters if k in {"rule", "technique", "user"}
-        }
+        detection_level = query.text_terms or _detection_level_filters(query)
         if not detection_level:
             hits.append(SearchHit(incident, detections, len(detections)))
             continue

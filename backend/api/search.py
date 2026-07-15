@@ -24,7 +24,7 @@ async def search(
     q: str = QueryParam(
         ...,
         description="Free text and/or field filters "
-        "(host:, severity:, technique:, rule:, user:, actionable:)",
+        "(host:, severity:, technique:, rule:, user:, actionable:, command_line:)",
     ),
     limit: int = QueryParam(default=100, ge=1, le=500),
 ) -> dict[str, Any]:
