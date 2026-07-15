@@ -315,6 +315,7 @@ function timelineDetail(d) {
     push("Time", fmtFullTime(d.matched_at));
     push("Process", d.image);
     push("Parent", d.parent_image);
+    push("File", f.target_filename);
     push("User", f.user);
     push("Integrity", f.integrity_level);
     push("PID", f.process_id);
@@ -628,6 +629,8 @@ function membersHtml(incident) {
       <span class="member-title">${escapeHtml(d.title)}</span>
       <span class="member-time">${clockTime(d.matched_at)}</span>
       ${d.command_line ? `<div class="cmd">${renderCommand(d.command_line)}</div>` : ""}
+      ${!d.command_line && d.forensics && d.forensics.target_filename
+            ? `<div class="member-file">${escapeHtml(d.forensics.target_filename)}</div>` : ""}
       ${evidenceHtml(d)}
     </div>`).join("");
 

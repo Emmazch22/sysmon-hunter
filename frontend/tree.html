@@ -548,6 +548,7 @@
             push("Time", fmtTime(d.matched_at));
             push("Process", d.image);
             push("Parent", d.parent_image);
+            push("File", f.target_filename);
             push("User", f.user);
             push("Integrity", f.integrity_level);
             push("PID", f.process_id);

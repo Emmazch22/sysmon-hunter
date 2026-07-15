@@ -720,6 +720,22 @@ main {
     color: var(--text-mute);
 }
 
+/* File path for detections with no command line -- file-write events (a
+     dropped ransom note, a renamed-to-.locked share file, a startup-folder
+     drop) have no process to quote, but the path is the evidence. Same box
+     as .cmd, without the shell-prompt marker, since a path is not a command. */
+.member-file {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 5px;
+    padding: 6px 9px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    word-break: break-all;
+}
+
 /* ---------- Evidence panel ----------
      Statistical detections (beacon, discovery burst) carry the numbers behind
      the verdict. A finding that says only "beacon detected" is an assertion; the
