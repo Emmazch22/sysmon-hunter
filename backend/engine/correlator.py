@@ -159,6 +159,11 @@ class ProcessTree:
                         "image": node.image,
                         "name": node.name,
                         "command_line": node.command_line,
+                        # Timestamps, so a node's popup has something to show
+                        # even when it never fired a detection -- a benign
+                        # context process is still worth knowing *when* it ran.
+                        "first_seen": node.first_seen.isoformat(),
+                        "last_seen": node.last_seen.isoformat(),
                     }
                 )
             for child in children.get(guid, []):

@@ -26,6 +26,7 @@ const state = {
     expanded: new Set(),    // incident ids currently drilled into
     viewFor: new Map(),     // incidentId -> "list" | "timeline" | "tree"
     timelineNode: new Map(), // incidentId -> index of the expanded timeline node
+    treeNode: new Map(),    // incidentId -> guid of the expanded tree node
     scope: "triage",        // "triage" (actionable only) or "all"
     searchQuery: "",        // active search text; empty means no search
     searchResults: null,    // array of incident ids matching the search, or null when not searching
@@ -388,28 +389,48 @@ function fmtFullTime(iso) {
  *
  *  Laid out as an indented tree rather than a graph -- process trees are strictly
  *  hierarchical, and indentation reads faster than edges for depth.
+ *
+ *  Every row is clickable, same interaction as the timeline: click a node, a
+ *  detail panel opens beside the tree with everything known about that specific
+ *  process -- identity, timing, command line, and every detection that fired on
+ *  it, not just whether it was flagged.
  */
-function processTreeSvg(nodes, detections) {
+function processTreeSvg(nodes, detections, incidentId) {
     if (!nodes || !nodes.length) {
         return '<div class="tree-empty">No process tree captured for this incident.</div>';
     }
 
-    // Which process GUIDs fired a detection, and the worst severity each reached.
-    const flagged = {};
+    const SEV_RANK = ["info", "low", "medium", "high", "critical"];
+
+    // Detections keyed by the exact process_guid that fired them -- precise,
+    // unlike matching on image name, which conflates two different processes
+    // that merely share an executable name (two cmd.exe in the same tree, one
+    // benign and one not, must not both light up).
+    const byGuid = {};
     for (const d of detections || []) {
-        const g = (d.forensics && d.forensics.process_guid) || d.process_guid;
-        // detections don't carry guid in the serializer; match on image name instead
-        // as a fallback so at least the flagged styling has something to key on.
+        if (!d.process_guid) continue;
+        (byGuid[d.process_guid] ||= []).push(d);
     }
+    // Fallback for detections persisted before process_guid was serialized:
+    // still flag by image name so old incidents are not left looking benign.
     const flaggedNames = {};
     for (const d of detections || []) {
+        if (d.process_guid) continue;
         const name = baseName(d.image);
         const sev = (d.severity || "medium").toLowerCase();
-        const rank = ["info", "low", "medium", "high", "critical"];
-        if (!flaggedNames[name] || rank.indexOf(sev) > rank.indexOf(flaggedNames[name])) {
+        if (!flaggedNames[name] || SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(flaggedNames[name])) {
             flaggedNames[name] = sev;
         }
     }
+
+    const worstSeverity = (dets) => {
+        let worst = null;
+        for (const d of dets) {
+            const sev = (d.severity || "medium").toLowerCase();
+            if (!worst || SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(worst)) worst = sev;
+        }
+        return worst;
+    };
 
     const byParent = {};
     const guids = new Set(nodes.map((n) => n.guid));
@@ -432,14 +453,20 @@ function processTreeSvg(nodes, detections) {
     const width = 560;
     const height = rows.length * rowH + 12;
 
+    const selected = state.treeNode.get(incidentId);
+
     let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="tree-svg" role="img" aria-label="Process tree">`;
 
+    let selectedY = null;
     rows.forEach((row, i) => {
         const { node, depth } = row;
         const x = 10 + depth * indent;
         const y = 12 + i * rowH;
-        const sev = flaggedNames[node.name];
+        const matched = byGuid[node.guid] || [];
+        const sev = matched.length ? worstSeverity(matched) : flaggedNames[node.name];
         const color = sev ? `var(--sev-${sev})` : "var(--text-dim)";
+        const isSelected = selected === node.guid;
+        if (isSelected) selectedY = y;
 
         // Connector: a short elbow from the parent's column down to this node.
         if (depth > 0) {
@@ -448,9 +475,13 @@ function processTreeSvg(nodes, detections) {
         }
 
         // Node dot: filled + haloed if it fired a detection, hollow if benign.
+        // A selected node gets the same ring treatment as the timeline.
+        if (isSelected) {
+            svg += `<circle cx="${x}" cy="${y}" r="8" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+        }
         if (sev) {
             svg += `<circle cx="${x}" cy="${y}" r="4" fill="${color}"/>`;
-            if (sev === "critical") svg += `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+            if (sev === "critical" && !isSelected) svg += `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
         } else {
             svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="none" stroke="${color}" stroke-width="1"/>`;
         }
@@ -458,6 +489,10 @@ function processTreeSvg(nodes, detections) {
         // Process name, coloured by whether it was flagged.
         const weight = sev ? "700" : "400";
         svg += `<text x="${x + 11}" y="${y + 3.5}" fill="${sev ? color : 'var(--text)'}" font-size="11" font-weight="${weight}" font-family="monospace">${escapeHtml(node.name)}</text>`;
+
+        // A transparent hit area spanning the whole row and its full width, so
+        // the click target is generous, not just the 4px dot.
+        svg += `<rect x="0" y="${y - rowH / 2}" width="${width}" height="${rowH}" fill="transparent" style="cursor:pointer" data-tree-node="${escapeHtml(node.guid)}" data-incident="${escapeHtml(incidentId)}"><title>Click for detail</title></rect>`;
     });
 
     svg += `</svg>`;
@@ -467,7 +502,70 @@ function processTreeSvg(nodes, detections) {
     <span><span class="tree-dot benign"></span> benign (context)</span>
   </div>`;
 
-    return svg + legend;
+    let popup = "";
+    if (selected != null && selectedY != null) {
+        const node = nodes.find((n) => n.guid === selected);
+        if (node) {
+            const topPct = (selectedY / height) * 100;
+            popup = `<div class="tree-popup-anchor" style="top:${topPct}%">${treeNodeDetail(node, byGuid[node.guid] || [])}</div>`;
+        }
+    }
+
+    return `<div class="tree-wrap"><div class="tree-svg-col">${svg}${legend}</div>${popup}</div>`;
+}
+
+/** The expandable detail for one process-tree node: who it was (image, GUID,
+ *  parentage, when it ran) plus every detection that fired on it specifically.
+ *  A benign context node still gets the identity card -- knowing WINWORD.EXE
+ *  spawned at 14:02:03 and stayed alive four minutes is useful even though it
+ *  never triggered a rule itself. Reuses timelineDetail() for each matched
+ *  detection so a firing looks identical whether read from the timeline or
+ *  the tree -- same data, same card, different entry point. */
+function treeNodeDetail(node, matchedDetections) {
+    const rows = [];
+    const push = (label, value) => {
+        if (value) rows.push(
+            `<div class="tl-detail-row"><span class="tl-detail-key">${escapeHtml(label)}</span>` +
+            `<span class="tl-detail-val">${escapeHtml(value)}</span></div>`
+        );
+    };
+
+    push("Process", node.name);
+    push("Full path", node.image);
+    push("GUID", node.guid);
+    push("Parent GUID", node.parent_guid);
+    push("First seen", fmtFullTime(node.first_seen));
+    push("Last seen", fmtFullTime(node.last_seen));
+
+    const cmd = node.command_line
+        ? `<div class="tl-detail-cmd">${renderCommand(node.command_line)}</div>` : "";
+
+    const SEV_RANK = ["info", "low", "medium", "high", "critical"];
+    let headSev = "info";
+    for (const d of matchedDetections) {
+        const sev = (d.severity || "medium").toLowerCase();
+        if (SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(headSev)) headSev = sev;
+    }
+
+    const identity = `
+    <div class="tl-detail" data-sev="${escapeHtml(headSev)}">
+      <div class="tl-detail-grid">${rows.join("")}</div>
+      ${cmd}
+    </div>`;
+
+    if (!matchedDetections.length) {
+        return `${identity}<div class="tree-detail-note">No detection fired on this process &mdash; benign context.</div>`;
+    }
+
+    const fired = matchedDetections
+        .slice()
+        .sort((a, b) => new Date(a.matched_at) - new Date(b.matched_at))
+        .map((d) => timelineDetail(d))
+        .join("");
+
+    return `${identity}
+    <div class="tree-detail-fired-head">Fired ${matchedDetections.length} detection${matchedDetections.length === 1 ? "" : "s"}</div>
+    ${fired}`;
 }
 
 /** A compact human gap: "3s", "5m", "2h". Empty for sub-second gaps, which are
@@ -541,7 +639,7 @@ function membersHtml(incident) {
     if (view === "timeline") {
         body = `<div class="timeline">${timelineSvg(incident._members, incident.id)}</div>`;
     } else if (view === "tree") {
-        body = `<div class="tree">${processTreeSvg(incident.process_tree, incident._members)}</div>`;
+        body = `<div class="tree">${processTreeSvg(incident.process_tree, incident._members, incident.id)}</div>`;
     } else {
         body = `<div class="members">${rows}</div>`;
     }
@@ -844,6 +942,7 @@ function connect() {
             state.expanded.clear();
             state.viewFor.clear();
             state.timelineNode.clear();
+            state.treeNode.clear();
             state.searchResults = null;
             $("s-last").textContent = "--:--:--";
             renderQueue();
@@ -1052,6 +1151,19 @@ document.addEventListener("click", (event) => {
         const idx = parseInt(node.dataset.timelineNode, 10);
         if (state.timelineNode.get(id) === idx) state.timelineNode.delete(id);
         else state.timelineNode.set(id, idx);
+        renderQueue();
+        return;
+    }
+
+    // Expand or collapse a process-tree node's detail -- same interaction,
+    // keyed by GUID instead of a timeline index since the tree has no
+    // inherent order to index into.
+    const treeNode = event.target.closest("[data-tree-node]");
+    if (treeNode) {
+        const id = treeNode.dataset.incident;
+        const guid = treeNode.dataset.treeNode;
+        if (state.treeNode.get(id) === guid) state.treeNode.delete(id);
+        else state.treeNode.set(id, guid);
         renderQueue();
         return;
     }

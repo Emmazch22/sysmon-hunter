@@ -1700,6 +1700,79 @@ main {
     border: 1px solid var(--text-dim);
 }
 
+/* ---------- Process tree node detail (popup) ----------
+     Same floating-panel pattern as the timeline's node detail: click a row,
+     a card opens beside the tree rather than pushing content below it. The
+     tree's width differs from the timeline's, so the anchor position is
+     tuned separately rather than sharing the timeline's fixed offset. */
+
+.tree-wrap {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.tree-svg-col {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 580px;
+}
+
+.tree-popup-anchor {
+    position: absolute;
+    left: 580px;
+    transform: translateY(-50%);
+    width: 340px;
+    z-index: 30;
+}
+
+.tree-detail-note {
+    margin-top: 9px;
+    padding: 8px 10px;
+    font-size: 10px;
+    font-style: italic;
+    color: var(--text-mute);
+    background: var(--sunken);
+    border: 1px solid var(--border);
+}
+
+.tree-detail-fired-head {
+    margin-top: 11px;
+    margin-bottom: 6px;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+}
+
+.tree-popup-anchor .tl-detail {
+    margin-bottom: 8px;
+}
+
+.tree-popup-anchor .tl-detail:last-child {
+    margin-bottom: 0;
+}
+
+@media (max-width: 1050px) {
+    .tree-wrap {
+        display: block;
+    }
+
+    .tree-svg-col {
+        max-width: 100%;
+    }
+
+    .tree-popup-anchor {
+        position: static;
+        transform: none;
+        width: 100%;
+        left: auto;
+        margin-top: 10px;
+    }
+}
+
 /* ---------- Behavior profile ----------
      A narrative account of the incident at the top of the drill-down: what the
      malware did, in kill-chain order. Turns "23 detections" into a story. */
