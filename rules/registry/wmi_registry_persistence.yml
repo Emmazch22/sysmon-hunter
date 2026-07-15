@@ -1,0 +1,20 @@
+id: SYS-078
+title: Registry Run key written by the WMI provider host
+event_id: 13
+severity: high
+attack: [T1047, T1547.001]
+description: >
+  wmiprvse.exe -- the process that services WMI calls, local or remote over
+  DCOM -- wrote a value under a Run key. SYS-030 already flags the Run key
+  itself, but the actor matters as much as the target: an ordinary installer
+  never asks WMI to plant its own persistence. Seeing wmiprvse.exe as the
+  writer is close to unambiguous for the documented technique of reaching a
+  host over WMI/DCOM, usually from another machine on the network, and using
+  it to write persistence without ever dropping a file or spawning a shell
+  for EDR to notice. Validated against a real Sysmon capture: a remote WMI
+  connection on port 135, followed by wmiprvse.exe writing
+  CurrentVersion\Run\wmipers pointing at a rundll32 payload.
+detection:
+  image|endswith: '\wmiprvse.exe'
+  TargetObject|contains: '\CurrentVersion\Run'
+condition: all

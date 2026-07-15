@@ -482,6 +482,28 @@ CASES = [
     # --- Unsigned driver load / BYOVD (SYS-077) ---
     ("SYS-077", True, event(6, ImageLoaded=r"C:\Windows\Temp\rtcore64.sys", Signed="false")),
     ("SYS-077", False, event(6, ImageLoaded=r"C:\Windows\System32\drivers\ndis.sys", Signed="true")),
+    # --- Registry Run key written by wmiprvse.exe (SYS-078), validated
+    # against wmi_remote_registry_sysmon.evtx: a remote WMI/DCOM connection
+    # on port 135 followed by wmiprvse.exe writing exactly this key. ---
+    (
+        "SYS-078",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\wbem\wmiprvse.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\wmipers",
+            Details="rundll32.exe a.dll, DllMain",
+        ),
+    ),
+    (
+        "SYS-078",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\System32\msiexec.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\SomeApp",
+        ),
+    ),
 ]
 
 
