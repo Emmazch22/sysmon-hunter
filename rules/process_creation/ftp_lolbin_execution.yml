@@ -1,0 +1,18 @@
+id: SYS-079
+title: FTP client spawned a child process
+event_id: 1
+severity: high
+attack: [T1105, T1202]
+description: >
+  ftp.exe spawned a child process. Its `-s:` scripted mode supports a `!`
+  escape line that shells out to run an arbitrary local command -- a
+  documented LOLBAS technique (WinPwnage's "execute" module ships it as
+  technique 11) for achieving execution through a signed Microsoft binary
+  that most controls never watch as a process parent, unlike cmd.exe's usual
+  parents such as Office or a browser. Interactive or scripted FTP sessions
+  have no legitimate reason to spawn anything, so the parent alone is close
+  to sufficient signal on its own. Validated against a real Sysmon capture:
+  ftp.exe -s:ftp.txt spawning cmd.exe /C calc.exe.
+detection:
+  parent_image|endswith: '\ftp.exe'
+condition: all

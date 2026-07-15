@@ -504,6 +504,28 @@ CASES = [
             TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\SomeApp",
         ),
     ),
+    # --- FTP client spawning a child process (SYS-079), validated against
+    # exec_sysmon_1_ftp.evtx: ftp.exe -s:ftp.txt (WinPwnage's FTP execution
+    # technique) spawning cmd.exe /C calc.exe. ---
+    (
+        "SYS-079",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            parent_image=r"C:\Windows\System32\ftp.exe",
+            command_line=r"C:\Windows\system32\cmd.exe /C c:\Windows\system32\calc.exe",
+        ),
+    ),
+    (
+        "SYS-079",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            parent_image=r"C:\Windows\explorer.exe",
+        ),
+    ),
 ]
 
 
