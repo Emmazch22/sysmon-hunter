@@ -682,19 +682,22 @@ function membersHtml(incident) {
     const tab = (id, label) =>
         `<button class="view-tab${view === id ? " on" : ""}" data-view="${id}" data-incident="${escapeHtml(incident.id)}">${label}</button>`;
 
-    // Full-screen tree, in a new tab: the inline tree is capped to a compact
-    // column so it fits beside the detection list, which runs out of room fast
-    // on a deep or wide chain. The dedicated page trades that constraint for
-    // the whole viewport, plus pan and zoom to navigate it.
-    const openTree = view === "tree"
-        ? `<a class="open-tab tree-open-tab" href="/incident/${escapeHtml(incident.id)}/tree" target="_blank" rel="noopener" title="Open process tree full-screen in a new tab" aria-label="Open process tree in a new tab"><svg class="ico"><use href="#i-external"/></svg> Open in new tab</a>`
-        : "";
+    // Full-screen explorer, in a new tab: the inline timeline/tree views are
+    // capped to a compact column so they fit beside the detection list, which
+    // runs out of room fast on a deep chain or a long sequence. The dedicated
+    // page trades that constraint for the whole viewport, pan and zoom, and a
+    // detail panel that floats beside the canvas rather than inside a small
+    // scrolling box -- so it is never clipped the way the inline popup can be.
+    // Always shown (not just in tree view), and opens on whichever of
+    // timeline/tree the analyst is currently looking at inline.
+    const exploreView = view === "timeline" ? "timeline" : "tree";
+    const explore = `<a class="open-tab tree-open-tab" href="/incident/${escapeHtml(incident.id)}/explore?view=${exploreView}" target="_blank" rel="noopener" title="Explore this incident full-screen in a new tab" aria-label="Explore in a new tab"><svg class="ico"><use href="#i-external"/></svg> Explore</a>`;
 
     return `
     ${profileHtml(incident)}
     <div class="member-views">
       ${tab("list", "List")}${tab("timeline", "Timeline")}${tab("tree", "Process tree")}
-      ${openTree}
+      ${explore}
     </div>
     ${body}`;
 }

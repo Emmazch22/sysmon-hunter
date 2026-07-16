@@ -15,7 +15,7 @@
         })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Process tree — Sysmon Hunter</title>
+    <title>Explore — Sysmon Hunter</title>
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%230B0F14%22/%3E%3Cpath%20d%3D%22M16%204l9%203.5v7c0%205.8-3.9%209.6-9%2011.5-5.1-1.9-9-5.7-9-11.5v-7L16%204z%22%20fill%3D%22none%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%222.5%22%20fill%3D%22%233FB6C8%22/%3E%3Cpath%20d%3D%22M16%2017.5v4%22%20stroke%3D%22%233FB6C8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -98,6 +98,12 @@
 
         .tp-spacer {
             flex: 1;
+        }
+
+        .tp-view-tabs {
+            display: flex;
+            gap: 6px;
+            flex: 0 0 auto;
         }
 
         .tp-main {
@@ -355,10 +361,14 @@
           <span>${(inc.detections || []).length} detection${(inc.detections || []).length === 1 ? "" : "s"}</span>
         </div>
         <div class="tp-spacer"></div>
+        <div class="tp-view-tabs">
+          <button class="view-tab${currentView === "tree" ? " on" : ""}" data-view="tree">Process tree</button>
+          <button class="view-tab${currentView === "timeline" ? " on" : ""}" data-view="timeline">Timeline</button>
+        </div>
       </header>
       <div class="tp-main">
         <div class="tp-viewport" id="viewport">
-          <div class="tp-legend">
+          <div class="tp-legend" id="legend">
             <span><span class="tree-dot flagged"></span> fired a detection</span>
             <span><span class="tree-dot benign"></span> benign (context)</span>
           </div>
@@ -372,21 +382,56 @@
           <div class="tp-hint">Scroll to zoom &middot; drag to pan &middot; click a node for detail</div>
         </div>
         <aside class="tp-side" id="side">
-          <div class="tp-side-empty">Click a process node to see its full detail here.</div>
+          <div class="tp-side-empty">Click a node to see its full detail here.</div>
         </aside>
       </div>`;
 
-            initTree(inc.process_tree || [], inc.detections || []);
+            document.querySelectorAll(".tp-view-tabs .view-tab").forEach((btn) => {
+                btn.addEventListener("click", () => setView(btn.dataset.view));
+            });
+
+            initExplorer(inc.process_tree || [], inc.detections || []);
         }
 
-        /* ---------- Tree data + rendering ---------- */
+        /** Switch between the process-tree and timeline views. Both share the
+         *  same pan/zoom viewport and side detail panel -- only what gets drawn
+         *  on the canvas and what a click means differs. */
+        function setView(nextView) {
+            if (nextView === currentView) return;
+            currentView = nextView;
+            selectedGuid = null;
+            selectedIndex = null;
 
+            const url = new URL(location.href);
+            url.searchParams.set("view", currentView);
+            history.replaceState(null, "", url);
+            document.title = currentView === "timeline" ? "Timeline — Sysmon Hunter" : "Process tree — Sysmon Hunter";
+
+            document.querySelectorAll(".tp-view-tabs .view-tab").forEach((btn) => {
+                btn.classList.toggle("on", btn.dataset.view === currentView);
+            });
+            const legend = document.getElementById("legend");
+            if (legend) legend.style.display = currentView === "tree" ? "flex" : "none";
+            document.getElementById("side").innerHTML =
+                `<div class="tp-side-empty">Click a node to see its full detail here.</div>`;
+
+            draw();
+            fitToView();
+        }
+
+        /* ---------- Tree + timeline data, and shared rendering ---------- */
+
+        let currentView = new URLSearchParams(location.search).get("view") === "timeline" ? "timeline" : "tree";
         let selectedGuid = null;
+        let selectedIndex = null;
         let treeRows = [];
         let treeByGuid = {};
         let treeFlaggedNames = {};
         let treeWidth = 640;
         let treeHeight = 200;
+        let timelineRows = [];
+        let timelineWidth = 640;
+        let timelineHeight = 200;
 
         function worstSeverity(dets) {
             let worst = null;
@@ -397,13 +442,26 @@
             return worst;
         }
 
-        function initTree(nodes, detections) {
-            const canvas = document.getElementById("canvas");
-            if (!nodes.length) {
-                canvas.innerHTML = `<div style="padding:40px;color:var(--text-mute);font-size:12px;">No process tree captured for this incident.</div>`;
-                return;
-            }
+        function humanGap(ms) {
+            const s = Math.round(ms / 1000);
+            if (s < 1) return "";
+            if (s < 60) return `${s}s`;
+            const m = Math.round(s / 60);
+            if (m < 60) return `${m}m`;
+            const h = Math.round(m / 60);
+            return `${h}h`;
+        }
 
+        function clockTime(iso) {
+            const date = iso ? new Date(iso) : new Date();
+            return date.toLocaleTimeString("en-GB", { hour12: false });
+        }
+
+        /** Build both the tree rows and the timeline rows once from the same
+         *  incident payload, then draw whichever view is active. Doing both up
+         *  front (rather than lazily on first switch) keeps setView() a simple
+         *  draw() + fitToView() with nothing that can fail partway. */
+        function initExplorer(nodes, detections) {
             treeByGuid = {};
             for (const d of detections) {
                 if (!d.process_guid) continue;
@@ -434,12 +492,32 @@
             };
             for (const r of roots) walk(r.guid, 0);
 
-            drawTree();
+            timelineRows = [...detections].sort(
+                (a, b) => new Date(a.matched_at) - new Date(b.matched_at)
+            );
+
+            const legend = document.getElementById("legend");
+            if (legend) legend.style.display = currentView === "tree" ? "flex" : "none";
+
             setupViewport();
+            draw();
             fitToView();
         }
 
+        function draw() {
+            if (currentView === "timeline") drawTimeline();
+            else drawTree();
+        }
+
         function drawTree() {
+            const canvas = document.getElementById("canvas");
+            if (!treeRows.length) {
+                canvas.innerHTML = `<div style="padding:40px;color:var(--text-mute);font-size:12px;">No process tree captured for this incident.</div>`;
+                treeWidth = 400;
+                treeHeight = 100;
+                return;
+            }
+
             const rowH = 34;
             const indent = 30;
             const startX = 20;
@@ -489,17 +567,85 @@
             document.getElementById("canvas").innerHTML = svg;
         }
 
+        function drawTimeline() {
+            const canvas = document.getElementById("canvas");
+            if (!timelineRows.length) {
+                canvas.innerHTML = `<div style="padding:40px;color:var(--text-mute);font-size:12px;">No detections to show.</div>`;
+                timelineWidth = 400;
+                timelineHeight = 100;
+                return;
+            }
+
+            const rowH = 54;
+            const spineX = 170;
+            const width = 640;
+            const top = 20;
+            const height = top + timelineRows.length * rowH + 16;
+            timelineWidth = width;
+            timelineHeight = height;
+            const y = (i) => top + i * rowH + rowH / 2;
+
+            let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Incident timeline">`;
+            svg += `<line x1="${spineX}" y1="${y(0)}" x2="${spineX}" y2="${y(timelineRows.length - 1)}" stroke="var(--border-hi)" stroke-width="1"/>`;
+
+            timelineRows.forEach((d, i) => {
+                const sev = (d.severity || "medium").toLowerCase();
+                const color = `var(--sev-${sev})`;
+                const cy = y(i);
+                const isSelected = selectedIndex === i;
+
+                if (i > 0) {
+                    const gapMs = new Date(d.matched_at) - new Date(timelineRows[i - 1].matched_at);
+                    const gap = humanGap(gapMs);
+                    if (gap) {
+                        svg += `<text x="${spineX}" y="${cy - rowH / 2 + 4}" fill="var(--text-mute)" font-size="9" font-family="monospace" text-anchor="middle">+${esc(gap)}</text>`;
+                    }
+                }
+
+                svg += `<text x="${spineX - 20}" y="${cy + 4}" fill="var(--text-mute)" font-size="10" font-family="monospace" text-anchor="end">${esc(clockTime(d.matched_at))}</text>`;
+
+                if (isSelected) {
+                    svg += `<circle cx="${spineX}" cy="${cy}" r="11" fill="none" stroke="${color}" stroke-width="1.6"/>`;
+                } else if (sev === "critical") {
+                    svg += `<circle cx="${spineX}" cy="${cy}" r="10" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>`;
+                }
+                svg += `<circle cx="${spineX}" cy="${cy}" r="5.5" fill="${color}"/>`;
+
+                svg += `<text x="${spineX + 18}" y="${cy - 2}" fill="${color}" font-size="12" font-weight="700" font-family="monospace">${esc(d.rule_id)}</text>`;
+                svg += `<text x="${spineX + 18}" y="${cy + 13}" fill="var(--text-dim)" font-size="10" font-family="monospace">${esc(baseName(d.image))}</text>`;
+
+                svg += `<rect x="0" y="${cy - rowH / 2}" width="${width}" height="${rowH}" fill="transparent" data-timeline-node="${i}"><title>Click for detail</title></rect>`;
+            });
+
+            svg += `</svg>`;
+            canvas.innerHTML = svg;
+        }
+
         function selectNode(guid) {
             selectedGuid = guid;
+            selectedIndex = null;
             drawTree();
             const row = treeRows.find((r) => r.node.guid === guid);
             const side = document.getElementById("side");
             if (!row) {
-                side.innerHTML = `<div class="tp-side-empty">Click a process node to see its full detail here.</div>`;
+                side.innerHTML = `<div class="tp-side-empty">Click a node to see its full detail here.</div>`;
                 return;
             }
             const matched = treeByGuid[guid] || [];
             side.innerHTML = `<div class="tp-side-head">Process detail</div>${nodeDetailHtml(row.node, matched)}`;
+        }
+
+        function selectDetection(index) {
+            selectedIndex = index;
+            selectedGuid = null;
+            drawTimeline();
+            const d = timelineRows[index];
+            const side = document.getElementById("side");
+            if (!d) {
+                side.innerHTML = `<div class="tp-side-empty">Click a node to see its full detail here.</div>`;
+                return;
+            }
+            side.innerHTML = `<div class="tp-side-head">Detection detail</div>${detectionDetailHtml(d)}`;
         }
 
         function nodeDetailHtml(node, matched) {
@@ -631,14 +777,16 @@
             if (!vp) return;
             const rect = vp.getBoundingClientRect();
             const pad = 48;
+            const w = currentView === "timeline" ? timelineWidth : treeWidth;
+            const h = currentView === "timeline" ? timelineHeight : treeHeight;
             const scale = clampScale(Math.min(
-                (rect.width - pad * 2) / treeWidth,
-                (rect.height - pad * 2) / treeHeight,
+                (rect.width - pad * 2) / w,
+                (rect.height - pad * 2) / h,
                 1
             ));
             view.scale = scale;
-            view.x = (rect.width - treeWidth * scale) / 2;
-            view.y = Math.max(20, (rect.height - treeHeight * scale) / 2);
+            view.x = (rect.width - w * scale) / 2;
+            view.y = Math.max(20, (rect.height - h * scale) / 2);
             applyTransform();
         }
 
@@ -686,8 +834,10 @@
                 vp.classList.remove("dragging");
                 if (!moved) {
                     const el = document.elementFromPoint(e.clientX, e.clientY);
-                    const hit = el && el.closest("[data-tree-node]");
-                    if (hit) selectNode(hit.dataset.treeNode);
+                    const treeHit = el && el.closest("[data-tree-node]");
+                    const timelineHit = el && el.closest("[data-timeline-node]");
+                    if (treeHit) selectNode(treeHit.dataset.treeNode);
+                    else if (timelineHit) selectDetection(parseInt(timelineHit.dataset.timelineNode, 10));
                 }
             };
             vp.addEventListener("pointerup", endPan);
