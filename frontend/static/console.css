@@ -2160,10 +2160,14 @@ main {
     border-color: color-mix(in srgb, var(--sev-high) 40%, transparent);
 }
 
-/* Close / false-positive / reopen -- the manual triage actions in the
-     incident card's meta row, styled between .drill (text-only) and
-     .open-tab (icon-only): a bordered icon+label button, quiet until hovered. */
-.inc-action {
+/* Close / set verdict / reopen -- the manual triage actions in the incident
+     card's meta row, styled between .drill (text-only) and .open-tab
+     (icon-only): a bordered icon+label button, quiet until hovered.
+     .verdict-btn shares the same look but opens a menu rather than acting
+     directly, which is the whole reason it exists as a separate class -- see
+     the "Set verdict" comment in incidentHtml(). */
+.inc-action,
+.verdict-btn {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -2179,24 +2183,73 @@ main {
     transition: color .12s, border-color .12s;
 }
 
-.inc-action .ico {
+.inc-action .ico,
+.verdict-btn .ico {
     width: 11px;
     height: 11px;
 }
 
-.inc-action:hover {
+.inc-action:hover,
+.verdict-btn:hover,
+.verdict-btn[aria-expanded="true"] {
     color: var(--text);
     border-color: var(--struct);
 }
 
-.inc-action-fp:hover {
-    color: var(--sev-high);
-    border-color: var(--sev-high);
-}
-
-.inc-action:focus-visible {
+.inc-action:focus-visible,
+.verdict-btn:focus-visible {
     outline: 2px solid var(--struct);
     outline-offset: 2px;
+}
+
+/* The dropdown "Set verdict" opens. Positioned like .settings-menu (absolute,
+     below its trigger) but left-aligned and narrower, since it hangs off an
+     inline button in a card rather than a header icon. */
+.verdict-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.verdict-caret {
+    font-size: 8px;
+    margin-left: 1px;
+}
+
+.verdict-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 150px;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+    z-index: 30;
+}
+
+.verdict-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    transition: color .12s, background .12s;
+}
+
+.verdict-item:hover {
+    color: var(--sev-high);
+    background: var(--surface-2);
+}
+
+.verdict-item:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: -2px;
 }
 
 /* Notes word counter */

@@ -188,6 +188,10 @@ function incidentHtml(incident, isFresh) {
         : status === "false_positive"
             ? `<span class="inc-status-badge fp">false positive</span>`
             : "";
+    // "Set verdict" is a menu trigger, not a direct action -- it must not look
+    // like a value already attached to the incident (that was the FP button's
+    // problem), so it opens a small dropdown instead of firing on its own click.
+    // See the delegated ".verdict-btn"/".verdict-item" listener below.
     const statusActions = resolved
         ? `<button class="inc-action" data-action="open" data-incident="${escapeHtml(incident.id)}" title="Reopen this incident">
              <svg class="ico"><use href="#i-undo"/></svg> Reopen
@@ -195,9 +199,14 @@ function incidentHtml(incident, isFresh) {
         : `<button class="inc-action" data-action="closed" data-incident="${escapeHtml(incident.id)}" title="Close this incident">
              <svg class="ico"><use href="#i-check"/></svg> Close
            </button>
-           <button class="inc-action inc-action-fp" data-action="false_positive" data-incident="${escapeHtml(incident.id)}" title="Mark as false positive">
-             <svg class="ico"><use href="#i-flag"/></svg> False positive
-           </button>`;
+           <div class="verdict-wrap">
+             <button class="verdict-btn" data-incident="${escapeHtml(incident.id)}" aria-haspopup="true" aria-expanded="false" title="Set a verdict for this incident">
+               <svg class="ico"><use href="#i-flag"/></svg> Set verdict <span class="verdict-caret">&#9662;</span>
+             </button>
+             <div class="verdict-menu" hidden role="menu">
+               <button class="verdict-item" data-action="false_positive" data-incident="${escapeHtml(incident.id)}" role="menuitem">False positive</button>
+             </div>
+           </div>`;
 
     const members = expanded ? membersHtml(incident) : "";
 
@@ -1054,6 +1063,48 @@ document.querySelectorAll(".filter").forEach((button) => {
         });
         renderQueue();
     });
+});
+
+/** The "Set verdict" dropdown on each incident card. One delegated listener
+ *  registered on `document`, not per-card wiring in renderQueue() -- the
+ *  queue re-renders its innerHTML on every incident update, which would
+ *  otherwise mean re-attaching (or leaking) a listener per card on every
+ *  push. Delegation makes that a non-issue: it works on whatever ".verdict-*"
+ *  elements exist in the DOM at click time. */
+function closeVerdictMenus() {
+    document.querySelectorAll(".verdict-menu").forEach((menu) => { menu.hidden = true; });
+    document.querySelectorAll(".verdict-btn").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+}
+
+document.addEventListener("click", (event) => {
+    const item = event.target.closest(".verdict-item");
+    if (item) {
+        event.stopPropagation();
+        setIncidentStatus(item.dataset.incident, item.dataset.action);
+        closeVerdictMenus();
+        return;
+    }
+
+    const trigger = event.target.closest(".verdict-btn");
+    if (trigger) {
+        event.stopPropagation();
+        const menu = trigger.nextElementSibling;
+        const opening = menu.hidden;
+        closeVerdictMenus();
+        if (opening) {
+            menu.hidden = false;
+            trigger.setAttribute("aria-expanded", "true");
+        }
+        return;
+    }
+
+    // A click anywhere else -- including on a Close/Reopen button, which has
+    // its own handler -- closes any open verdict menu.
+    closeVerdictMenus();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeVerdictMenus();
 });
 
 bootstrap();
