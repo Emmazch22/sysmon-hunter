@@ -1,0 +1,35 @@
+id: SYS-092
+title: PE metadata claims a trusted binary, but it runs from a staging path
+event_id: 1
+severity: high
+attack: [T1036.005]
+description: >
+  A process's internal PE metadata (OriginalFileName) names a well-known
+  Windows or Office binary, yet the file itself runs from a path any user can
+  write to. Malware authors set this field so an EDR alert or a hasty triage
+  glance shows "CALC.EXE" instead of the payload's real, disposable name.
+  This complements SYS-007 rather than replacing it: SYS-007 catches an
+  attacker who names the *file itself* svchost.exe outside System32, while
+  this rule catches the file being named anything at all, because the lie
+  lives in the metadata instead of the filename. Emotet's staged payloads are
+  a textbook case: shipped as a random name, internally stamped CALC.EXE.
+detection:
+  OriginalFileName:
+    - CALC.EXE
+    - NOTEPAD.EXE
+    - CMD.EXE
+    - EXPLORER.EXE
+    - MSPAINT.EXE
+    - WERFAULT.EXE
+    - SVCHOST.EXE
+    - IEXPLORE.EXE
+    - WINWORD.EXE
+    - EXCEL.EXE
+    - CHROME.EXE
+    - CONHOST.EXE
+  image|re:
+    - '\\users\\[^\\]+\\appdata\\local\\temp\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\[^\\]+\.exe'
+    - '\\programdata\\[^\\]+\.exe'
+condition: all

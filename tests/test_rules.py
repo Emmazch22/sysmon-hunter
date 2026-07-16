@@ -851,6 +851,39 @@ CASES = [
             TargetObject=r"HKLM\SAM\SAM\Domains\Account\F",
         ),
     ),
+    # --- PE metadata masquerade (SYS-092), validated against
+    # exec_emotet_sysmon_1.evtx: a payload named Dyxxur4gx.exe, staged under
+    # AppData\Local\Temp, internally stamped OriginalFileName=CALC.EXE. ---
+    (
+        "SYS-092",
+        True,
+        event(
+            1,
+            image=r"C:\Users\Clippy\AppData\Local\Temp\WOrd\2019\Dyxxur4gx.exe",
+            parent_image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            OriginalFileName="CALC.EXE",
+            Description="Windows Calculator",
+            Company="Microsoft Corporation",
+        ),
+    ),
+    (
+        "SYS-092",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\calc.exe",
+            OriginalFileName="CALC.EXE",
+        ),
+    ),
+    (
+        "SYS-092",
+        False,
+        event(
+            1,
+            image=r"C:\Users\Clippy\AppData\Local\Temp\WOrd\2019\Dyxxur4gx.exe",
+            Description="Some legit installer",
+        ),
+    ),
 ]
 
 

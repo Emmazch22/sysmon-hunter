@@ -33,8 +33,9 @@ machine. The phases, roughly in kill-chain order:
                   ├─ three rundll32 children: bare (C2 + named pipe + beacon +
                   │   injection), comsvcs MiniDump (+ LSASS access), url.dll
                   │   OpenURL (+ child wscript)
-                  ├─ masquerading svchost.exe, a dropped payload.exe (BYOVD
-                  │   driver + unmanaged PowerShell + startup persistence)
+                  ├─ masquerading svchost.exe, a PE stamped CALC.EXE staged in
+                  │   Temp (SYS-092), a dropped payload.exe (BYOVD driver +
+                  │   unmanaged PowerShell + startup persistence)
                   ├─ wmic.exe registering a WMI event consumer
                   └─ ransomware.exe: shadow-copy deletion, a ransom note, and
                       several .locked files
@@ -72,7 +73,7 @@ EXPECTED_RULES = {
     "SYS-040", "SYS-041", "SYS-050", "SYS-051", "SYS-060", "SYS-070", "SYS-071",
     "SYS-072", "SYS-073", "SYS-074", "SYS-075", "SYS-076", "SYS-077", "SYS-078",
     "SYS-079", "SYS-080", "SYS-081", "SYS-082", "SYS-083", "SYS-084", "SYS-085",
-    "SYS-086", "SYS-087", "SYS-088", "SYS-089", "SYS-090", "SYS-091",
+    "SYS-086", "SYS-087", "SYS-088", "SYS-089", "SYS-090", "SYS-091", "SYS-092",
 }
 
 
@@ -165,6 +166,7 @@ G = {
     "rundll_url": "{rng-rundll-url}",
     "wscript_child": "{rng-wscript-child}",
     "svchost_masq": "{rng-svchost-masq}",
+    "calc_masq": "{rng-calc-masq}",
     "payload": "{rng-payload}",
     "wmic": "{rng-wmic}",
     "wmiprvse": "{rng-wmiprvse}",
@@ -389,6 +391,13 @@ def events() -> list[dict]:
     ev.append(proc(step(1), G["svchost_masq"], G["ops"], r"C:\Users\Public\svchost.exe",
                     "svchost.exe -k netsvcs", pid=4930, ppid=4510))
 
+    # PE metadata masquerade: internally stamped CALC.EXE, staged in Temp.
+    ev.append(proc(step(1), G["calc_masq"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\Dyxxur4gx.exe",
+                    r'"Dyxxur4gx.exe"', pid=4935, ppid=4510,
+                    OriginalFileName="CALC.EXE", Description="Windows Calculator",
+                    Company="Microsoft Corporation"))
+
     ev.append(proc(step(1), G["payload"], G["ops"],
                     r"C:\Users\redteam.ops\AppData\Local\Temp\update.exe",
                     r"update.exe -install", pid=4940, ppid=4510, integrity="High"))
@@ -535,17 +544,4 @@ def main() -> int:
     if missing:
         print(f"Did not fire: {', '.join(sorted(missing))}")
     else:
-        print("Every rule in the corpus fired at least once.")
-
-    print(f"Distinct incidents created: {len(incident_ids)} ({', '.join(sorted(incident_ids)) or 'none'})")
-    if len(incident_ids) == 1:
-        print("Confirmed: everything correlated into a single incident.")
-    elif len(incident_ids) > 1:
-        print("Warning: the run split across more than one incident.")
-
-    print(f"\nOpen http://localhost:8000 and expand the {HOST} incident.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+  
