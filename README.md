@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.2.0**
+**v0.3.0**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -22,9 +22,43 @@ malware telemetry — see [Detection engineering](#detection-engineering).
 
 ---
 
+## Why this exists
+
+Sysmon telemetry, by itself, is not a detection. A single event —
+`powershell.exe -enc SQBFAFgA...` — is a lead an analyst has to chase by hand:
+pull up the process tree, check what spawned it and what it spawned, check
+whether the IP it beaconed to is known-bad, decide whether the ten minutes that
+just cost was worth it. Multiply that by the volume a real endpoint produces and
+the actual job of a SOC analyst is triage, not detection — deciding, fast, which
+of a thousand events deserves the next five minutes.
+
+This project exists to practice that whole job, not just the rule-writing part
+of it. Most detection-engineering practice stops at "does this Sigma rule match
+this sample" — a useful exercise, but it skips the part that decides whether an
+analyst can actually act on the output: does a match become an incident with the
+story around it, does the process tree survive to be shown, does one critical
+detection outrank three medium ones the way it should, is a false positive one
+click to dismiss instead of a database edit. Building the full pipeline —
+ingest, normalize, correlate, score, present — was the point, and every rule in
+the corpus is validated the way a real detection engineer validates one: replay
+a known-bad `.evtx` from a public malware-sample corpus, see what fires and what
+should have, fix the gap, prove the fix against the sample. [SYS-092](#detection-engineering)
+exists because a submitted Emotet sample only tripped one rule in the whole
+corpus — that gap, and how it got closed, is the kind of thing this project is
+for.
+
+The result is useful past the exercise. It runs as a single process on a
+laptop's worth of resources, needs no SIEM license or cluster to stand up, and
+turns a Sysmon event stream into a short queue of incidents that an analyst —
+or someone learning what a detection pipeline looks like end to end — can
+actually work through: what happened, in what order, how bad, and what to do
+about it.
+
+---
+
 ## What it does
 
-- **Rule-based detection** — 48 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 49 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 9 Sysmon event types (process
   creation, network, registry, image load, process access, file create, named
   pipes, driver load, WMI event). Indexed by EventID so only relevant rules run
@@ -54,15 +88,25 @@ malware telemetry — see [Detection engineering](#detection-engineering).
   full-page view.
 - **Full-text and field search** — one search box, free text plus
   `host:` / `severity:` / `technique:` / `rule:` / `user:` / `command_line:` /
-  `actionable:` filters, mixed freely in a single query.
+  `actionable:` filters, mixed freely in a single query, with an on-demand "?"
+  reference popover for the syntax.
 - **PDF incident reports** — a self-contained, print-ready report per incident
   (summary, kill-chain narrative, process chain, every detection's forensics,
   and key indicators), generated server-side with no headless browser.
-- **Live console** — WebSocket feed, incident queue, three incident views (list,
-  interactive timeline, full process tree), a dedicated full-screen process-tree
-  viewer (opens in a new tab, with click-drag panning and scroll-wheel zoom),
-  clickable ATT&CK techniques with MITRE descriptions, inline base64 decoding of
-  encoded command lines, and a database-reset control in the settings menu.
+- **Incident triage** — close an incident, reopen it, or mark it a false
+  positive from the console or its full-page view, through a "Set verdict"
+  menu. Closed and false-positive incidents drop out of the default "needs
+  triage" filter without disappearing from "all" or "closed".
+- **Explore view** — a dedicated full-screen page per incident: a pan-and-zoom
+  process tree, an equally full-screen timeline, and a plain scrollable log of
+  every detection's full forensic detail — for a tree or sequence too wide or
+  deep for the inline column, or an incident you just want to read straight
+  through.
+- **Live console** — WebSocket feed, incident queue, three inline incident
+  views (list, interactive timeline, full process tree), clickable ATT&CK
+  techniques with MITRE descriptions, inline base64 decoding of encoded
+  command lines, a light/dark theme toggle, and a database-reset control, all
+  in the settings menu.
 
 ---
 
@@ -86,6 +130,12 @@ click-and-drag panning, scroll-wheel zoom, and zoom-to-fit — built for tracing
 a wide or deep tree that the inline column cannot show at once.
 
 ![Process tree](docs/03_process_tree.png)
+
+"Explore" hands the same incident to a dedicated full-screen page — process
+tree, timeline, and a plain scrollable log, each a click away from the other —
+with the tree and timeline gaining click-and-drag panning, scroll-wheel zoom,
+and zoom-to-fit, built for a wide or deep tree, or a long sequence, that the
+inline column cannot show at once.
 
 ### Interactive attack timeline
 
@@ -199,6 +249,16 @@ compared `Type` against the WMI class name, but Sysmon actually reports the
 human-readable label ("Command Line", "Script") — fixed and validated against
 two real captures.
 
+A user-submitted Emotet sample (`exec_emotet_sysmon_1.evtx`) surfaced one more
+gap: the sample is a single process-creation event, and it only tripped
+SYS-006 (execution from a staging path). The payload's PE metadata claimed
+`CALC.EXE` / "Windows Calculator" / Microsoft Corporation while running under a
+random name from a Temp folder — classic resource-spoofing, and a signal no
+rule inspected, since the existing masquerading rule (SYS-007) only checks
+whether the *file itself* is named after a system binary. **SYS-092** checks
+`OriginalFileName` against a list of commonly-spoofed binaries alongside the
+staging-path check, and is validated against the same sample.
+
 ---
 
 ## Design decisions
@@ -287,7 +347,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 251 tests
+python -m pytest        # 280 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -322,14 +382,14 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   48 YAML detection rules, by EventID
+├── rules/                   49 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
-├── scripts/                 seed_apt, seed_demo, seed_rw, replay_evtx,
-│                            fetch_attack
+├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
+│                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   251 tests
+└── tests/                   280 tests
 ```
 
 ---
