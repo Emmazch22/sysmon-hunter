@@ -314,15 +314,14 @@ function timelineSvg(detections, incidentId) {
 
     svg += `</svg>`;
 
-    // Detail popup for the selected node, floated to the right of its row rather
-    // than pushed below the timeline, so the sequence stays in view while an
-    // analyst reads one step. Positioned by the node's vertical offset.
+    // Detail popup for the selected node, floated beside the timeline rather
+    // than pushed below it, so the sequence stays in view while an analyst
+    // reads one step. Sticky-positioned (see .tl-popup-anchor), not pinned to
+    // the node's own offset, so it stays fully inside the queue's scroll
+    // window no matter which row was clicked.
     let popup = "";
     if (selected != null && sorted[selected]) {
-        const nodeY = y(selected);
-        // As a fraction of the SVG height, so it tracks the node when the SVG scales.
-        const topPct = (nodeY / height) * 100;
-        popup = `<div class="tl-popup-anchor" style="top:${topPct}%">${timelineDetail(sorted[selected])}</div>`;
+        popup = `<div class="tl-popup-anchor">${timelineDetail(sorted[selected])}</div>`;
     }
 
     return `<div class="timeline-wrap"><div class="timeline-svg-col">${svg}</div>${popup}</div>`;
@@ -539,8 +538,7 @@ function processTreeSvg(nodes, detections, incidentId) {
     if (selected != null && selectedY != null) {
         const node = nodes.find((n) => n.guid === selected);
         if (node) {
-            const topPct = (selectedY / height) * 100;
-            popup = `<div class="tree-popup-anchor" style="top:${topPct}%">${treeNodeDetail(node, byGuid[node.guid] || [])}</div>`;
+            popup = `<div class="tree-popup-anchor">${treeNodeDetail(node, byGuid[node.guid] || [])}</div>`;
         }
     }
 
@@ -1496,6 +1494,35 @@ document.addEventListener("DOMContentLoaded", () => {
     // Escape clears the search when the box is focused.
     if (input) input.addEventListener("keydown", (e) => {
         if (e.key === "Escape") { input.value = ""; runSearch(""); }
+    });
+});
+
+// Search syntax help: same click-to-open/outside-click-or-Escape-to-close
+// pattern as the incident verdict menu, so it behaves the way the rest of the
+// console already does.
+document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("search-help-btn");
+    const menu = document.getElementById("search-help-menu");
+    if (!btn || !menu) return;
+
+    const close = () => {
+        menu.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+    };
+
+    btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const opening = menu.hidden;
+        close();
+        if (opening) {
+            menu.hidden = false;
+            btn.setAttribute("aria-expanded", "true");
+        }
+    });
+    menu.addEventListener("click", (event) => event.stopPropagation());
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") close();
     });
 });
 

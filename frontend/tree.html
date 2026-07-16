@@ -246,6 +246,34 @@
             margin-bottom: 10px;
         }
 
+        /* Logs view: a plain scrollable list, not a pan/zoom canvas -- every
+           detection is already fully expanded, so there is nothing to click
+           into and no side panel needed. */
+        .tp-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 20px;
+            background:
+                radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/22px 22px,
+                var(--bg);
+        }
+
+        .tp-logs-inner {
+            max-width: 760px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .tp-log-time {
+            font-size: 9px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+            margin-bottom: 4px;
+        }
+
         .loading,
         .error {
             margin: auto;
@@ -364,6 +392,7 @@
         <div class="tp-view-tabs">
           <button class="view-tab${currentView === "tree" ? " on" : ""}" data-view="tree">Process tree</button>
           <button class="view-tab${currentView === "timeline" ? " on" : ""}" data-view="timeline">Timeline</button>
+          <button class="view-tab${currentView === "logs" ? " on" : ""}" data-view="logs">Logs</button>
         </div>
       </header>
       <div class="tp-main">
@@ -384,6 +413,9 @@
         <aside class="tp-side" id="side">
           <div class="tp-side-empty">Click a node to see its full detail here.</div>
         </aside>
+        <div class="tp-logs" id="logs" hidden>
+          <div class="tp-logs-inner" id="logs-inner"></div>
+        </div>
       </div>`;
 
             document.querySelectorAll(".tp-view-tabs .view-tab").forEach((btn) => {
@@ -405,23 +437,65 @@
             const url = new URL(location.href);
             url.searchParams.set("view", currentView);
             history.replaceState(null, "", url);
-            document.title = currentView === "timeline" ? "Timeline — Sysmon Hunter" : "Process tree — Sysmon Hunter";
+            document.title = currentView === "timeline" ? "Timeline — Sysmon Hunter"
+                : currentView === "logs" ? "Logs — Sysmon Hunter"
+                    : "Process tree — Sysmon Hunter";
 
             document.querySelectorAll(".tp-view-tabs .view-tab").forEach((btn) => {
                 btn.classList.toggle("on", btn.dataset.view === currentView);
             });
-            const legend = document.getElementById("legend");
-            if (legend) legend.style.display = currentView === "tree" ? "flex" : "none";
+            applyViewVisibility();
+
+            if (currentView === "logs") {
+                renderLogs();
+                return;
+            }
             document.getElementById("side").innerHTML =
                 `<div class="tp-side-empty">Click a node to see its full detail here.</div>`;
-
             draw();
             fitToView();
         }
 
+        /** Show whichever of the pan/zoom viewport (tree/timeline) or the plain
+         *  scrollable list (logs) matches the current view, and hide the other.
+         *  Shared by the first render and every later setView() call. */
+        function applyViewVisibility() {
+            const isLogs = currentView === "logs";
+            const viewport = document.getElementById("viewport");
+            const side = document.getElementById("side");
+            const logs = document.getElementById("logs");
+            if (viewport) viewport.hidden = isLogs;
+            if (side) side.hidden = isLogs;
+            if (logs) logs.hidden = !isLogs;
+            const legend = document.getElementById("legend");
+            if (legend) legend.style.display = currentView === "tree" ? "flex" : "none";
+        }
+
+        /** Logs view: every detection, full detail, newest last -- the same
+         *  chronological order as the timeline, just without needing a click to
+         *  expand each one. Reuses detectionDetailHtml() so a detection looks
+         *  identical here, in the timeline's side panel, and in a tree node's
+         *  fired-detections list. */
+        function renderLogs() {
+            const container = document.getElementById("logs-inner");
+            if (!container) return;
+            if (!timelineRows.length) {
+                container.innerHTML = `<div class="tp-side-empty">No detections to show.</div>`;
+                return;
+            }
+            container.innerHTML = timelineRows.map((d) => `
+        <div class="tp-log-entry">
+          <div class="tp-log-time">${esc(clockTime(d.matched_at))}</div>
+          ${detectionDetailHtml(d)}
+        </div>`).join("");
+        }
+
         /* ---------- Tree + timeline data, and shared rendering ---------- */
 
-        let currentView = new URLSearchParams(location.search).get("view") === "timeline" ? "timeline" : "tree";
+        let currentView = (() => {
+            const v = new URLSearchParams(location.search).get("view");
+            return v === "timeline" ? "timeline" : v === "logs" ? "logs" : "tree";
+        })();
         let selectedGuid = null;
         let selectedIndex = null;
         let treeRows = [];
@@ -496,10 +570,13 @@
                 (a, b) => new Date(a.matched_at) - new Date(b.matched_at)
             );
 
-            const legend = document.getElementById("legend");
-            if (legend) legend.style.display = currentView === "tree" ? "flex" : "none";
-
             setupViewport();
+            applyViewVisibility();
+
+            if (currentView === "logs") {
+                renderLogs();
+                return;
+            }
             draw();
             fitToView();
         }
@@ -773,6 +850,7 @@
         }
 
         function fitToView() {
+            if (currentView === "logs") return;
             const vp = document.getElementById("viewport");
             if (!vp) return;
             const rect = vp.getBoundingClientRect();

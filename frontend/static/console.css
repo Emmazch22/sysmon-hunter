@@ -1524,11 +1524,19 @@ main {
 }
 
 .tl-popup-anchor {
-    position: absolute;
-    left: 460px;
-    /* just past the timeline column */
-    transform: translateY(-50%);
+    /* Sticky, not absolute-positioned-by-node-offset: the queue panel is a
+       fixed-height scroll box (.queue { max-height: 560px; overflow-y: auto })
+       and a popup pinned to a specific row's height routinely landed partly
+       above or below that box's visible scroll window, clipped by it -- not by
+       .timeline, which has no overflow of its own. Sticky keeps the popup
+       fully inside whatever part of .queue is currently scrolled into view,
+       regardless of which row was clicked. */
+    position: sticky;
+    top: 12px;
+    align-self: flex-start;
     width: 340px;
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
     z-index: 30;
 }
 
@@ -1539,18 +1547,6 @@ main {
     padding: 13px 15px;
     box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
     position: relative;
-}
-
-/* A small pointer connecting the popup back to its node. */
-.tl-detail::before {
-    content: "";
-    position: absolute;
-    left: -7px;
-    top: 50%;
-    transform: translateY(-50%);
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-right: 6px solid var(--border-hi);
 }
 
 .tl-detail-grid {
@@ -1630,14 +1626,9 @@ main {
 
     .tl-popup-anchor {
         position: static;
-        transform: none;
         width: 100%;
-        left: auto;
+        max-height: none;
         margin-top: 10px;
-    }
-
-    .tl-detail::before {
-        display: none;
     }
 }
 
@@ -1710,6 +1701,86 @@ main {
 
 .search-parsed {
     color: var(--struct);
+}
+
+/* ---------- Search syntax help ----------
+     A "?" button beside the search box opens a small reference of the field
+     filters the /search endpoint understands. The placeholder used to carry
+     this alone, but it is long enough to be clipped on anything narrower than
+     a wide desktop window, and it disappears the moment the analyst starts
+     typing -- exactly when it would be most useful. This stays available on
+     demand instead, same click-to-open/outside-click-to-close pattern as the
+     verdict menu. */
+
+.search-help-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.search-help-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--border-hi);
+    background: transparent;
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color .12s, border-color .12s;
+}
+
+.search-help-btn:hover,
+.search-help-btn[aria-expanded="true"] {
+    color: var(--struct);
+    border-color: var(--struct);
+}
+
+.search-help-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+    padding: 12px 14px;
+    z-index: 30;
+}
+
+.search-help-title {
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.search-help-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 7px;
+}
+
+.search-help-row:last-child {
+    margin-bottom: 0;
+}
+
+.search-help-row code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--struct);
+}
+
+.search-help-row span {
+    font-size: 10px;
+    color: var(--text-dim);
 }
 
 /* ---------- Process tree view ----------
@@ -1790,10 +1861,15 @@ main {
 }
 
 .tree-popup-anchor {
-    position: absolute;
-    left: 580px;
-    transform: translateY(-50%);
+    /* Sticky for the same reason as .tl-popup-anchor above: .queue clips
+       anything absolutely positioned outside its current scroll window,
+       whether that is above or below it. */
+    position: sticky;
+    top: 12px;
+    align-self: flex-start;
     width: 340px;
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
     z-index: 30;
 }
 
@@ -1836,9 +1912,8 @@ main {
 
     .tree-popup-anchor {
         position: static;
-        transform: none;
         width: 100%;
-        left: auto;
+        max-height: none;
         margin-top: 10px;
     }
 }

@@ -183,8 +183,32 @@
                         <use href="#i-recon" />
                     </svg>
                     <input type="text" id="search-input" class="search-input" autocomplete="off"
-                        placeholder="Search:  mimikatz   ·   command_line:encodedcommand   ·   host:WKSTN-FINANCE-04   ·   severity:critical">
+                        placeholder="Search incidents&hellip; try mimikatz or host:, severity:, rule:">
                     <button class="search-clear" id="search-clear" aria-label="Clear search" hidden>&times;</button>
+                    <div class="search-help-wrap">
+                        <button class="search-help-btn" id="search-help-btn" type="button" aria-haspopup="true"
+                            aria-expanded="false" aria-label="Search syntax help" title="Search syntax help">?</button>
+                        <div class="search-help-menu" id="search-help-menu" hidden role="menu">
+                            <div class="search-help-title">Search syntax</div>
+                            <div class="search-help-row"><code>mimikatz</code><span>free text &mdash; matched against title, host,
+                                    image and rule id</span></div>
+                            <div class="search-help-row"><code>host:WKSTN-FINANCE-04</code><span>host contains&hellip;</span>
+                            </div>
+                            <div class="search-help-row"><code>severity:critical</code><span>info, low, medium, high or
+                                    critical</span></div>
+                            <div class="search-help-row"><code>rule:SYS-041</code><span>a specific rule id</span></div>
+                            <div class="search-help-row"><code>technique:T1003</code><span>an ATT&amp;CK id, exact or
+                                    prefix</span></div>
+                            <div class="search-help-row"><code>user:svc_backup</code><span>the forensic user field
+                                    contains&hellip;</span></div>
+                            <div class="search-help-row"><code>command_line:encodedcommand</code><span>any command line
+                                    contains&hellip;</span></div>
+                            <div class="search-help-row"><code>actionable:true</code><span>only incidents that crossed the
+                                    score threshold</span></div>
+                            <div class="search-help-row"><code>host:WKSTN-04 severity:high</code><span>combine freely &mdash; all
+                                    must match</span></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="search-hint" id="search-hint" hidden></div>
                 <div class="queue" id="queue">
