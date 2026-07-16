@@ -544,4 +544,17 @@ def main() -> int:
     if missing:
         print(f"Did not fire: {', '.join(sorted(missing))}")
     else:
-  
+        print("Every rule in the corpus fired at least once.")
+
+    print(f"Distinct incidents created: {len(incident_ids)} ({', '.join(sorted(incident_ids)) or 'none'})")
+    if len(incident_ids) == 1:
+        print("Confirmed: everything correlated into a single incident.")
+    elif len(incident_ids) > 1:
+        print("Warning: the run split across more than one incident.")
+
+    print(f"\nOpen http://localhost:8000 and expand the {HOST} incident.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
