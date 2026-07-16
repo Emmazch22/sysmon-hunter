@@ -3,6 +3,17 @@
 
 <head>
     <meta charset="utf-8">
+    <script>
+        // Applied before first paint, so opening the tree view never flashes
+        // the wrong theme while console.css is still loading.
+        (function () {
+            try {
+                if (localStorage.getItem("hunter-theme") === "light") {
+                    document.documentElement.setAttribute("data-theme", "light");
+                }
+            } catch (e) { }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Process tree — Sysmon Hunter</title>
     <link rel="icon" type="image/svg+xml"

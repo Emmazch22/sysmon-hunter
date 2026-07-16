@@ -31,6 +31,22 @@ class Severity(str, Enum):
     CRITICAL = "critical"
 
 
+class IncidentStatus(str, Enum):
+    """An incident's triage state.
+
+    Set by the analyst, never by the engine: the correlator's upsert only
+    ever inserts a new row as OPEN and must never overwrite this field on an
+    existing one, the same way it never touches notes. CLOSED means "handled,
+    nothing more to do"; FALSE_POSITIVE means "handled, and it wasn't real" --
+    kept distinct from CLOSED so the console (and eventually a metric) can
+    tell "resolved" from "resolved, the rule was wrong."
+    """
+
+    OPEN = "open"
+    CLOSED = "closed"
+    FALSE_POSITIVE = "false_positive"
+
+
 # Weights used to score incidents. The scale is deliberately non-linear: one
 # critical detection should outweigh several medium ones, because a single
 # LSASS access matters more than three suspicious-path executions.

@@ -35,6 +35,47 @@
     --display: 'Space Grotesk', system-ui, sans-serif;
 }
 
+/* ---------- Light theme ----------
+     Dark is the console's default; light is the one alternate, toggled from
+     the settings menu (see #theme-toggle-btn in console.js) and persisted in
+     localStorage. Every rule in this file reads colour from a variable, so
+     redefining the palette here is the entire theme -- nothing below this
+     block needs to know a light mode exists. */
+:root[data-theme="light"] {
+    --bg: #F3F5F7;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF2;
+    --sunken: #E4E9ED;
+    --border: #D7DEE4;
+    --border-hi: #C1CBD4;
+
+    --text: #1B2530;
+    --text-dim: #4C5A69;
+    --text-mute: #7C8A98;
+
+    --struct: #0E7C90;
+    --attack: #6249B8;
+
+    --sev-info: #2F6690;
+    --sev-low: #147F91;
+    --sev-medium: #A6741A;
+    --sev-high: #BF5323;
+    --sev-critical: #C22B24;
+}
+
+:root[data-theme="light"] body {
+    background-image:
+        linear-gradient(rgba(14, 124, 144, .05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 124, 144, .05) 1px, transparent 1px);
+}
+
+:root[data-theme="light"] body::after {
+    background: linear-gradient(to bottom,
+            transparent 0%,
+            rgba(14, 124, 144, .05) 50%,
+            transparent 100%);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -2112,6 +2153,50 @@ main {
     border: 1px solid var(--border-hi);
     padding: 1px 6px;
     margin-left: 6px;
+}
+
+.inc-status-badge.fp {
+    color: var(--sev-high);
+    border-color: color-mix(in srgb, var(--sev-high) 40%, transparent);
+}
+
+/* Close / false-positive / reopen -- the manual triage actions in the
+     incident card's meta row, styled between .drill (text-only) and
+     .open-tab (icon-only): a bordered icon+label button, quiet until hovered. */
+.inc-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--border-hi);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 2px 8px;
+    transition: color .12s, border-color .12s;
+}
+
+.inc-action .ico {
+    width: 11px;
+    height: 11px;
+}
+
+.inc-action:hover {
+    color: var(--text);
+    border-color: var(--struct);
+}
+
+.inc-action-fp:hover {
+    color: var(--sev-high);
+    border-color: var(--sev-high);
+}
+
+.inc-action:focus-visible {
+    outline: 2px solid var(--struct);
+    outline-offset: 2px;
 }
 
 /* Notes word counter */

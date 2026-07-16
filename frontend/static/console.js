@@ -177,14 +177,36 @@ function incidentHtml(incident, isFresh) {
         ? `<span class="sev-tag"><svg class="ico"><use href="#i-alert"/></svg>${escapeHtml(severity)}</span>`
         : `<span class="watch">watching</span>`;
 
+    // Status is analyst-set triage state, distinct from "actionable" (which the
+    // engine derives from score/severity/volume). A resolved incident keeps its
+    // severity badge -- it still says what it was -- and gains a status badge
+    // plus a dimmed row so the queue reads at a glance as "handled".
+    const status = incident.status || "open";
+    const resolved = status === "closed" || status === "false_positive";
+    const statusBadge = status === "closed"
+        ? `<span class="inc-status-badge">closed</span>`
+        : status === "false_positive"
+            ? `<span class="inc-status-badge fp">false positive</span>`
+            : "";
+    const statusActions = resolved
+        ? `<button class="inc-action" data-action="open" data-incident="${escapeHtml(incident.id)}" title="Reopen this incident">
+             <svg class="ico"><use href="#i-undo"/></svg> Reopen
+           </button>`
+        : `<button class="inc-action" data-action="closed" data-incident="${escapeHtml(incident.id)}" title="Close this incident">
+             <svg class="ico"><use href="#i-check"/></svg> Close
+           </button>
+           <button class="inc-action inc-action-fp" data-action="false_positive" data-incident="${escapeHtml(incident.id)}" title="Mark as false positive">
+             <svg class="ico"><use href="#i-flag"/></svg> False positive
+           </button>`;
+
     const members = expanded ? membersHtml(incident) : "";
 
     return `
-    <article class="inc${isFresh ? " fresh" : ""}" data-sev="${escapeHtml(severity)}">
+    <article class="inc${isFresh ? " fresh" : ""}${resolved ? " is-closed" : ""}" data-sev="${escapeHtml(severity)}">
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
-          ${badge}
+          ${badge}${statusBadge}
           <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>
@@ -204,6 +226,7 @@ function incidentHtml(incident, isFresh) {
           <button class="drill" data-incident="${escapeHtml(incident.id)}">
             ${expanded ? "Hide detections" : "Show detections"}
           </button>
+          ${statusActions}
           <a class="open-tab" href="/incident/${escapeHtml(incident.id)}" target="_blank" rel="noopener" title="Open full incident view in a new tab" aria-label="Open in new tab">
             <svg class="ico"><use href="#i-external"/></svg>
           </a>
@@ -752,7 +775,15 @@ function visibleIncidents() {
             .sort((a, b) => order.get(a.id) - order.get(b.id));  // keep server ranking
     }
 
-    const scoped = state.scope === "triage" ? all.filter((i) => i.actionable) : all;
+    // A closed or dismissed incident is triaged: it leaves "Needs triage" and
+    // "All" the moment an analyst resolves it, and lives only under "Closed" --
+    // the same way a real queue moves resolved tickets out of the way.
+    const isResolved = (i) => i.status === "closed" || i.status === "false_positive";
+    let scoped;
+    if (state.scope === "triage") scoped = all.filter((i) => i.actionable && !isResolved(i));
+    else if (state.scope === "closed") scoped = all.filter(isResolved);
+    else scoped = all.filter((i) => !isResolved(i));
+
     return scoped.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
 }
 
@@ -786,6 +817,13 @@ function renderQueue(freshId = null) {
     $("queue").querySelectorAll(".drill").forEach((button) => {
         button.addEventListener("click", () => toggleDrill(button.dataset.incident));
     });
+
+    $("queue").querySelectorAll(".inc-action").forEach((button) => {
+        button.addEventListener("click", (event) => {
+            event.stopPropagation();
+            setIncidentStatus(button.dataset.incident, button.dataset.action);
+        });
+    });
 }
 
 /** Expand or collapse an incident, fetching its detections the first time. */
@@ -809,6 +847,34 @@ async function toggleDrill(incidentId) {
         incident._members = [];
     }
     renderQueue();
+}
+
+/** Close, dismiss as false positive, or reopen an incident. Analyst-set triage
+ *  state, distinct from the engine's actionable/score/severity -- see
+ *  backend/api/status.py. Only this tab's view updates immediately; other
+ *  open consoles pick up the change the next time they reload or drill in,
+ *  the same tradeoff notes already make (see wireNotes on the incident page). */
+async function setIncidentStatus(incidentId, newStatus) {
+    try {
+        const res = await fetch(`/incidents/${incidentId}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const updated = await res.json();
+
+        // Preserve any already-fetched member list, otherwise an expanded
+        // incident collapses to a spinner every time its status changes.
+        const existing = state.incidents.get(incidentId);
+        if (existing?._members) updated._members = existing._members;
+
+        state.incidents.set(incidentId, updated);
+        renderQueue();
+        renderStats();
+    } catch (err) {
+        alert("Could not update the incident's status: " + err.message);
+    }
 }
 
 /* ---------- Rendering: detection stream ---------- */
@@ -842,7 +908,9 @@ function renderStream(freshCount = 0) {
 
 function renderStats() {
     const incidents = [...state.incidents.values()];
-    const actionable = incidents.filter((i) => i.actionable);
+    const actionable = incidents.filter(
+        (i) => i.actionable && i.status !== "closed" && i.status !== "false_positive"
+    );
     const hosts = new Set(incidents.map((i) => i.host).filter((h) => h && h !== "unknown"));
 
     const techniqueCounts = {};
@@ -999,11 +1067,44 @@ connect();
    gone, on every connected console (see the "reset" branch in connect()).
    ============================================================ */
 
+/** Dark mode is the console's default look; "light" is the one alternate
+ *  theme, toggled from the settings menu and remembered across visits (and,
+ *  via the inline snippet in each page's <head>, applied before first paint
+ *  so switching pages never flashes back to dark). */
+const THEME_KEY = "hunter-theme";
+
+function applyTheme(theme) {
+    if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+    } else {
+        document.documentElement.removeAttribute("data-theme");
+    }
+    const icon = $("theme-toggle-icon");
+    const label = $("theme-toggle-label");
+    if (icon) icon.innerHTML = `<use href="${theme === "light" ? "#i-moon" : "#i-sun"}"/>`;
+    if (label) label.textContent = theme === "light" ? "Dark mode" : "Light mode";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const btn = $("settings-btn");
     const menu = $("settings-menu");
     const resetBtn = $("reset-db-btn");
+    const themeBtn = $("theme-toggle-btn");
     if (!btn || !menu) return;
+
+    applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+
+    if (themeBtn) {
+        themeBtn.addEventListener("click", () => {
+            const current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+            const next = current === "light" ? "dark" : "light";
+            applyTheme(next);
+            try {
+                if (next === "light") localStorage.setItem(THEME_KEY, "light");
+                else localStorage.removeItem(THEME_KEY);
+            } catch (e) { }
+        });
+    }
 
     const closeMenu = () => {
         menu.hidden = true;

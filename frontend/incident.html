@@ -3,6 +3,17 @@
 
 <head>
     <meta charset="utf-8">
+    <script>
+        // Applied before first paint, so arriving here from the console never
+        // flashes the wrong theme while console.css is still loading.
+        (function () {
+            try {
+                if (localStorage.getItem("hunter-theme") === "light") {
+                    document.documentElement.setAttribute("data-theme", "light");
+                }
+            } catch (e) { }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Incident — Sysmon Hunter</title>
     <link rel="icon" type="image/svg+xml"
@@ -75,6 +86,20 @@
 
         .ih-id {
             color: var(--text-mute);
+        }
+
+        .ih-status-badge {
+            font-size: 10px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+            border: 1px solid var(--border-hi);
+            padding: 2px 8px;
+        }
+
+        .ih-status-badge.fp {
+            color: var(--sev-high);
+            border-color: color-mix(in srgb, var(--sev-high) 40%, transparent);
         }
 
         .ih-actions {
@@ -278,6 +303,16 @@
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 3" />
         </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+            <path d="M20 6L9 17l-5-5" />
+        </symbol>
+        <symbol id="i-flag" viewBox="0 0 24 24">
+            <path d="M4 3v18M4 4h13l-3 4 3 4H4" />
+        </symbol>
+        <symbol id="i-undo" viewBox="0 0 24 24">
+            <path d="M3 10h10a5 5 0 010 10H8" />
+            <path d="M8 5L3 10l5 5" />
+        </symbol>
     </svg>
 
     <div class="page" id="page">
@@ -344,6 +379,27 @@
 
             const detections = inc.detections || [];
 
+            // Triage status is analyst-set state, separate from severity: an
+            // incident keeps the severity it earned even once resolved, but
+            // gains a status badge and a reopen path instead of close/FP.
+            const incStatus = inc.status || "open";
+            const resolved = incStatus === "closed" || incStatus === "false_positive";
+            const statusBadge = incStatus === "closed"
+                ? `<span class="ih-status-badge">closed</span>`
+                : incStatus === "false_positive"
+                    ? `<span class="ih-status-badge fp">false positive</span>`
+                    : "";
+            const statusActions = resolved
+                ? `<button class="action-btn" id="status-reopen">
+                     <svg class="ico"><use href="#i-undo"/></svg> Reopen incident
+                   </button>`
+                : `<button class="action-btn" id="status-close">
+                     <svg class="ico"><use href="#i-check"/></svg> Close incident
+                   </button>
+                   <button class="action-btn" id="status-fp">
+                     <svg class="ico"><use href="#i-flag"/></svg> Mark false positive
+                   </button>`;
+
             const summary = [
                 ["Host", inc.host],
                 ["Severity", `${sev} · score ${inc.score}`],
@@ -373,12 +429,14 @@
       <span>score ${esc(inc.score)}</span>
       <span>${esc(inc.host)}</span>
       <span class="ih-id">#${esc(inc.id)}</span>
+      ${statusBadge}
     </div>
 
     <div class="ih-actions">
       <a class="action-btn primary" href="/incidents/${esc(inc.id)}/report" target="_blank" rel="noopener">
         <svg class="ico"><use href="#i-download"/></svg> Download PDF report
       </a>
+      ${statusActions}
     </div>
 
     <div class="section">
@@ -414,6 +472,7 @@
     </div>`;
 
             wireNotes(inc.id);
+            wireStatus(inc.id);
         }
 
         /** Render the Key Indicators panel: the actionable summary of the incident --
@@ -535,6 +594,33 @@
                     setStatus("Could not delete note.", true);
                 }
             });
+        }
+
+        /** Wire the close / false-positive / reopen buttons. Whichever ran,
+         *  the page simply reloads itself from the now-updated incident --
+         *  simpler than patching the DOM in place, and this page is not one an
+         *  analyst refreshes rapidly. */
+        function wireStatus(incidentId) {
+            const setIncidentStatus = async (newStatus) => {
+                try {
+                    const r = await fetch(`/incidents/${incidentId}/status`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: newStatus }),
+                    });
+                    if (!r.ok) throw new Error();
+                    await load();
+                } catch {
+                    alert("Could not update the incident's status.");
+                }
+            };
+
+            const closeBtn = document.getElementById("status-close");
+            const fpBtn = document.getElementById("status-fp");
+            const reopenBtn = document.getElementById("status-reopen");
+            if (closeBtn) closeBtn.addEventListener("click", () => setIncidentStatus("closed"));
+            if (fpBtn) fpBtn.addEventListener("click", () => setIncidentStatus("false_positive"));
+            if (reopenBtn) reopenBtn.addEventListener("click", () => setIncidentStatus("open"));
         }
 
         function detectionCard(d) {

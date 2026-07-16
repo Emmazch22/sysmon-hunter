@@ -104,6 +104,10 @@ def serialize_incident(incident: Incident, actionable: bool) -> dict[str, Any]:
         "process_tree": incident.process_tree,
         "techniques": incident.techniques,
         "actionable": actionable,
+        # Status is analyst-set, DB-only state -- a live incident straight from
+        # the correlator has never been triaged yet, so it is always "open"
+        # here. The same reasoning as the "notes": "" line below.
+        "status": "open",
         "notes": "",
         "first_seen": incident.first_seen.isoformat(),
         "last_seen": incident.last_seen.isoformat(),
@@ -123,6 +127,7 @@ def serialize_incident_row(row: IncidentRow) -> dict[str, Any]:
         "process_tree": row.process_tree or [],
         "techniques": row.techniques or [],
         "actionable": bool(row.actionable),
+        "status": row.status or "open",
         "notes": row.notes or "",
         "first_seen": row.first_seen.isoformat(),
         "last_seen": row.last_seen.isoformat(),

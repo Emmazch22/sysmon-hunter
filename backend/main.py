@@ -32,6 +32,7 @@ from backend.api import (
     profile,
     report,
     search,
+    status,
     ws,
 )
 from backend.config import BASE_DIR, settings
@@ -118,6 +119,7 @@ app.include_router(report.router)
 app.include_router(search.router)
 app.include_router(profile.router)
 app.include_router(notes.router)
+app.include_router(status.router)
 app.include_router(admin.router)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and

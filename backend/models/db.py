@@ -104,9 +104,11 @@ class IncidentRow(Base):
     actionable: Mapped[int] = mapped_column(Integer, default=0)  # SQLite has no bool
 
     # --- SOC triage state ---
-    # An incident's lifecycle: new -> in_progress -> closed. Set by the analyst,
-    # not the engine, so upsert must never overwrite it -- see upsert_incident.
-    # Analyst verdict, set at any point: tp, fp, tp_benign, inconclusive, or "".
+    # An incident's lifecycle: open -> closed, or open -> false_positive. Set by
+    # the analyst, not the engine, so upsert must never overwrite it -- see
+    # upsert_incident. One of IncidentStatus's values, stored as plain text
+    # rather than a DB-level enum so a future status needs no migration to add.
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
     # Free-text analyst notes, persisted and shown in the report.
     notes: Mapped[str] = mapped_column(Text, default="")
 
@@ -227,6 +229,19 @@ async def update_incident_notes(incident_id: str, notes: str) -> "IncidentRow | 
         if row is None:
             return None
         row.notes = notes
+        await session.commit()
+        await session.refresh(row)
+        return row
+
+
+async def update_incident_status(incident_id: str, status: str) -> "IncidentRow | None":
+    """Set an incident's triage status. Never called by the engine's upsert --
+    only by the analyst, from the console or the incident page."""
+    async with Session() as session:
+        row = await session.get(IncidentRow, incident_id)
+        if row is None:
+            return None
+        row.status = status
         await session.commit()
         await session.refresh(row)
         return row
