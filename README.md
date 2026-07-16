@@ -112,24 +112,15 @@ about it.
 
 ## The console
 
-### Incident detail: behavior profile, chain, and detections
+### Incident detail: behavior profile and process tree
 
-Expanding an incident leads with a plain-language behavior profile, then the
-process chain and every detection with its full forensic context — who ran it,
-with what privileges, and the hashes for pivoting.
+Expanding an incident leads with a plain-language behavior profile — what
+happened, phase by phase, each line backed by the ATT&CK techniques behind it —
+then the complete branching process tree the incident spans. A foothold that
+spawned several children shows every branch; nodes that fired a detection are
+coloured by severity, benign context processes are hollow.
 
-![Incident](docs/02_incident.png)
-
-### Full process tree
-
-Beyond the linear chain: the complete branching tree the incident spans. A
-foothold that spawned several children shows every branch. Nodes that fired a
-detection are coloured by severity; benign context processes are hollow.
-"Open in new tab" hands the same tree to a dedicated full-screen page with
-click-and-drag panning, scroll-wheel zoom, and zoom-to-fit — built for tracing
-a wide or deep tree that the inline column cannot show at once.
-
-![Process tree](docs/03_process_tree.png)
+![Incident detail](docs/03_process_tree.png)
 
 "Explore" hands the same incident to a dedicated full-screen page — process
 tree, timeline, and a plain scrollable log, each a click away from the other —
