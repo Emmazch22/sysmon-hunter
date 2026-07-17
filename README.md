@@ -391,3 +391,9 @@ Built as a hands-on threat-detection research project. The engine targets a
 single collector; scaling to many would mean moving the queue to Redis and the
 store to Postgres, both isolated behind small interfaces so that change touches
 one file each.
+
+---
+
+## License
+
+[MIT](LICENSE)
