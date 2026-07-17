@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -227,7 +227,7 @@ RULES = [
     ("SYS-034", "1", "High", "Control panel item (.cpl) executed from a user-writable path", "T1218.002"),
     ("SYS-035", "1", "High", "Script host executing an encoded script", "T1059.005, T1059.007, T1027"),
     ("SYS-036", "1", "High", "Script host spawned by rundll32", "T1059, T1218.011"),
-    ("SYS-037", "1", "High", "rundll32 executing a URL or file handler via url.dll", "T1218.011, T1204.001"),
+    ("SYS-037", "1", "High", "rundll32 invoking a known LOLBAS DLL export", "T1218.011, T1204.001"),
     ("SYS-038", "1", "High", "IIS credentials extracted via appcmd", "T1552.001, T1003"),
     ("SYS-039", "1", "Medium", "appcmd executed by a web server worker or script host", "T1552.001"),
     ("SYS-040", "7", "High", "PowerShell engine loaded by a non-PowerShell process", "T1059.001"),
@@ -247,18 +247,31 @@ RULES = [
     ("SYS-079", "1", "High", "FTP client spawned a child process", "T1105, T1202"),
     ("SYS-080", "11", "Critical", "Ransom note dropped", "T1486, T1491.001"),
     ("SYS-081", "11", "Critical", "File written with a known ransomware encryption extension", "T1486"),
+    ("SYS-082", "1", "Critical", "Credential dumping via comsvcs.dll MiniDump export", "T1003.001"),
+    ("SYS-083", "13", "High", "Fileless UAC bypass via auto-elevate registry hijack", "T1548.002"),
+    ("SYS-084", "1", "High", "cmstp executed with a silent or auto-install flag", "T1218.003"),
+    ("SYS-085", "13", "High", "Port forwarding rule added via netsh", "T1090.001"),
+    ("SYS-086", "13", "High", "PowerShell script block logging disabled via registry", "T1562.001"),
+    ("SYS-087", "12", "High", "PowerShell Constrained Language Mode lockdown policy removed", "T1562.001"),
+    ("SYS-088", "1", "Critical", "IIS worker process spawned a command shell", "T1505.003"),
+    ("SYS-089", "1", "Critical", "SQL Server process spawned a command shell", "T1059.003, T1190"),
+    ("SYS-090", "1", "Medium", "Process spawned by the PowerShell remoting host", "T1021.006"),
+    ("SYS-091", "13", "Medium", "Local account or administrators-group membership changed in the SAM hive", "T1136.001, T1098"),
+    ("SYS-092", "1", "High", "PE metadata claims a trusted binary, but it runs from a staging path", "T1036.005"),
 ]
 
 EVENT_ID_NAMES = {
     "1": "Process Create", "3": "Network Connection", "6": "Driver Load",
     "7": "Image Load", "10": "Process Access", "11": "File Create",
-    "13": "Registry Set", "17": "Pipe Created", "20": "WMI Event",
+    "12": "Registry Create/Delete", "13": "Registry Set", "17": "Pipe Created",
+    "20": "WMI Event",
 }
 
 API_ROUTES = [
     ("POST", "/ingest", "Accept one normalized Sysmon/Winlogbeat event; runs it through the full pipeline."),
     ("GET", "/incidents", "List incidents, most recent first."),
     ("GET", "/incidents/{id}", "Full incident detail: detections, process tree, forensics."),
+    ("PUT", "/incidents/{id}/status", "Close an incident, mark it a false positive, or reopen it."),
     ("PUT", "/incidents/{id}/notes", "Set the incident's analyst note (500-word limit)."),
     ("DELETE", "/incidents/{id}/notes", "Clear the incident's analyst note."),
     ("GET", "/incidents/{id}/profile", "Kill-chain narrative summary for the incident."),
@@ -272,7 +285,8 @@ API_ROUTES = [
     ("WS", "/ws", "Live event stream: new detections, incident updates, resets."),
     ("GET", "/", "The analyst console (single page app)."),
     ("GET", "/incident/{id}", "Full-page view of one incident, with notes editor."),
-    ("GET", "/incident/{id}/tree", "Full-screen, pan/zoom process-tree viewer."),
+    ("GET", "/incident/{id}/explore", "Full-screen Explore view: process tree, timeline, or logs, picked by tab."),
+    ("GET", "/incident/{id}/tree", "Alias for /explore?view=tree, kept for old links."),
 ]
 
 CONFIG_SETTINGS = [
@@ -346,10 +360,11 @@ TOC_SECTIONS = [
     ("4", "Detection Rule Catalog", []),
     ("5", "The Analyst Console", [
         "5.1 Incident Queue", "5.2 Incident Detail Views",
-        "5.3 Full-Screen Process Tree Viewer", "5.4 Search",
+        "5.3 Explore View", "5.4 Search",
         "5.5 IOC Enrichment", "5.6 ATT&amp;CK Technique Reference",
         "5.7 Analyst Notes", "5.8 PDF Incident Reports",
-        "5.9 Settings &amp; Database Reset", "5.10 Live WebSocket Feed",
+        "5.9 Incident Triage", "5.10 Theme &amp; Database Reset",
+        "5.11 Live WebSocket Feed",
     ]),
     ("6", "REST API Reference", []),
     ("7", "Configuration Reference", []),
@@ -443,7 +458,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "38 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "49 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -564,8 +579,8 @@ story.append(Paragraph(
     "Rule IDs follow no severity ordering; they are assigned sequentially as "
     "rules are added. “Event” is the Sysmon Event ID the rule is indexed "
     "under (Process Create = 1, Network Connection = 3, Driver Load = 6, "
-    "Image Load = 7, Process Access = 10, File Create = 11, Registry Set = 13, "
-    "Pipe Created = 17, WMI Event = 20).",
+    "Image Load = 7, Process Access = 10, File Create = 11, Registry "
+    "Create/Delete = 12, Registry Set = 13, Pipe Created = 17, WMI Event = 20).",
     styles["Caption"]
 ))
 
@@ -582,10 +597,12 @@ story.append(H2("5.1&nbsp;&nbsp;Incident Queue"))
 story.append(P(
     "The primary view: every incident the engine has correlated, most recent "
     "first, filterable between “Triage” (actionable incidents only, i.e. "
-    "those over the score threshold) and “All” (everything the engine is "
-    "tracking, including sub-threshold activity it has not promoted). Each row "
-    "shows the derived title, severity, host, cumulative score, the process "
-    "chain, and ATT&amp;CK technique chips at a glance, before any drill-down."
+    "those over the score threshold), “All” (everything the engine is "
+    "tracking, including sub-threshold activity it has not promoted), and "
+    "“Closed” (incidents an analyst has already resolved -- see Section 5.9). "
+    "Each row shows the derived title, severity, host, cumulative score, the "
+    "process chain, and ATT&amp;CK technique chips at a glance, before any "
+    "drill-down."
 ))
 
 story.append(H2("5.2&nbsp;&nbsp;Incident Detail Views"))
@@ -605,15 +622,19 @@ story += bullets([
     "visible, not only the flagged parts.",
 ])
 
-story.append(H2("5.3&nbsp;&nbsp;Full-Screen Process Tree Viewer"))
+story.append(H2("5.3&nbsp;&nbsp;Explore View"))
 story.append(P(
-    "The inline tree view is deliberately compact so it fits beside the "
-    "detection list, which is too little room for a wide or deep tree. "
-    "“Open in new tab” hands the same tree to a dedicated full-page view "
-    "(<font face=\"Courier\">/incident/{id}/tree</font>) with click-and-drag "
-    "panning, scroll-wheel zoom centred on the cursor, a zoom-to-fit control, "
-    "and keyboard shortcuts (<font face=\"Courier\">+</font> / "
-    "<font face=\"Courier\">-</font> / <font face=\"Courier\">0</font>). Clicking a node "
+    "The inline detail views are deliberately compact so they fit beside the "
+    "detection list, which is too little room for a wide tree, a long "
+    "timeline, or a long log list. “Explore” hands the same incident to a "
+    "dedicated full-screen page "
+    "(<font face=\"Courier\">/incident/{id}/explore</font>) with three tabs "
+    "switchable in place, each a click away from the other: process tree, "
+    "timeline, and a plain scrollable log. The tree and timeline gain "
+    "click-and-drag panning, scroll-wheel zoom centred on the cursor, a "
+    "zoom-to-fit control, and keyboard shortcuts "
+    "(<font face=\"Courier\">+</font> / <font face=\"Courier\">-</font> / "
+    "<font face=\"Courier\">0</font>). Clicking a node or a timeline entry "
     "opens the same forensic detail panel used inline."
 ))
 
@@ -678,15 +699,29 @@ story.append(P(
     "with reportlab, requiring no headless browser in the deployment image."
 ))
 
-story.append(H2("5.9&nbsp;&nbsp;Settings &amp; Database Reset"))
+story.append(H2("5.9&nbsp;&nbsp;Incident Triage"))
 story.append(P(
-    "A settings menu in the console header holds one destructive action: "
-    "wiping the database. Confirmed with a dialog, since there is no undo -- "
-    "every detection and incident is permanently removed, on every connected "
-    "console, via the same WebSocket broadcast that delivers live updates."
+    "Every incident carries a status: open, closed, or a verdict such as "
+    "false positive or benign, set from a “Set verdict” menu on the incident "
+    "card and cleared with a “Close” action. Any state can transition to any "
+    "other -- a closed incident can be reopened if new evidence surfaces -- "
+    "and there is no workflow enforced beyond that; the analyst is the one "
+    "doing the triage, not the console. Closed incidents drop out of the "
+    "default queue view and are reachable from the “Closed” filter tab "
+    "(Section 5.1), so a shift's queue only ever shows what still needs a "
+    "decision."
 ))
 
-story.append(H2("5.10&nbsp;&nbsp;Live WebSocket Feed"))
+story.append(H2("5.10&nbsp;&nbsp;Theme &amp; Database Reset"))
+story.append(P(
+    "A settings menu in the console header holds a light/dark theme toggle "
+    "and one destructive action: wiping the database. The reset is confirmed "
+    "with a dialog, since there is no undo -- every detection and incident is "
+    "permanently removed, on every connected console, via the same WebSocket "
+    "broadcast that delivers live updates."
+))
+
+story.append(H2("5.11&nbsp;&nbsp;Live WebSocket Feed"))
 story.append(P(
     "The console holds a persistent WebSocket connection and reconnects "
     "automatically on drop, so it can be left open on a wall display "
@@ -772,7 +807,7 @@ story.append(Paragraph(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 242 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 280 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -843,12 +878,13 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;38 YAML detection rules, by Event ID<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;49 YAML detection rules, by Event ID<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
-    "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, replay_evtx, fetch_attack<br/>"
+    "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
+    "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;242 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;280 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))
