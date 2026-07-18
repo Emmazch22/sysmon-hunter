@@ -1,0 +1,16 @@
+id: SYS-093
+title: Scheduled task created via schtasks
+event_id: 1
+severity: high
+attack: [T1053.005]
+description: >
+  schtasks.exe ran with /create -- Windows' oldest and still most-abused
+  persistence primitive: whatever /tr names runs on whatever /sc schedule
+  says, survives reboot, and needs no registry key or service to do it.
+  Installers and admin scripts use this legitimately, so weigh the command
+  line -- particularly /tr pointing at PowerShell, a script host, or a path
+  under Temp/AppData -- before treating this as anything more than a lead.
+detection:
+  image|endswith: '\schtasks.exe'
+  command_line|contains: '/create'
+condition: all

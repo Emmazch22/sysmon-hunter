@@ -1,0 +1,19 @@
+id: SYS-104
+title: A security or update service was stopped from the command line
+event_id: 1
+severity: high
+attack: [T1489, T1562.001]
+description: >
+  sc.exe or net.exe stopped a named security-relevant service --
+  WinDefend (Defender), Sense (Defender ATP), wuauserv (Windows Update), or a
+  known third-party AV/EDR service. Turning off the defensive service itself,
+  rather than tampering with its configuration, is the blunter half of
+  defense evasion and typically precedes dropping the payload the service
+  would otherwise have caught.
+detection:
+  image|endswith:
+    - '\sc.exe'
+    - '\net.exe'
+    - '\net1.exe'
+  command_line|re: '(?=.*\bstop\b)(?=.*(windefend|\bsense\b|wuauserv|mbamservice|webrootsvc))'
+condition: all

@@ -1,0 +1,16 @@
+id: SYS-097
+title: Windows event log cleared via wevtutil
+event_id: 1
+severity: high
+attack: [T1070.001]
+description: >
+  wevtutil ran with the cl (clear-log) verb. Clearing a log is not something
+  routine administration does from the command line, and it is a step an
+  intruder takes near the end of an operation specifically to remove the
+  record of what they did on this host -- including, often, the record of
+  the clear itself in the Security log, which is why correlating this with
+  whatever ran immediately before matters more than usual.
+detection:
+  image|endswith: '\wevtutil.exe'
+  command_line|re: '(?<!\S)cl(?!\S)'
+condition: all

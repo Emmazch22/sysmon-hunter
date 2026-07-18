@@ -1,0 +1,19 @@
+id: SYS-103
+title: Account added to the local Administrators group via net.exe
+event_id: 1
+severity: medium
+attack: [T1098, T1136.001]
+description: >
+  net.exe or net1.exe ran a localgroup command adding a member to
+  Administrators. SYS-091 catches this same outcome from the registry side,
+  which covers tools that touch the SAM hive directly; this rule catches the
+  far more common path, an operator or script just running net.exe, which
+  SYS-091 alone would miss if it were ever narrowed to registry-only
+  actors. Routine account administration produces this too, so weigh it
+  against who ran the command and whether it was expected.
+detection:
+  image|endswith:
+    - '\net.exe'
+    - '\net1.exe'
+  command_line|re: '(?=.*\blocalgroup\b)(?=.*\badministrators\b)(?=.*\badd\b)'
+condition: all

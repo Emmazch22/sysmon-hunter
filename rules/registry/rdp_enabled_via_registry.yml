@@ -1,0 +1,16 @@
+id: SYS-107
+title: Remote Desktop enabled via registry
+event_id: 13
+severity: medium
+attack: [T1021.001]
+description: >
+  fDenyTSConnections under Terminal Server was set to 0, turning Remote
+  Desktop on. This is a normal one-time admin action on a freshly built
+  host, and exactly the kind of change an intruder makes to open a second,
+  interactive way back into a host they otherwise reached through a
+  non-interactive foothold. Worth a look at who made the change and whether
+  the host was supposed to accept RDP at all.
+detection:
+  TargetObject|contains: 'Terminal Server\fDenyTSConnections'
+  Details|equals: 'DWORD (0x00000000)'
+condition: all

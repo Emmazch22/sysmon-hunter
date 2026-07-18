@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     description="Sysmon detection engine with process-tree correlation.",
-    version="0.2.0",
+    version="0.3.1",
     lifespan=lifespan,
     # The root path belongs to the analyst, not to Swagger.
     docs_url="/api/docs",

@@ -1,0 +1,15 @@
+id: SYS-106
+title: cipher used to wipe free disk space
+event_id: 1
+severity: medium
+attack: [T1070.004]
+description: >
+  cipher.exe ran with /w, the flag that overwrites deallocated disk space so
+  deleted files cannot be recovered by undelete tools. It ships with Windows
+  and needs no download, which makes it an attractive built-in alternative to
+  sdelete for the same anti-forensic goal: covering up files removed earlier
+  in the intrusion.
+detection:
+  image|endswith: '\cipher.exe'
+  command_line|contains: '/w:'
+condition: all

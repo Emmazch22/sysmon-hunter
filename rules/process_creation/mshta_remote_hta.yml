@@ -1,0 +1,15 @@
+id: SYS-100
+title: mshta executed a remote HTA
+event_id: 1
+severity: high
+attack: [T1218.005]
+description: >
+  mshta.exe's command line names an http(s) URL rather than a local file.
+  mshta runs whatever VBScript or JScript the target HTA contains with full
+  script-host privileges and none of the browser's sandboxing, which is why
+  it is a recurring first-stage payload in phishing chains -- the lure links
+  straight to mshta rather than to a browser download.
+detection:
+  image|endswith: '\mshta.exe'
+  command_line|re: 'https?://'
+condition: all

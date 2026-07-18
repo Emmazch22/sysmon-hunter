@@ -1,0 +1,24 @@
+id: SYS-099
+title: .NET installer utility executed from a user-writable staging path
+event_id: 1
+severity: high
+attack: [T1218.004, T1218.009]
+description: >
+  InstallUtil.exe, Regsvcs.exe, or Regasm.exe ran against an assembly staged
+  under Temp, AppData, ProgramData, or Public. All three are signed
+  Microsoft binaries that execute arbitrary code from an assembly's
+  installer/register methods -- a well-worn way to run a payload under a
+  trusted, allow-listed process name. Run against an assembly in its normal
+  install location, this is routine .NET deployment; run against one in a
+  staging directory, it is the technique.
+detection:
+  image|endswith:
+    - '\installutil.exe'
+    - '\regsvcs.exe'
+    - '\regasm.exe'
+  command_line|re:
+    - '\\users\\[^\\]+\\appdata\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\'
+    - '\\programdata\\'
+condition: all

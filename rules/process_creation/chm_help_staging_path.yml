@@ -1,0 +1,20 @@
+id: SYS-101
+title: Compiled HTML Help opened from a user-writable staging path
+event_id: 1
+severity: medium
+attack: [T1218.001]
+description: >
+  hh.exe (the Microsoft HTML Help viewer) opened a .chm file staged under
+  Temp, AppData, ProgramData, or Public rather than a normal install or
+  Windows help location. A .chm can embed a shortcut object that runs
+  arbitrary script the moment its topic is viewed, which makes hh.exe a
+  living-off-the-land script host in the same family as mshta -- rare enough
+  in genuine use from a staging directory to be worth a look every time.
+detection:
+  image|endswith: '\hh.exe'
+  command_line|re:
+    - '\\users\\[^\\]+\\appdata\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\'
+    - '\\programdata\\'
+condition: all

@@ -1,0 +1,16 @@
+id: SYS-105
+title: Sysinternals sdelete executed
+event_id: 1
+severity: high
+attack: [T1070.004]
+description: >
+  sdelete or sdelete64 ran. The tool exists for exactly one purpose --
+  overwriting a file (or a whole volume's free space) so it cannot be
+  recovered -- which makes its mere presence on an endpoint worth flagging
+  the same way a mimikatz execution is: there is no routine business reason
+  for it to run outside of a deliberate, scheduled data-sanitization policy.
+detection:
+  image|endswith:
+    - '\sdelete.exe'
+    - '\sdelete64.exe'
+condition: all

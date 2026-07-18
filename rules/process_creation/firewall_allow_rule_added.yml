@@ -1,0 +1,15 @@
+id: SYS-096
+title: Firewall rule added to allow inbound traffic
+event_id: 1
+severity: high
+attack: [T1562.004]
+description: >
+  netsh advfirewall added a rule permitting inbound traffic. Opening a hole
+  in the host firewall is a standard step before standing up a listener or a
+  reverse-proxy relay that needs to accept connections from outside -- and
+  legitimate software installs rarely need to do this from the command line
+  rather than through their own installer's firewall integration.
+detection:
+  image|endswith: '\netsh.exe'
+  command_line|re: '(?=.*advfirewall)(?=.*\badd\b)(?=.*\brule\b)(?=.*action=allow)'
+condition: all

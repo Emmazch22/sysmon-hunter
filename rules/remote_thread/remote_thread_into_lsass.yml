@@ -1,0 +1,15 @@
+id: SYS-095
+title: Remote thread created inside LSASS
+event_id: 8
+severity: critical
+attack: [T1055, T1003.001]
+description: >
+  A process created a thread running inside lsass.exe rather than opening it
+  for a memory read (SYS-041 already covers that path). This is the
+  injection route to the same goal -- credential theft -- and also the
+  generic process-injection primitive attackers reach for to run code under
+  a trusted process's identity. Outside of AV/EDR internals, nothing
+  legitimate creates a remote thread in LSASS.
+detection:
+  TargetImage|endswith: '\lsass.exe'
+condition: all

@@ -1,0 +1,15 @@
+id: SYS-102
+title: msiexec installed a package from a remote URL
+event_id: 1
+severity: high
+attack: [T1218.007]
+description: >
+  msiexec.exe's command line names an http(s) URL as the package to install.
+  msiexec fetching and running an MSI straight from the internet, rather
+  than a local path handed to it by a software deployment tool, is a
+  documented way to get a payload to execute under a signed Windows
+  installer binary that most allow-list policies never think to restrict.
+detection:
+  image|endswith: '\msiexec.exe'
+  command_line|re: 'https?://'
+condition: all
