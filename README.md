@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.3.0**
+**v0.3.1**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -58,11 +58,11 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 49 YAML rules with Sigma-compatible matching
-  semantics, mapped to MITRE ATT&CK, across 9 Sysmon event types (process
-  creation, network, registry, image load, process access, file create, named
-  pipes, driver load, WMI event). Indexed by EventID so only relevant rules run
-  per event.
+- **Rule-based detection** — 64 YAML rules with Sigma-compatible matching
+  semantics, mapped to MITRE ATT&CK, across 10 Sysmon event types (process
+  creation, network, registry, image load, process access, remote thread, file
+  create, named pipes, driver load, WMI event). Indexed by EventID so only
+  relevant rules run per event.
 - **Ransomware detection** — a dropped ransom note (matched against the
   near-universal "how to decrypt / restore your files" naming convention) and
   mass file writes with a known ransomware encryption extension (`.locked`,
@@ -250,6 +250,20 @@ whether the *file itself* is named after a system binary. **SYS-092** checks
 `OriginalFileName` against a list of commonly-spoofed binaries alongside the
 staging-path check, and is validated against the same sample.
 
+A separate pass added 15 more rules (SYS-093 through SYS-107) not from a
+specific captured sample but to close gaps in technique coverage that had no
+rule at all: scheduled-task creation, a new service pointed at a staged
+binary, a remote thread created inside LSASS (the injection route to the same
+target SYS-041 already covers by memory access), a firewall rule opened for
+inbound traffic, an event log cleared with `wevtutil`, a passworded archive
+staged for exfiltration, `InstallUtil`/`Regsvcs`/`Regasm` run against a staged
+assembly, a remote HTA or MSI package, `hh.exe` against a staged `.chm`, an
+account added to local Administrators from the command line, a security
+service stopped, anti-forensic disk wiping (`sdelete`, `cipher /w`), and RDP
+enabled via registry. Each still ships with a true-positive and a true-negative
+case; `scripts/seed_full_coverage.py` fires all of them end to end as a single
+correlated incident.
+
 ---
 
 ## Design decisions
@@ -338,7 +352,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 280 tests
+python -m pytest        # 310 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -373,14 +387,14 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   49 YAML detection rules, by EventID
+├── rules/                   64 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   280 tests
+└── tests/                   310 tests
 ```
 
 ---

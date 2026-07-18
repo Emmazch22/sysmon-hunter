@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -258,13 +258,28 @@ RULES = [
     ("SYS-090", "1", "Medium", "Process spawned by the PowerShell remoting host", "T1021.006"),
     ("SYS-091", "13", "Medium", "Local account or administrators-group membership changed in the SAM hive", "T1136.001, T1098"),
     ("SYS-092", "1", "High", "PE metadata claims a trusted binary, but it runs from a staging path", "T1036.005"),
+    ("SYS-093", "1", "High", "Scheduled task created via schtasks", "T1053.005"),
+    ("SYS-094", "13", "High", "New service image path points at a user-writable staging location", "T1543.003"),
+    ("SYS-095", "8", "Critical", "Remote thread created inside LSASS", "T1055, T1003.001"),
+    ("SYS-096", "1", "High", "Firewall rule added to allow inbound traffic", "T1562.004"),
+    ("SYS-097", "1", "High", "Windows event log cleared via wevtutil", "T1070.001"),
+    ("SYS-098", "1", "Medium", "Archive utility invoked with a password, staging data for exfiltration", "T1560.001"),
+    ("SYS-099", "1", "High", ".NET installer utility executed from a user-writable staging path", "T1218.004, T1218.009"),
+    ("SYS-100", "1", "High", "mshta executed a remote HTA", "T1218.005"),
+    ("SYS-101", "1", "Medium", "Compiled HTML Help opened from a user-writable staging path", "T1218.001"),
+    ("SYS-102", "1", "High", "msiexec installed a package from a remote URL", "T1218.007"),
+    ("SYS-103", "1", "Medium", "Account added to the local Administrators group via net.exe", "T1098, T1136.001"),
+    ("SYS-104", "1", "High", "A security or update service was stopped from the command line", "T1489, T1562.001"),
+    ("SYS-105", "1", "High", "Sysinternals sdelete executed", "T1070.004"),
+    ("SYS-106", "1", "Medium", "cipher used to wipe free disk space", "T1070.004"),
+    ("SYS-107", "13", "Medium", "Remote Desktop enabled via registry", "T1021.001"),
 ]
 
 EVENT_ID_NAMES = {
     "1": "Process Create", "3": "Network Connection", "6": "Driver Load",
-    "7": "Image Load", "10": "Process Access", "11": "File Create",
-    "12": "Registry Create/Delete", "13": "Registry Set", "17": "Pipe Created",
-    "20": "WMI Event",
+    "7": "Image Load", "8": "Remote Thread Created", "10": "Process Access",
+    "11": "File Create", "12": "Registry Create/Delete", "13": "Registry Set",
+    "17": "Pipe Created", "20": "WMI Event",
 }
 
 API_ROUTES = [
@@ -458,7 +473,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "49 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "64 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -579,8 +594,9 @@ story.append(Paragraph(
     "Rule IDs follow no severity ordering; they are assigned sequentially as "
     "rules are added. “Event” is the Sysmon Event ID the rule is indexed "
     "under (Process Create = 1, Network Connection = 3, Driver Load = 6, "
-    "Image Load = 7, Process Access = 10, File Create = 11, Registry "
-    "Create/Delete = 12, Registry Set = 13, Pipe Created = 17, WMI Event = 20).",
+    "Image Load = 7, Remote Thread Created = 8, Process Access = 10, File "
+    "Create = 11, Registry Create/Delete = 12, Registry Set = 13, Pipe "
+    "Created = 17, WMI Event = 20).",
     styles["Caption"]
 ))
 
@@ -807,7 +823,7 @@ story.append(Paragraph(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 280 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 310 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -878,13 +894,13 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;49 YAML detection rules, by Event ID<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;64 YAML detection rules, by Event ID<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;280 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;310 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))
