@@ -1,0 +1,20 @@
+id: SYS-126
+title: Process image tampering detected (hollowing or doppelganging)
+event_id: 25
+severity: critical
+attack: [T1055.012, T1055.013]
+description: >
+  Sysmon's ProcessTampering event fired, meaning a process's own image was
+  swapped out from under it after creation -- process hollowing (start a
+  process suspended, unmap its legitimate image, map in a malicious one) or
+  process doppelganging (the same idea via NTFS transactions instead of
+  suspend/unmap). Both exist for one reason: run attacker code inside a
+  process that still looks, from Task Manager or a casual EDR glance, like
+  the trusted binary it was launched as. Sysmon only emits this event for
+  the tampering itself, never for ordinary process creation, so there is no
+  legitimate baseline to exclude -- any occurrence is worth a look.
+detection:
+  Type:
+    - Image is locked for access
+    - Process Doppelganging
+condition: any

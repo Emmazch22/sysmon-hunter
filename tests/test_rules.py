@@ -1371,6 +1371,103 @@ CASES = [
         False,
         event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
     ),
+    # --- DNS query to a dynamic DNS domain (SYS-124) ---
+    ("SYS-124", True, event(22, QueryName="beacon.duckdns.org")),
+    ("SYS-124", False, event(22, QueryName="www.google.com")),
+    # --- Self-cleanup: executable deleted from a staging path (SYS-125) ---
+    (
+        "SYS-125",
+        True,
+        event(
+            23,
+            IsExecutable="true",
+            TargetFilename=r"C:\Users\bob\AppData\Local\Temp\payload.exe",
+        ),
+    ),
+    (
+        "SYS-125",
+        False,
+        event(
+            23,
+            IsExecutable="false",
+            TargetFilename=r"C:\Users\bob\AppData\Local\Temp\notes.txt",
+        ),
+    ),
+    (
+        "SYS-125",
+        False,
+        event(23, IsExecutable="true", TargetFilename=r"C:\Program Files\App\app.exe"),
+    ),
+    # --- Process tampering: hollowing / doppelganging (SYS-126) ---
+    ("SYS-126", True, event(25, Type="Image is locked for access")),
+    ("SYS-126", True, event(25, Type="Process Doppelganging")),
+    # --- Executable staged inside an alternate data stream (SYS-127) ---
+    (
+        "SYS-127",
+        True,
+        event(15, TargetFilename=r"C:\Users\bob\Downloads\invoice.pdf:payload.exe"),
+    ),
+    (
+        "SYS-127",
+        False,
+        event(15, TargetFilename=r"C:\Users\bob\Downloads\invoice.pdf:Zone.Identifier"),
+    ),
+    # --- Raw volume access outside known disk utilities (SYS-128) ---
+    (
+        "SYS-128",
+        True,
+        event(9, Device=r"\Device\HarddiskVolume2", image=r"C:\Users\bob\rawcopy.exe"),
+    ),
+    (
+        "SYS-128",
+        False,
+        event(
+            9,
+            Device=r"\Device\HarddiskVolume2",
+            image=r"C:\Windows\System32\vssadmin.exe",
+        ),
+    ),
+    # --- Timestomping: file creation time backdated (SYS-129) ---
+    (
+        "SYS-129",
+        True,
+        event(
+            2,
+            image=r"C:\Users\bob\timestomp.exe",
+            TargetFilename=r"C:\Windows\System32\evil.dll",
+        ),
+    ),
+    ("SYS-129", False, event(2, image=r"C:\Windows\System32\msiexec.exe")),
+    # --- DCSync-style directory replication request (SYS-130) ---
+    (
+        "SYS-130",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\mimikatz.exe",
+            command_line='mimikatz.exe "lsadump::dcsync /user:krbtgt"',
+        ),
+    ),
+    (
+        "SYS-130",
+        False,
+        event(1, image=r"C:\Windows\System32\net.exe", command_line="net user"),
+    ),
+    # --- Command line references a known Mimikatz module (SYS-131) ---
+    (
+        "SYS-131",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\mimikatz.exe",
+            command_line='mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords"',
+        ),
+    ),
+    (
+        "SYS-131",
+        False,
+        event(1, image=r"C:\Windows\System32\whoami.exe", command_line="whoami /priv"),
+    ),
 ]
 
 

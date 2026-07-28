@@ -1,0 +1,31 @@
+id: SYS-124
+title: DNS query to a dynamic DNS domain
+event_id: 22
+severity: medium
+attack: [T1071.004, T1568]
+description: >
+  A DNS query resolved a hostname under a free dynamic-DNS provider
+  (DuckDNS, No-IP, Dynu, and similar). These services let anyone point a
+  subdomain at whatever IP they control right now and repoint it later with
+  no re-registration, which is exactly the property a C2 operator wants: the
+  domain in the payload never has to change even as the backing
+  infrastructure gets burned and rotated. Legitimate use exists (home-lab
+  remote access, self-hosted services), so this is a lead, not a verdict --
+  its value is in whether the querying process is itself unusual, and
+  whether the correlator's tree shows anything else nearby.
+detection:
+  QueryName|contains:
+    - '.duckdns.org'
+    - '.no-ip.org'
+    - '.no-ip.com'
+    - '.no-ip.biz'
+    - '.ddns.net'
+    - '.dynu.com'
+    - '.dynu.net'
+    - '.hopto.org'
+    - '.zapto.org'
+    - '.myftp.org'
+    - '.serveftp.com'
+    - '.servehttp.com'
+    - '.changeip.com'
+condition: any

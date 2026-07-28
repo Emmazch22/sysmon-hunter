@@ -1,0 +1,24 @@
+id: SYS-130
+title: DCSync-style directory replication requested from a command line
+event_id: 1
+severity: critical
+attack: [T1003.006]
+description: >
+  A command line referenced DCSync or the DRSUAPI call it abuses
+  (GetNCChanges). DCSync does not touch LSASS or NTDS.dit at all -- it asks
+  a domain controller to replicate account data over the same protocol real
+  DCs use to replicate to each other, which is what makes it so effective:
+  any account holding replication rights (Get-Changes and
+  Get-Changes-All, often granted far more broadly than intended) can pull
+  every credential in the domain, including krbtgt, without ever running
+  code on a DC or touching a file an EDR watches. None of this project's
+  other credential-access rules see it, since they all key on LSASS handle
+  access or a file read against NTDS.dit -- this is the one path that goes
+  around both.
+detection:
+  command_line|contains:
+    - 'lsadump::dcsync'
+    - 'dcsync'
+    - 'getncchanges'
+    - 'invoke-dcsync'
+condition: any

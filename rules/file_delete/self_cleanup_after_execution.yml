@@ -1,0 +1,23 @@
+id: SYS-125
+title: Executable deleted from a staging path shortly after being dropped
+event_id: 23
+severity: medium
+attack: [T1070.004]
+description: >
+  A file Sysmon considers executable was deleted from a user-writable
+  staging path (Temp, a user's AppData, ProgramData, or Public). Deleting
+  the dropper, the loader, or a stage-2 payload right after it has run is
+  routine self-cleanup: the process that mattered already executed, and
+  removing the file on disk means a slower responder finds a process-tree
+  entry with nothing left to pull a hash from. Ordinary installers clean up
+  their own temp files too, which is why this stays a medium lead rather
+  than an automatic verdict -- its value is in what else the same process
+  tree did before the file disappeared.
+detection:
+  IsExecutable|equals: 'true'
+  TargetFilename|re:
+    - '\\appdata\\local\\temp\\'
+    - '\\windows\\temp\\'
+    - '\\users\\public\\'
+    - '\\programdata\\'
+condition: all

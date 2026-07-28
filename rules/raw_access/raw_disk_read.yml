@@ -1,0 +1,24 @@
+id: SYS-128
+title: Raw volume access by a process outside known disk utilities
+event_id: 9
+severity: high
+attack: [T1006]
+description: >
+  A process opened a volume (`\Device\HarddiskVolumeN`) for raw, sector-level
+  reads rather than going through the normal file API. Reading a disk this
+  way sidesteps file-level locks and ACLs entirely, which is precisely why
+  it shows up in credential-theft tooling that needs to read a file the OS
+  is actively holding open -- NTDS.dit on a live domain controller, or a
+  registry hive backing SAM/SYSTEM -- without touching the file handle the
+  running service already has locked. Backup software, disk-imaging tools,
+  and filesystem utilities are the legitimate callers of this API and are
+  excluded by name; almost nothing else has a reason to read a volume raw.
+detection:
+  Device|contains: 'HarddiskVolume'
+  image|endswith|not:
+    - '\vssadmin.exe'
+    - '\wbadmin.exe'
+    - '\defrag.exe'
+    - '\chkdsk.exe'
+    - '\dfrgui.exe'
+condition: all

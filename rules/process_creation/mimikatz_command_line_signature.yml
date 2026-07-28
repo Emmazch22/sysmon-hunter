@@ -1,0 +1,24 @@
+id: SYS-131
+title: Command line references a known Mimikatz module or command
+event_id: 1
+severity: critical
+attack: [T1003.001]
+description: >
+  A command line named a specific Mimikatz module invocation --
+  sekurlsa::logonpasswords, sekurlsa::pth, lsadump::sam, kerberos::ptt, or
+  the reflective-load wrapper Invoke-Mimikatz -- rather than a generic
+  reference to the tool. This is a second, independent path to the same
+  finding SYS-041/SYS-010 (LSASS opened with credential-dumping access)
+  already catch: those key on the OS-level handle access, which fires
+  whether Mimikatz reads memory itself or is loaded reflectively straight
+  into PowerShell with no mimikatz.exe on disk at all. A command line this
+  explicit is one of the highest-confidence signals this engine has --
+  there is no legitimate reason for it to appear outside a penetration test.
+detection:
+  command_line|contains:
+    - 'sekurlsa::logonpasswords'
+    - 'sekurlsa::pth'
+    - 'lsadump::sam'
+    - 'kerberos::ptt'
+    - 'invoke-mimikatz'
+condition: any

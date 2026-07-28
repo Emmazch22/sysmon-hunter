@@ -1,0 +1,20 @@
+id: SYS-129
+title: File creation timestamp changed outside a servicing process
+event_id: 2
+severity: medium
+attack: [T1070.006]
+description: >
+  Sysmon's FileCreateTime event fired: something called SetFileTime to
+  rewrite a file's creation timestamp after the fact. Windows itself almost
+  never does this outside servicing and installers, which is why those are
+  the only callers excluded here -- everything else that backdates a
+  timestamp is doing it on purpose, and the purpose is almost always
+  timestomping: making a dropped payload's creation date match the
+  surrounding system files so it does not stand out to an analyst sorting a
+  directory by date.
+detection:
+  image|endswith|not:
+    - '\msiexec.exe'
+    - '\trustedinstaller.exe'
+    - '\tiworker.exe'
+condition: all

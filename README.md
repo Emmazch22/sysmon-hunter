@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.3.2**
+**v0.3.3**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -58,11 +58,12 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 80 YAML rules with Sigma-compatible matching
-  semantics, mapped to MITRE ATT&CK, across 10 Sysmon event types (process
-  creation, network, registry, image load, process access, remote thread, file
-  create, named pipes, driver load, WMI event). Indexed by EventID so only
-  relevant rules run per event.
+- **Rule-based detection** — 88 YAML rules with Sigma-compatible matching
+  semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
+  creation, network, DNS query, registry, image load, process access, remote
+  thread, file create, file delete, file creation-time change, alternate data
+  streams, named pipes, driver load, raw disk access, process tampering, WMI
+  event). Indexed by EventID so only relevant rules run per event.
 - **Ransomware detection** — a dropped ransom note (matched against the
   near-universal "how to decrypt / restore your files" naming convention) and
   mass file writes with a known ransomware encryption extension (`.locked`,
@@ -268,8 +269,15 @@ launchers, an RDP session hijack via `tscon`, direct execution of AD-recon
 tooling (SharpHound/AdFind), cloud-exfil tools (rclone/mega), Kerberoasting
 via Rubeus, a PowerShell v2 downgrade, an AMSI-bypass command-line signature,
 classic `bitsadmin /transfer`, a COM CLSID hijack, and token-theft tool
-keywords. Every rule in both passes ships with a true-positive and a
-true-negative case; `scripts/seed_full_coverage.py` fires all 80 end to end as
+keywords. A third pass added 8 more (SYS-124 through SYS-131), this time
+targeting Sysmon event types the corpus had never keyed on at all: a DNS
+query to a dynamic-DNS domain, an executable deleted from a staging path
+right after it ran, process hollowing/doppelganging, a payload staged inside
+an NTFS alternate data stream, raw volume access outside known disk
+utilities, a backdated file-creation timestamp, a DCSync-style directory
+replication request, and a command line naming a specific Mimikatz module.
+Every rule across all three passes ships with a true-positive and a
+true-negative case; `scripts/seed_full_coverage.py` fires all 88 end to end as
 a single correlated incident.
 
 ---
@@ -374,7 +382,7 @@ remembers it in the browser for next time — no other setup needed.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 361 tests
+python -m pytest        # 378 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -409,7 +417,7 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   80 YAML detection rules, by EventID
+├── rules/                   88 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic

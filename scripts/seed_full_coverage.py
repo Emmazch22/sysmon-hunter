@@ -2,13 +2,13 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 80 rules
--- across every EventID the engine understands (1, 3, 6, 7, 8, 10, 11, 12, 13,
-17, 20) plus a handful of EventIDs no rule keys on (18, 19, 21, 22, 23) added
-purely so the incident's raw event stream and process tree show the full
-breadth of what Sysmon reports -- while staying ONE incident: everything hangs
-off a single process-tree root, and no gap between events exceeds the
-correlation window, so the correlator never splits it in two.
+job: it is a regression fixture and a coverage demo, built to fire all 88 rules
+-- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
+12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
+19, 21) added purely so the incident's raw event stream and process tree show
+the full breadth of what Sysmon reports -- while staying ONE incident:
+everything hangs off a single process-tree root, and no gap between events
+exceeds the correlation window, so the correlator never splits it in two.
 
 That means trading realism for coverage. No real intrusion touches IIS, SQL
 Server, PsExec, WMI/DCOM, CMSTP, and a phishing macro in the same twenty
@@ -47,14 +47,21 @@ machine. The phases, roughly in kill-chain order:
                   │   a net.exe admin-group add, sc stopping WinDefend,
                   │   sdelete, cipher /w, and RDP enabled via registry
                   │   (SYS-093 through SYS-107)
-                  └─ coverage-expansion pass 2: reg.exe saving the SAM hive,
-                      procdump against lsass, ntdsutil NTDS.dit extraction,
-                      mavinject injection, wsl -e, MSBuild against a staged
-                      project, forfiles against a staged target, a tscon
-                      session hijack, SharpHound, rclone, Rubeus, a
-                      PowerShell v2 downgrade, an AMSI-bypass command line,
-                      bitsadmin /transfer, a COM CLSID hijack, and a
-                      token-theft tool keyword (SYS-108 through SYS-123)
+                  ├─ coverage-expansion pass 2: reg.exe saving the SAM hive,
+                  │   procdump against lsass, ntdsutil NTDS.dit extraction,
+                  │   mavinject injection, wsl -e, MSBuild against a staged
+                  │   project, forfiles against a staged target, a tscon
+                  │   session hijack, SharpHound, rclone, Rubeus, a
+                  │   PowerShell v2 downgrade, an AMSI-bypass command line,
+                  │   bitsadmin /transfer, a COM CLSID hijack, and a
+                  │   token-theft tool keyword (SYS-108 through SYS-123)
+                  └─ coverage-expansion pass 3: a hollowed/doppelganged
+                      process, RawCopy reading a volume directly, a
+                      timestomped DLL, a DCSync request, and a
+                      sekurlsa::logonpasswords command line, plus a DNS
+                      query to a dynamic-DNS domain and a self-deleting
+                      dropper reusing earlier actors (SYS-124 through
+                      SYS-131)
               └─ ftp.exe -s:script -> cmd.exe               (SYS-079)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
@@ -78,7 +85,7 @@ HOST = "WKSTN-RANGE-01"
 USER = "CORP\\redteam.ops"
 BASE = datetime.now(timezone.utc) - timedelta(minutes=15)
 
-# All 80 rule IDs the corpus ships today, so main() can report exactly what
+# All 88 rule IDs the corpus ships today, so main() can report exactly what
 # (if anything) did not fire.
 EXPECTED_RULES = {
     "SYS-001", "SYS-002", "SYS-003", "SYS-004", "SYS-005", "SYS-006", "SYS-007",
@@ -92,7 +99,8 @@ EXPECTED_RULES = {
     "SYS-100", "SYS-101", "SYS-102", "SYS-103", "SYS-104", "SYS-105", "SYS-106",
     "SYS-107", "SYS-108", "SYS-109", "SYS-110", "SYS-111", "SYS-112", "SYS-113",
     "SYS-114", "SYS-115", "SYS-116", "SYS-117", "SYS-118", "SYS-119", "SYS-120",
-    "SYS-121", "SYS-122", "SYS-123",
+    "SYS-121", "SYS-122", "SYS-123", "SYS-124", "SYS-125", "SYS-126", "SYS-127",
+    "SYS-128", "SYS-129", "SYS-130", "SYS-131",
 }
 
 
@@ -200,6 +208,12 @@ G = {
     "bitsadmin": "{rng-bitsadmin}",
     "com_hijack": "{rng-com-hijack}",
     "juicypotato": "{rng-juicypotato}",
+    # Coverage-expansion pass 3 (SYS-124 through SYS-131).
+    "hollow_host": "{rng-hollow-host}",
+    "rawcopy": "{rng-rawcopy}",
+    "timestomp": "{rng-timestomp}",
+    "dcsync": "{rng-dcsync}",
+    "mimikatz_sekurlsa": "{rng-mimikatz-sekurlsa}",
 }
 
 
@@ -614,6 +628,62 @@ def events() -> list[dict]:
     ev.append(proc(step(1), G["juicypotato"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\JuicyPotato.exe",
                     "JuicyPotato.exe -l 1337 -p C:\\Windows\\System32\\cmd.exe -t *",
                     pid=5390, ppid=4510, integrity="High"))
+
+    # === Coverage-expansion pass 3: SYS-124 through SYS-131, off "ops" ===
+    # DNS query to a dynamic-DNS domain, reusing the beacon already running
+    # under rundll_bare rather than spinning up a new actor.
+    ev.append(raw_event(22, step(1), Image=r"C:\Windows\System32\rundll32.exe",
+                         ProcessGuid=G["rundll_bare"], QueryName="failover.duckdns.org",
+                         QueryResults="45.132.192.68"))
+
+    # Self-cleanup: the BYOVD payload deletes its own staged copy after running.
+    ev.append(raw_event(23, step(1), Image=r"C:\Users\redteam.ops\AppData\Local\Temp\update.exe",
+                         ProcessGuid=G["payload"], IsExecutable="true",
+                         TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Temp\update.exe"))
+
+    # Process tampering: a masquerading svchost gets hollowed out for the
+    # actual payload to run inside.
+    ev.append(proc(step(1), G["hollow_host"], G["ops"], r"C:\Windows\System32\svchost.exe",
+                    "svchost.exe -k netsvcs -p", pid=5400, ppid=4510))
+    ev.append(raw_event(25, step(1), Image=r"C:\Windows\System32\svchost.exe",
+                         ProcessGuid=G["hollow_host"], Type="Image is locked for access"))
+
+    # Executable payload staged inside an NTFS alternate data stream on an
+    # otherwise ordinary-looking staged document.
+    ev.append(raw_event(15, step(1), Image=r"C:\Users\redteam.ops\AppData\Local\Temp\update.exe",
+                         ProcessGuid=G["payload"],
+                         TargetFilename=r"C:\Users\redteam.ops\Downloads\Invoice_Q3.pdf:payload.exe"))
+
+    # Raw volume read: a RawCopy-style tool bypasses the file API entirely to
+    # read a locked hive/DB off disk sector by sector.
+    ev.append(proc(step(1), G["rawcopy"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\RawCopy.exe",
+                    r"RawCopy.exe /FileNamePath:C:\Windows\NTDS\ntds.dit /OutputPath:C:\Users\redteam.ops\AppData\Local\Temp",
+                    pid=5410, ppid=4510, integrity="High"))
+    ev.append(raw_event(9, step(1), Image=r"C:\Users\redteam.ops\AppData\Local\Temp\RawCopy.exe",
+                         ProcessGuid=G["rawcopy"], Device=r"\Device\HarddiskVolume2"))
+
+    # Timestomping: a dropped DLL's creation time is backdated to blend in
+    # with the surrounding system files.
+    ev.append(proc(step(1), G["timestomp"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\timestomp.exe",
+                    r"timestomp.exe C:\Windows\System32\evil.dll -z C:\Windows\System32\ntdll.dll",
+                    pid=5420, ppid=4510))
+    ev.append(raw_event(2, step(1), Image=r"C:\Users\redteam.ops\AppData\Local\Temp\timestomp.exe",
+                         ProcessGuid=G["timestomp"], TargetFilename=r"C:\Windows\System32\evil.dll",
+                         CreationUtcTime="2019-03-19 10:12:00.000",
+                         PreviousCreationUtcTime="2026-07-15 09:41:03.000"))
+
+    # DCSync: replication rights abused to pull every credential in the
+    # domain over DRSUAPI, no LSASS access and no NTDS.dit file read at all.
+    ev.append(proc(step(1), G["dcsync"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\mimikatz.exe",
+                    r'mimikatz.exe "lsadump::dcsync /domain:corp.local /user:krbtgt"',
+                    pid=5430, ppid=4510, integrity="High"))
+
+    # A second Mimikatz invocation, this time via the sekurlsa module -- an
+    # independent, command-line-only signal alongside the LSASS-access rules.
+    ev.append(proc(step(1), G["mimikatz_sekurlsa"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\mimikatz.exe",
+                    r'mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords"',
+                    pid=5440, ppid=4510, integrity="High"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

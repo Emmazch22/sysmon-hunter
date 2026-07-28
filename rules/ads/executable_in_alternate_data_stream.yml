@@ -1,0 +1,20 @@
+id: SYS-127
+title: Executable content staged inside an NTFS alternate data stream
+event_id: 15
+severity: high
+attack: [T1564.004]
+description: >
+  A file was written with an alternate data stream whose name itself looks
+  like an executable (a ":payload.exe" or ":stage.ps1" suffix on the
+  filename). Every file downloaded through a browser gets a Zone.Identifier
+  stream for Mark-of-the-Web -- that alone is not interesting, and this rule
+  does not fire on it. What it does fire on is a stream name carrying its
+  own runnable extension, which is a much older but still-effective way to
+  hide a payload: Explorer, most file-copy tools, and a casual `dir` never
+  show alternate streams at all, so a payload living in one survives a
+  cursory look at a file that appears to be nothing but an ordinary
+  document or image.
+detection:
+  TargetFilename|re:
+    - ':[^\\/:]+\.(exe|dll|ps1|bat|vbs|hta|scr|cmd)$'
+condition: any
