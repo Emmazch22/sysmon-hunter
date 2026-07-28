@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.3.2**
+**v0.3.3**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -75,6 +75,12 @@ about it.
   rule can see, robust to the jitter every modern C2 applies.
 - **Reconnaissance-burst detection** — flags clusters of *distinct* ATT&CK
   discovery techniques in one process tree.
+- **Behavioral baseline detection** — learns, per host, which (process,
+  parent process) combinations are normal, and flags the first time it sees
+  one it hasn't — catching techniques nobody has written a rule for yet. Off
+  by default, with a per-host learning phase so a host's first stretch of
+  ordinary activity is never mistaken for anomalies; toggled live from the
+  console's settings menu, no restart required.
 - **Behavior profiling** — turns an incident's detections into a kill-chain
   narrative: "gained initial access through a phishing document, executed an
   obfuscated PowerShell payload, harvested credentials from LSASS, beaconed to
@@ -105,8 +111,8 @@ about it.
 - **Live console** — WebSocket feed, incident queue, three inline incident
   views (list, interactive timeline, full process tree), clickable ATT&CK
   techniques with MITRE descriptions, inline base64 decoding of encoded
-  command lines, a light/dark theme toggle, and a database-reset control, all
-  in the settings menu.
+  command lines, a light/dark theme toggle, a behavioral-baseline on/off
+  switch, and a database-reset control, all in the settings menu.
 
 ---
 
@@ -360,7 +366,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 342 tests
+python -m pytest        # 357 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -402,7 +408,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   342 tests
+└── tests/                   357 tests
 ```
 
 ---

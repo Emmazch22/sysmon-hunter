@@ -37,9 +37,11 @@ from backend.api import (
 )
 from backend.config import BASE_DIR, settings
 from backend.engine.attack import attack_lookup
+from backend.engine.baseline import baseline_detector
 from backend.engine.enrichment import enrichment_service
 from backend.engine.pipeline import pipeline
 from backend.engine.rule_loader import rule_store
+from backend.engine.runtime_settings import runtime_settings
 from backend.models import db
 
 logging.basicConfig(
@@ -90,6 +92,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "No rules loaded. The engine will accept events and detect nothing."
         )
 
+    await runtime_settings.load()
+    await baseline_detector.load()
+
     sweeper = asyncio.create_task(_sweep_loop())
     log.info("%s ready with %d rules", settings.app_name, count)
 
@@ -102,7 +107,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     description="Sysmon detection engine with process-tree correlation.",
-    version="0.3.2",
+    version="0.3.3",
     lifespan=lifespan,
     # The root path belongs to the analyst, not to Swagger.
     docs_url="/api/docs",
@@ -190,5 +195,6 @@ async def health() -> dict[str, Any]:
         "rule_errors": rule_store.errors,
         "enrichment_providers": enrichment_service.providers_configured,
         "coverage_by_event_id": rule_store.coverage,
+        **runtime_settings.as_dict(),
         **pipeline.stats,
     }
