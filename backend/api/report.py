@@ -25,8 +25,7 @@ async def incident_report(incident_id: str) -> Response:
     404 if the incident is unknown. The filename is set from the incident id so
     a downloaded report is self-identifying in a folder of many.
     """
-    rows = await db.list_incidents(limit=500)
-    incident = next((r for r in rows if r.id == incident_id), None)
+    incident = await db.get_incident(incident_id)
     if incident is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

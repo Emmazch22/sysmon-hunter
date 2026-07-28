@@ -49,8 +49,7 @@ async def get_incident(incident_id: str) -> dict[str, Any]:
     ordered detection list answers "what happened, in what sequence" -- which is
     the question that decides whether this is an intrusion or a false positive.
     """
-    rows = await db.list_incidents(limit=500)
-    incident = next((row for row in rows if row.id == incident_id), None)
+    incident = await db.get_incident(incident_id)
 
     if incident is None:
         raise HTTPException(

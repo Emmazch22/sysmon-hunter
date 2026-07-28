@@ -221,6 +221,18 @@ async def list_incidents(
         return list(result.scalars().all())
 
 
+async def get_incident(incident_id: str) -> "IncidentRow | None":
+    """One incident by id, or None.
+
+    A direct primary-key lookup, not a scan of `list_incidents()`'s recent
+    window -- an incident older than the most recent page must still be
+    reachable by id, since that is exactly how a permalink, a bookmarked
+    report URL, or a search result gets back to it.
+    """
+    async with Session() as session:
+        return await session.get(IncidentRow, incident_id)
+
+
 async def update_incident_notes(incident_id: str, notes: str) -> "IncidentRow | None":
     """Set (or clear) an incident's analyst note. The note belongs to the
     analyst and is never touched by the engine's upsert."""
