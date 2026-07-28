@@ -34,18 +34,9 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
-/* ---------- Helpers ---------- */
-
-/** Escape untrusted strings before they touch innerHTML.
- *  Command lines are attacker-controlled by definition: an operator who names
- *  a process `<img onerror=...>` should not get script execution in the SOC. */
-function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (c) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-}
-
-/** Reduce a full Windows path to the executable name. */
+/* ---------- Helpers ----------
+   escapeHtml, baseName, clockTime, fmtFullTime, and humanGap now live in
+   common.js, loaded before this file -- see that file's header for why. */
 
 /* ============================================================
    Base64 decoding
@@ -125,17 +116,6 @@ function renderCommand(text) {
 function countWords(text) {
     const t = String(text || "").trim();
     return t ? t.split(/\s+/).length : 0;
-}
-
-function baseName(path) {
-    if (!path) return "unknown";
-    const parts = String(path).split(/[\\/]/);
-    return parts[parts.length - 1] || String(path);
-}
-
-function clockTime(iso) {
-    const date = iso ? new Date(iso) : new Date();
-    return date.toLocaleTimeString("en-GB", { hour12: false });
 }
 
 /** Pick an icon for a detection by its rule family.
@@ -405,13 +385,6 @@ function bestHash(raw) {
     return parts.sha256 || parts.sha1 || parts.md5 || null;
 }
 
-/** Full timestamp for the detail panel: date + time, not just the clock. */
-function fmtFullTime(iso) {
-    if (!iso) return "";
-    return new Date(iso).toLocaleString("en-GB", { hour12: false });
-}
-
-
 /** Build an SVG of the incident's full process tree.
  *
  *  Unlike the chain (the ancestry of the one process that triggered a detection),
@@ -597,18 +570,6 @@ function treeNodeDetail(node, matchedDetections) {
     return `${identity}
     <div class="tree-detail-fired-head">Fired ${matchedDetections.length} detection${matchedDetections.length === 1 ? "" : "s"}</div>
     ${fired}`;
-}
-
-/** A compact human gap: "3s", "5m", "2h". Empty for sub-second gaps, which are
- *  noise on a timeline of attacker actions. */
-function humanGap(ms) {
-    const s = Math.round(ms / 1000);
-    if (s < 1) return "";
-    if (s < 60) return `${s}s`;
-    const m = Math.round(s / 60);
-    if (m < 60) return `${m}m`;
-    const h = Math.round(m / 60);
-    return `${h}h`;
 }
 
 /** Render the incident behavior profile: a narrative summary plus the ordered

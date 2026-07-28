@@ -319,6 +319,7 @@
         <div class="loading">Loading incident&hellip;</div>
     </div>
 
+    <script src="/static/common.js"></script>
     <script>
         "use strict";
 
@@ -338,11 +339,10 @@
             granted_access: "Granted access", pipe_name: "Named pipe", dns_query: "DNS query",
         };
 
-        function esc(v) {
-            return String(v ?? "").replace(/[&<>"']/g, (c) =>
-                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-        }
-        function baseName(p) { return p ? String(p).split(/[\\/]/).pop() : "unknown"; }
+        // escapeHtml and baseName are defined once in common.js, loaded above;
+        // `esc` is this page's existing call-site name for escapeHtml, kept
+        // as an alias so nothing below has to change.
+        const esc = escapeHtml;
         function fmtTime(iso) {
             if (!iso) return "unknown";
             const d = new Date(iso);

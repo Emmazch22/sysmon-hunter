@@ -320,6 +320,7 @@
         <div class="loading">Loading process tree&hellip;</div>
     </div>
 
+    <script src="/static/common.js"></script>
     <script>
         "use strict";
 
@@ -338,15 +339,11 @@
             granted_access: "Granted access", pipe_name: "Named pipe", dns_query: "DNS query",
         };
 
-        function esc(v) {
-            return String(v ?? "").replace(/[&<>"']/g, (c) =>
-                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-        }
-        function baseName(p) { return p ? String(p).split(/[\\/]/).pop() : "unknown"; }
-        function fmtTime(iso) {
-            if (!iso) return "";
-            return new Date(iso).toLocaleString("en-GB", { hour12: false });
-        }
+        // escapeHtml, baseName, clockTime, fmtFullTime, and humanGap all come
+        // from common.js, loaded above. These three aliases keep this page's
+        // existing call-site names (esc, fmtTime) working unchanged.
+        const esc = escapeHtml;
+        const fmtTime = fmtFullTime;
 
         /** /incident/{id}/tree -- the id is the second-to-last path segment. */
         function incidentId() {
@@ -514,21 +511,6 @@
                 if (!worst || SEV_RANK.indexOf(sev) > SEV_RANK.indexOf(worst)) worst = sev;
             }
             return worst;
-        }
-
-        function humanGap(ms) {
-            const s = Math.round(ms / 1000);
-            if (s < 1) return "";
-            if (s < 60) return `${s}s`;
-            const m = Math.round(s / 60);
-            if (m < 60) return `${m}m`;
-            const h = Math.round(m / 60);
-            return `${h}h`;
-        }
-
-        function clockTime(iso) {
-            const date = iso ? new Date(iso) : new Date();
-            return date.toLocaleTimeString("en-GB", { hour12: false });
         }
 
         /** Build both the tree rows and the timeline rows once from the same
