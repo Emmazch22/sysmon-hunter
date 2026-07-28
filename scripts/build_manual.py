@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -273,6 +273,22 @@ RULES = [
     ("SYS-105", "1", "High", "Sysinternals sdelete executed", "T1070.004"),
     ("SYS-106", "1", "Medium", "cipher used to wipe free disk space", "T1070.004"),
     ("SYS-107", "13", "Medium", "Remote Desktop enabled via registry", "T1021.001"),
+    ("SYS-108", "1", "Critical", "Credential hive saved to disk via reg.exe", "T1003.002"),
+    ("SYS-109", "1", "Critical", "Sysinternals procdump run against LSASS", "T1003.001"),
+    ("SYS-110", "1", "Critical", "NTDS.dit extracted via ntdsutil", "T1003.003"),
+    ("SYS-111", "1", "High", "mavinject used to inject into a running process", "T1055.001"),
+    ("SYS-112", "1", "Medium", "WSL used to execute a command outside its Linux filesystem", "T1202, T1059.004"),
+    ("SYS-113", "1", "High", "MSBuild ran a project file staged in a user-writable path", "T1127.001"),
+    ("SYS-114", "1", "Medium", "Uncommon signed proxy-execution binary run against a staged target", "T1218, T1216"),
+    ("SYS-115", "1", "High", "RDP session hijacked via tscon", "T1563.002"),
+    ("SYS-116", "1", "High", "Active Directory reconnaissance tool executed", "T1087, T1482"),
+    ("SYS-117", "1", "Medium", "Cloud sync/transfer tool executed", "T1567.002"),
+    ("SYS-118", "1", "High", "Kerberoasting tooling executed", "T1558.003"),
+    ("SYS-119", "1", "High", "PowerShell launched in version-2 downgrade mode", "T1059.001"),
+    ("SYS-120", "1", "High", "Command line references a known AMSI-bypass signature", "T1562.001"),
+    ("SYS-121", "1", "Medium", "bitsadmin used to transfer a file", "T1197"),
+    ("SYS-122", "13", "High", "CLSID InprocServer32 handler registered under a user's own hive", "T1546.015"),
+    ("SYS-123", "1", "High", "Command line references a known privilege-escalation token-theft tool", "T1134"),
 ]
 
 EVENT_ID_NAMES = {
@@ -473,7 +489,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "64 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "80 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -823,7 +839,7 @@ story.append(Paragraph(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 310 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 342 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -894,13 +910,13 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;64 YAML detection rules, by Event ID<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;80 YAML detection rules, by Event ID<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;310 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;342 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.3.1**
+**v0.3.2**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 64 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 80 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 10 Sysmon event types (process
   creation, network, registry, image load, process access, remote thread, file
   create, named pipes, driver load, WMI event). Indexed by EventID so only
@@ -260,9 +260,17 @@ staged for exfiltration, `InstallUtil`/`Regsvcs`/`Regasm` run against a staged
 assembly, a remote HTA or MSI package, `hh.exe` against a staged `.chm`, an
 account added to local Administrators from the command line, a security
 service stopped, anti-forensic disk wiping (`sdelete`, `cipher /w`), and RDP
-enabled via registry. Each still ships with a true-positive and a true-negative
-case; `scripts/seed_full_coverage.py` fires all of them end to end as a single
-correlated incident.
+enabled via registry. A second pass added 16 more (SYS-108 through SYS-123):
+SAM/SYSTEM/SECURITY hive dumps via `reg save`, procdump against LSASS,
+NTDS.dit extraction via `ntdsutil`, `mavinject` injection, WSL used as a
+LOLBIN, MSBuild against a staged project, four more staged-target LOLBAS
+launchers, an RDP session hijack via `tscon`, direct execution of AD-recon
+tooling (SharpHound/AdFind), cloud-exfil tools (rclone/mega), Kerberoasting
+via Rubeus, a PowerShell v2 downgrade, an AMSI-bypass command-line signature,
+classic `bitsadmin /transfer`, a COM CLSID hijack, and token-theft tool
+keywords. Every rule in both passes ships with a true-positive and a
+true-negative case; `scripts/seed_full_coverage.py` fires all 80 end to end as
+a single correlated incident.
 
 ---
 
@@ -352,7 +360,7 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 310 tests
+python -m pytest        # 342 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -387,14 +395,14 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   64 YAML detection rules, by EventID
+├── rules/                   80 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   310 tests
+└── tests/                   342 tests
 ```
 
 ---
