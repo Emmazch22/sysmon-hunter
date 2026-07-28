@@ -1,0 +1,24 @@
+id: SYS-133
+title: mmc.exe loaded a Management Saved Console from a staging path
+event_id: 1
+severity: high
+attack: [T1218.014]
+description: >
+  mmc.exe (Microsoft Management Console) opened a .msc file staged under a
+  user-writable location -- AppData, Temp, Downloads, Desktop, or ProgramData
+  -- rather than the standard, admin-installed .msc files that ship under
+  System32. A crafted .msc can execute arbitrary code the moment it is
+  opened, and because mmc.exe is a signed Microsoft binary, running one this
+  way is proxy execution through a binary nothing blocks. An analyst or
+  admin double-clicking a legitimate snap-in from its normal install path
+  never trips this; a phishing attachment or a dropped payload staged
+  anywhere a user can write to does.
+detection:
+  image|endswith: '\mmc.exe'
+  command_line|re:
+    - '\\appdata\\[^ ]*\.msc'
+    - '\\temp\\[^ ]*\.msc'
+    - '\\downloads\\[^ ]*\.msc'
+    - '\\desktop\\[^ ]*\.msc'
+    - '\\programdata\\[^ ]*\.msc'
+condition: all

@@ -1,0 +1,21 @@
+id: SYS-139
+title: Active network connections enumerated via netstat
+event_id: 1
+severity: medium
+attack: [T1049]
+description: >
+  netstat ran with `-ano` or `-anob`, the flag combination that lists every
+  active connection alongside the owning process ID (and, with `-b`, the
+  executable) -- the fastest way to spot an established C2 channel or
+  identify which local process a lateral-movement target should watch for.
+  Routine for network troubleshooting, so this is a medium lead; `DSC-001`
+  already folds a looser `netstat` pattern into its recon-burst count (see
+  SYS-138's description for that relationship), and this rule adds the
+  single-event version scoped to the specific flag combination attackers
+  actually use.
+detection:
+  image|endswith: '\netstat.exe'
+  command_line|contains:
+    - '-ano'
+    - '-anob'
+condition: all

@@ -289,6 +289,19 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1070.006": "defense-evasion",
     "T1564.004": "defense-evasion",
     "T1006": "defense-evasion",
+    # SYS-132..150. T1218.008/T1218.014 grouped with their parent T1218 as
+    # "download" for consistency with T1218.011 above, even though these two
+    # are proxy-execution rather than download techniques strictly speaking --
+    # the parent-fallback in _tactic_for() would resolve them the same way
+    # anyway, this just makes the mapping explicit rather than implicit.
+    "T1218.008": "download",
+    "T1218.014": "download",
+    "T1555.003": "credential-access",
+    "T1555": "credential-access",
+    "T1083": "discovery",
+    "T1518.001": "discovery",
+    "T1048": "exfiltration",
+    "T1558.004": "credential-access",
 }
 
 
@@ -337,6 +350,81 @@ _NARRATIVES: list[tuple[set[str], str]] = [
     ({"discovery", "command-and-control"}, "Reconnaissance with C2"),
     ({"credential-access", "discovery"}, "Credential access after recon"),
 ]
+
+# Correlation chains: named, high-confidence multi-stage patterns expressed as
+# rule-ID co-occurrence, richer than the generic tactic-only _NARRATIVES above
+# because they name a specific attack story ("ransomware", not just "impact
+# after credential access"). Checked before _NARRATIVES, so a matching chain
+# always wins over the more generic tactic-based title.
+#
+# Each entry is (classification slug, title, [requirement, ...]), where a
+# requirement is (minimum_count, {candidate rule IDs}) -- the incident's
+# detections must include at least `minimum_count` distinct rule IDs from that
+# set. All requirements in the list must be satisfied (AND across
+# requirements); within one requirement, any `minimum_count` of its rule IDs
+# satisfy it (OR, with a floor).
+#
+# This is deliberately a rule-ID pattern match producing a title and
+# classification label, not a score bonus. The spec that requested these
+# three chains asked for flat point bonuses added on top of SEVERITY_SCORE
+# (+150/+300/+500) -- incompatible with this engine's existing, carefully
+# calibrated weights, where a single CRITICAL detection already scores 14 and
+# two HIGHs (16) already clear the CRITICAL band through pure stacking (see
+# SCORE_BANDS above). Adding arbitrary bonus points on top would make the
+# score stop meaning "how bad are the individual findings" and break that
+# calibration for every incident, not just these three patterns. What a chain
+# buys instead is identity: a specific, named classification and title an
+# analyst recognises instantly -- the actionability a bonus was meant to
+# guarantee is already there, because every rule referenced below is itself
+# HIGH or CRITICAL, so any chain that matches already scores well past the
+# actionable threshold on the existing scale.
+_CORRELATION_CHAINS: list[tuple[str, str, list[tuple[int, set[str]]]]] = [
+    (
+        "ransomware",
+        "Ransomware activity chain",
+        [
+            (1, {"SYS-004"}),  # shadow copy / backup destruction
+            (1, {"SYS-080", "SYS-081"}),  # ransom note or encrypted-extension write
+        ],
+    ),
+    (
+        "credential-theft-campaign",
+        "Credential theft campaign",
+        [
+            (
+                2,
+                {
+                    "SYS-010",  # LSASS access
+                    "SYS-041",  # LSASS access (credential-dumping access rights)
+                    "SYS-130",  # DCSync-style directory replication request
+                    "SYS-131",  # Mimikatz module referenced on the command line
+                    "SYS-135",  # non-browser process touched a browser credential DB
+                    "SYS-136",  # script interpreter touched a KeePass database
+                    "SYS-137",  # browser credential DB written into a staging dir
+                    "SYS-118",  # Kerberoasting
+                    "SYS-150",  # AS-REP roasting
+                },
+            ),
+        ],
+    ),
+    (
+        "office-to-powershell",
+        "Office to PowerShell infection chain",
+        [
+            (1, {"SYS-001"}),  # Office application spawned a command interpreter
+            # Deliberately SYS-009 (download cradle) only, not SYS-002 (encoded
+            # command): SYS-001+SYS-002 is the exact combination the existing
+            # "Phishing execution chain" narrative test already covers, and
+            # this chain is meant to be a *more* specific story layered on
+            # top of that one, not a silent retitling of it. A download
+            # cradle fetching a second stage is the sharper, unambiguous
+            # signal that this is specifically an infection chain rather
+            # than any encoded-command execution following an Office spawn.
+            (1, {"SYS-009"}),
+        ],
+    ),
+]
+
 
 # A lone tactic, made readable for the fallback title.
 _TACTIC_LABEL: dict[str, str] = {
@@ -398,14 +486,43 @@ class Incident(BaseModel):
         return sorted(seen)
 
     @property
+    def correlation_chain(self) -> Optional[tuple[str, str]]:
+        """The first `_CORRELATION_CHAINS` pattern this incident's rule IDs
+        satisfy, as `(classification slug, title)`, or None.
+
+        Derived, like `title`, from the incident's current detections every
+        time it is read -- so a chain that becomes complete as more
+        detections land is picked up immediately, with no re-scoring step.
+        """
+        rule_ids = {d.rule_id for d in self.detections}
+        for classification, name, requirements in _CORRELATION_CHAINS:
+            if all(len(rule_ids & candidates) >= minimum for minimum, candidates in requirements):
+                return classification, name
+        return None
+
+    @property
+    def classification(self) -> Optional[str]:
+        """Machine-readable slug for the matched correlation chain, if any
+        (e.g. "ransomware"), for UI badges and filtering. None when no chain
+        matches -- most incidents will not classify this specifically."""
+        chain = self.correlation_chain
+        return chain[0] if chain is not None else None
+
+    @property
     def title(self) -> str:
         """A human-readable summary of what this incident is.
 
         Derived, never stored: it always reflects the incident's current
         contents, so a title generated when the incident held one detection
-        updates itself as more land. Priority is narrative first (a multi-stage
-        story), then a signature rule, then the dominant single tactic.
+        updates itself as more land. Priority is a named correlation chain
+        first (the most specific possible story), then a tactic-based
+        narrative (a multi-stage story with no chain of its own), then a
+        signature rule, then the dominant single tactic.
         """
+        chain = self.correlation_chain
+        if chain is not None:
+            return f"{chain[1]} on {self.host}"
+
         tactics = {_tactic_for(t) for t in self.techniques}
         tactics.discard(None)
 

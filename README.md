@@ -1,6 +1,6 @@
 # Sysmon Hunter
 
-**v0.3.3**
+**v0.3.4**
 
 A real-time detection and correlation engine for Windows Sysmon telemetry, with
 a live analyst console. It ingests events from an endpoint, matches them against
@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 88 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 103 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -276,9 +276,25 @@ right after it ran, process hollowing/doppelganging, a payload staged inside
 an NTFS alternate data stream, raw volume access outside known disk
 utilities, a backdated file-creation timestamp, a DCSync-style directory
 replication request, and a command line naming a specific Mimikatz module.
-Every rule across all three passes ships with a true-positive and a
-true-negative case; `scripts/seed_full_coverage.py` fires all 88 end to end as
-a single correlated incident.
+A fourth pass added 15 more (SYS-132 through SYS-150, skipping a few numbers
+left unused by design): `odbcconf`/`mmc` signed-binary proxy execution,
+browser-credential and KeePass database staging (by process identity and by
+staging path, two separate rules on purpose), network/connection/directory
+discovery via built-in commands, a command line that both enumerates
+processes and names a security vendor, archive creation with its header
+encrypted (not just password-protected), a `curl -T`/`Invoke-WebRequest
+-InFile` upload, an `rclone` transfer against an actual configured remote,
+script-based SharpHound invocation, built-in AD account/group enumeration
+commands, and Impacket-style AS-REP roasting. This pass also introduced
+**correlation chains**: three named, rule-ID-level patterns
+(`_CORRELATION_CHAINS` in `backend/models/schemas.py`) that recognise a
+specific multi-stage story — a ransomware activity chain, a credential-theft
+campaign, and an Office-to-PowerShell infection chain — and surface it as a
+`classification` field and a chain-specific incident title, ranked above the
+existing tactic-based narratives. Every rule across all four passes ships
+with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
+fires all 103 end to end as a single correlated incident and confirms its
+classification.
 
 ---
 
@@ -382,7 +398,7 @@ remembers it in the browser for next time — no other setup needed.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 378 tests
+python -m pytest        # 412 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -417,14 +433,14 @@ sysmon-hunter/
 │   │                        report, profile, pipeline
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   88 YAML detection rules, by EventID
+├── rules/                   103 YAML detection rules, by EventID
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   342 tests
+└── tests/                   412 tests
 ```
 
 ---

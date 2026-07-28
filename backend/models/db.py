@@ -102,6 +102,16 @@ class IncidentRow(Base):
     # in-memory ProcessTree is pruned.
     process_tree: Mapped[list[dict]] = mapped_column(JSON, default=list)
     actionable: Mapped[int] = mapped_column(Integer, default=0)  # SQLite has no bool
+    # Machine-readable slug for a matched correlation chain (e.g. "ransomware",
+    # "credential-theft-campaign"), or NULL when the incident's rule IDs don't
+    # satisfy any pattern in schemas.py's _CORRELATION_CHAINS. Computed by
+    # Incident.classification and written here the same way title/severity
+    # are -- derived on every read of the live object, persisted as a plain
+    # column so a closed/reloaded incident still shows its classification
+    # without recomputing from its full detection list.
+    classification: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, index=True
+    )
 
     # --- SOC triage state ---
     # An incident's lifecycle: open -> closed, or open -> false_positive. Set by
@@ -193,6 +203,7 @@ async def upsert_incident(incident: Incident, actionable: bool) -> None:
         row.chain = incident.chain
         row.process_tree = incident.process_tree
         row.techniques = incident.techniques
+        row.classification = incident.classification
         row.actionable = int(actionable)
         row.last_seen = incident.last_seen
 

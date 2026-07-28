@@ -1,0 +1,23 @@
+id: SYS-132
+title: Odbcconf used as a signed proxy-execution binary
+event_id: 1
+severity: high
+attack: [T1218.008]
+description: >
+  odbcconf.exe -- a signed Microsoft utility for configuring ODBC drivers --
+  ran with its `/A` action flag against a REGSVR or INSTALLDRIVER action, or
+  a command line that otherwise names one of those two actions directly.
+  Both actions load an attacker-supplied DLL through a trusted, allow-listed
+  binary, the same LOLBAS pattern SYS-074 (regsvr32) and SYS-008/SYS-037
+  (rundll32) already cover for their own proxies. Legitimate ODBC driver
+  installation goes through this exact code path too, so a deployment tool
+  that genuinely manages ODBC drivers on this host is worth excluding by
+  ParentImage once known -- not built in here, since guessing that allowlist
+  would either miss real deployment tooling or blind the rule to everything.
+detection:
+  image|endswith: '\odbcconf.exe'
+  command_line|re:
+    - '/a\s*\{'
+    - '\bregsvr\b'
+    - '\binstalldriver\b'
+condition: all

@@ -114,6 +114,69 @@ class TestSubTechniqueFallback:
         assert inc.title == "Suspicious activity on WS-01"
 
 
+class TestCorrelationChains:
+    """`_CORRELATION_CHAINS` names a specific multi-stage story from rule-ID
+    co-occurrence and outranks both the tactic narratives and the signature
+    rules above -- these tests pin that priority and the per-chain
+    thresholds (e.g. the credential-theft chain requires *two* distinct
+    rules, not just one, so it reads as a campaign rather than a single
+    lead)."""
+
+    def test_ransomware_chain_needs_both_prep_and_encryption_evidence(self) -> None:
+        # SYS-004 alone is still just the existing "Ransomware preparation"
+        # signature-rule title (see TestSignatureRules above) -- the chain
+        # only completes once encryption evidence lands too.
+        inc = incident_with([("SYS-004", ["T1490"])], host="HR-WS-03")
+        assert inc.classification is None
+        assert inc.title == "Ransomware preparation on HR-WS-03"
+
+        inc.add(
+            Detection(
+                rule_id="SYS-081",
+                title="x",
+                severity=Severity.CRITICAL,
+                attack=["T1486"],
+                event=Event(event_id=11),
+            )
+        )
+        assert inc.classification == "ransomware"
+        assert inc.title == "Ransomware activity chain on HR-WS-03"
+
+    def test_credential_theft_campaign_needs_two_distinct_rules(self) -> None:
+        # A single credential-access rule is a lead, not a campaign -- the
+        # existing "Credential theft" signature-rule title still applies.
+        inc = incident_with([("SYS-041", ["T1003.001"])])
+        assert inc.classification is None
+        assert inc.title == "Credential theft on WS-01"
+
+        inc.add(
+            Detection(
+                rule_id="SYS-135",
+                title="x",
+                severity=Severity.HIGH,
+                attack=["T1555.003"],
+                event=Event(event_id=11),
+            )
+        )
+        assert inc.classification == "credential-theft-campaign"
+        assert inc.title == "Credential theft campaign on WS-01"
+
+    def test_office_to_powershell_chain(self) -> None:
+        inc = incident_with(
+            [
+                ("SYS-001", ["T1566.001", "T1059"]),
+                ("SYS-009", ["T1059.001", "T1105"]),
+            ],
+            host="FIN-WS-07",
+        )
+        assert inc.classification == "office-to-powershell"
+        assert inc.title == "Office to PowerShell infection chain on FIN-WS-07"
+
+    def test_no_chain_matches_leaves_classification_none(self) -> None:
+        inc = incident_with([("SYS-030", ["T1547.001"])])
+        assert inc.classification is None
+
+
 class TestRuleCorpusTechniquesResolve:
     """Guardrail: every technique any shipped rule actually declares must
     resolve to a tactic here (directly or via the sub-technique fallback).

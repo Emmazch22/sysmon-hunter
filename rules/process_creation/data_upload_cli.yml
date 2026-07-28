@@ -1,0 +1,19 @@
+id: SYS-144
+title: Command-line tooling uploaded a file to a remote server
+event_id: 1
+severity: high
+attack: [T1048]
+description: >
+  curl ran with `-T`/`--upload-file` (PUT a local file to a URL), or
+  PowerShell's Invoke-WebRequest/Invoke-RestMethod ran with `-InFile` --
+  the command-line equivalent of an HTTP PUT/POST that sends a local file
+  out, as opposed to the far more common case of pulling one down. Living
+  off HTTP(S) this way blends into ordinary web traffic and needs no
+  additional tooling beyond what already ships on the host, which is
+  exactly why it shows up in exfiltration playbooks that would rather not
+  drop rclone or a bespoke uploader at all.
+detection:
+  command_line|re:
+    - 'curl(\.exe)?\s.*(-t\s|--upload-file)'
+    - '(invoke-webrequest|invoke-restmethod)\b.*-infile\b'
+condition: any

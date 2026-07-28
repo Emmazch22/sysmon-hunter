@@ -1,0 +1,20 @@
+id: SYS-148
+title: SharpHound invoked via script or named by its collection arguments
+event_id: 1
+severity: high
+attack: [T1482]
+description: >
+  A command line referenced SharpHound.ps1 (the in-memory/reflective
+  PowerShell delivery method), called Invoke-BloodHound, or carried a
+  CollectionMethod argument -- the ways SharpHound runs *without* dropping
+  SharpHound.exe to disk. SYS-116 already catches the compiled binary by
+  image name alone (sharphound.exe or adfind.exe, no argument inspection);
+  this rule is the command-line-based complement that catches the same tool
+  when it never touches disk as an .exe at all, which is how most public
+  tradecraft guides recommend running it.
+detection:
+  command_line|re:
+    - 'sharphound\.ps1'
+    - 'invoke-bloodhound'
+    - '-{1,2}collectionmethod'
+condition: any

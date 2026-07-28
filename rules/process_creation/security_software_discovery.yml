@@ -1,0 +1,22 @@
+id: SYS-141
+title: Security or EDR product enumerated from the command line
+event_id: 1
+severity: high
+attack: [T1518.001]
+description: >
+  A command line combined a software/process enumeration command (wmic
+  product, Get-CimInstance, tasklist, or sc query) with a named security
+  vendor -- Defender, SentinelOne, CrowdStrike, Carbon Black, Cylance,
+  Sophos, Trend Micro, Trellix, or McAfee -- anywhere in the same command
+  line. Checking whether a specific antivirus/EDR service exists before
+  deciding how (or whether) to proceed is routine pre-execution
+  reconnaissance for both commodity malware and hands-on-keyboard operators;
+  either combination on its own (the bare enumeration command, or the vendor
+  name in an unrelated context) is too common to key on alone, so this rule
+  requires both in one line via a pair of lookaheads rather than two
+  separate field checks -- the matcher's YAML detection block cannot express
+  "this field matches list A AND separately matches list B" any other way,
+  since a mapping cannot repeat the same field|operator key twice.
+detection:
+  command_line|re: '(?=.*\b(wmic\s+product|get-ciminstance|tasklist|sc\s+query)\b)(?=.*\b(defender|sentinelone|crowdstrike|carbon\s*black|cylance|sophos|trend\s*micro|trellix|mcafee)\b)'
+condition: all

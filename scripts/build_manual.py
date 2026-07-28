@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.3.3"
+VERSION = "0.3.4"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -289,6 +289,29 @@ RULES = [
     ("SYS-121", "1", "Medium", "bitsadmin used to transfer a file", "T1197"),
     ("SYS-122", "13", "High", "CLSID InprocServer32 handler registered under a user's own hive", "T1546.015"),
     ("SYS-123", "1", "High", "Command line references a known privilege-escalation token-theft tool", "T1134"),
+    ("SYS-124", "22", "Medium", "DNS query to a dynamic DNS domain", "T1071.004, T1568"),
+    ("SYS-125", "23", "Medium", "Executable deleted from a staging path shortly after being dropped", "T1070.004"),
+    ("SYS-126", "25", "Critical", "Process image tampering detected (hollowing or doppelganging)", "T1055.012, T1055.013"),
+    ("SYS-127", "15", "High", "Executable content staged inside an NTFS alternate data stream", "T1564.004"),
+    ("SYS-128", "9", "High", "Raw volume access by a process outside known disk utilities", "T1006"),
+    ("SYS-129", "2", "Medium", "File creation timestamp changed outside a servicing process", "T1070.006"),
+    ("SYS-130", "1", "Critical", "DCSync-style directory replication requested from a command line", "T1003.006"),
+    ("SYS-131", "1", "Critical", "Command line references a known Mimikatz module or command", "T1003.001"),
+    ("SYS-132", "1", "High", "Odbcconf used as a signed proxy-execution binary", "T1218.008"),
+    ("SYS-133", "1", "High", "mmc.exe loaded a Management Saved Console from a staging path", "T1218.014"),
+    ("SYS-135", "11", "High", "Non-browser process touched a browser credential database", "T1555.003"),
+    ("SYS-136", "11", "High", "Script interpreter touched a KeePass database", "T1555"),
+    ("SYS-137", "11", "High", "Browser credential database written into a staging directory", "T1555.003"),
+    ("SYS-138", "1", "Medium", "Network configuration discovery command executed", "T1016"),
+    ("SYS-139", "1", "Medium", "Active network connections enumerated via netstat", "T1049"),
+    ("SYS-140", "1", "Medium", "Recursive filesystem enumeration executed", "T1083"),
+    ("SYS-141", "1", "High", "Security or EDR product enumerated from the command line", "T1518.001"),
+    ("SYS-142", "1", "Medium", "Archive created with its header/file-list encrypted", "T1560.001"),
+    ("SYS-143", "1", "High", "Rclone ran a copy/sync against a remote destination", "T1567.002"),
+    ("SYS-144", "1", "High", "Command-line tooling uploaded a file to a remote server", "T1048"),
+    ("SYS-148", "1", "High", "SharpHound invoked via script or named by its collection arguments", "T1482"),
+    ("SYS-149", "1", "Medium", "Active Directory account or group enumeration command executed", "T1087"),
+    ("SYS-150", "1", "High", "AS-REP roasting tooling executed", "T1558.004"),
 ]
 
 EVENT_ID_NAMES = {
@@ -489,7 +512,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "88 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "103 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -839,7 +862,7 @@ story.append(Paragraph(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 378 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 412 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -910,13 +933,13 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;88 YAML detection rules, by Event ID<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;103 YAML detection rules, by Event ID<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;378 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;412 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

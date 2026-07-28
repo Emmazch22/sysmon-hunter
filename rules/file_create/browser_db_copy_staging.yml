@@ -1,0 +1,26 @@
+id: SYS-137
+title: Browser credential database written into a staging directory
+event_id: 11
+severity: high
+attack: [T1555.003]
+description: >
+  A file named "Login Data", "Cookies", or "Web Data" was written somewhere
+  under Temp, Downloads, or ProgramData -- none of which is where a real
+  browser profile lives. This is the location-based half of the same check
+  SYS-135 does by process identity: SYS-135 fires when the wrong *process*
+  touches the file wherever it lands, this fires when the file lands in the
+  wrong *place* whoever wrote it, so a copy step that happens to run through
+  something already on SYS-135's exclusion list (or a tool this rule set has
+  never seen before) still gets caught here. Between the two, a credential
+  stealer has to avoid both the browser's own profile path and the browser's
+  own binary to slip past silently.
+detection:
+  TargetFilename|contains:
+    - '\Temp\'
+    - '\Downloads\'
+    - '\ProgramData\'
+  TargetFilename|endswith:
+    - 'Login Data'
+    - 'Cookies'
+    - 'Web Data'
+condition: all

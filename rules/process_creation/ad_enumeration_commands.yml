@@ -1,0 +1,22 @@
+id: SYS-149
+title: Active Directory account or group enumeration command executed
+event_id: 1
+severity: medium
+attack: [T1087]
+description: >
+  net user, net group, nltest, or dsquery ran -- the built-in-tooling way to
+  enumerate domain accounts and group membership, no extra binary required.
+  SYS-116 covers the compiled AD-recon tools (SharpHound/AdFind) that walk
+  the whole domain graph at once; this rule covers the much noisier-looking
+  but often-overlooked built-in commands that accomplish the same
+  reconnaissance goal one query at a time. `DSC-001`'s burst detector already
+  counts several of these same commands toward its distinct-technique
+  threshold (see engine/discovery.py) -- this is the single-event lead
+  underneath that statistical layer, the same relationship SYS-138 has with
+  network-config discovery.
+detection:
+  command_line|re:
+    - '\bnet\d?\s+(user|group)\b'
+    - '\bnltest\b'
+    - '\bdsquery\b'
+condition: any

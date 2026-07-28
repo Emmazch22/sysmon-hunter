@@ -1,0 +1,23 @@
+id: SYS-136
+title: Script interpreter touched a KeePass database
+event_id: 11
+severity: high
+attack: [T1555]
+description: >
+  A scripting interpreter or LOLBin -- powershell.exe, cmd.exe, wscript.exe,
+  cscript.exe, or rundll32.exe -- created or overwrote a `.kdbx` file
+  (KeePass's database format). KeePass itself is the only process with a
+  legitimate reason to touch its own database file; a script engine copying,
+  exporting, or staging one is consistent with credential harvesting ahead
+  of an offline brute-force or a keyed dump against a captured master
+  password. As with SYS-135, Sysmon has no file-read event, so this looks
+  for the file being written or touched rather than opened.
+detection:
+  TargetFilename|endswith: '.kdbx'
+  image|endswith:
+    - '\powershell.exe'
+    - '\cmd.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\rundll32.exe'
+condition: all

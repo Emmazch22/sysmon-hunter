@@ -1,0 +1,24 @@
+id: SYS-138
+title: Network configuration discovery command executed
+event_id: 1
+severity: medium
+attack: [T1016]
+description: >
+  A command line ran one of the standard local network-configuration
+  enumeration commands: ipconfig, arp -a, route print, or netsh interface.
+  Every one of these is routine for a help-desk technician or a script
+  troubleshooting connectivity, which is why this stays a medium lead --
+  its value is almost entirely in correlation. `DSC-001` (see
+  engine/discovery.py) already counts these same commands as part of its
+  *distinct-technique-burst* statistical detector, which fires only once
+  several different recon categories appear together in one process tree;
+  this rule is the single-event complement to that, giving an analyst a
+  concrete lead the moment even one of these runs, the same relationship
+  SYS-093 through SYS-123 already have with that detector.
+detection:
+  command_line|re:
+    - '\bipconfig\b'
+    - '\barp\s+-a\b'
+    - '\broute\s+print\b'
+    - '\bnetsh\s+interface\b'
+condition: any

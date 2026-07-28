@@ -168,6 +168,12 @@ function incidentHtml(incident, isFresh) {
         : status === "false_positive"
             ? `<span class="inc-status-badge fp">false positive</span>`
             : "";
+
+    // A matched correlation chain names a specific, high-confidence attack
+    // story (e.g. "ransomware") -- see schemas.py's _CORRELATION_CHAINS.
+    const classificationBadge = incident.classification
+        ? `<span class="inc-classification-badge">${escapeHtml(incident.classification.replace(/-/g, " "))}</span>`
+        : "";
     // "Set verdict" is a menu trigger, not a direct action -- it must not look
     // like a value already attached to the incident (that was the FP button's
     // problem), so it opens a small dropdown instead of firing on its own click.
@@ -195,7 +201,7 @@ function incidentHtml(incident, isFresh) {
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
-          ${badge}${statusBadge}
+          ${badge}${statusBadge}${classificationBadge}
           <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>

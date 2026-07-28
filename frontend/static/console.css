@@ -2237,6 +2237,21 @@ main {
     border-color: color-mix(in srgb, var(--sev-high) 40%, transparent);
 }
 
+/* A matched correlation chain (schemas.py's _CORRELATION_CHAINS) -- filled
+     rather than outlined like the status badge, so a "ransomware" or
+     "credential theft campaign" classification stands out in the queue at a
+     glance, before an analyst reads the title. */
+.inc-classification-badge {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--sev-critical);
+    padding: 1px 6px;
+    margin-left: 6px;
+}
+
 /* Close / set verdict / reopen -- the manual triage actions in the incident
      card's meta row, styled between .drill (text-only) and .open-tab
      (icon-only): a bordered icon+label button, quiet until hovered.

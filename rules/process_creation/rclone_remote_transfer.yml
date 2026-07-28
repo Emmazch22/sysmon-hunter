@@ -1,0 +1,21 @@
+id: SYS-143
+title: Rclone ran a copy/sync against a remote destination
+event_id: 1
+severity: high
+attack: [T1567.002]
+description: >
+  rclone.exe ran a `copy`, `sync`, or `move` subcommand naming a configured
+  remote (rclone's `remote:path` syntax) as source or destination. SYS-117
+  already flags rclone (and mega's CLI tools) purely by binary name, with no
+  argument inspection -- a broad, medium-severity net across four cloud
+  tools. This rule is the higher-fidelity complement scoped specifically to
+  rclone: it requires the actual data-movement command and a remote target,
+  which is what an exfiltration run looks like as opposed to `rclone
+  version` or `rclone config` showing up incidentally.
+detection:
+  image|endswith: '\rclone.exe'
+  # The colon-delimited remote:path token must not be immediately followed by
+  # a slash -- that excludes an ordinary Windows path argument (C:\Users\...)
+  # from tripping this on ITS colon, which a bare `\S+:\S+` would do.
+  command_line|re: '\b(copy|sync|move)\b.*\b[A-Za-z][\w.-]*:(?![\\/])\S+'
+condition: all

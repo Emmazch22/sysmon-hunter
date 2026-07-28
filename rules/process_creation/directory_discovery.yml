@@ -1,0 +1,21 @@
+id: SYS-140
+title: Recursive filesystem enumeration executed
+event_id: 1
+severity: medium
+attack: [T1083]
+description: >
+  A command recursively listed a directory tree: `dir /s`, the `tree`
+  command, or PowerShell's `Get-ChildItem -Recurse`. This is the one recon
+  category `DSC-001`'s burst detector does not cover at all (see
+  engine/discovery.py) -- file and directory discovery has no signature in
+  its table today -- so this rule is the only coverage the corpus has for an
+  attacker mapping out what documents, credentials, or configuration files
+  are sitting on a host before deciding what to steal or encrypt. A build
+  script or backup job walking a tree is common enough that this stays
+  medium rather than high.
+detection:
+  command_line|re:
+    - '\bdir\s+/s\b'
+    - '\btree\b'
+    - 'get-childitem\s+-recurse'
+condition: any

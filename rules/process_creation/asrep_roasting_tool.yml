@@ -1,0 +1,23 @@
+id: SYS-150
+title: AS-REP roasting tooling executed
+event_id: 1
+severity: high
+attack: [T1558.004]
+description: >
+  A command line referenced GetNPUsers (Impacket's AS-REP roasting client) or
+  an ASREP-roasting invocation of Rubeus. AS-REP roasting targets accounts
+  with Kerberos pre-authentication disabled: unlike SYS-118's Kerberoasting
+  (T1558.003), it needs no valid credential at all to request and crack a
+  ticket, which makes it reachable from a position with zero domain access.
+  Rubeus itself already trips SYS-118 on image name alone regardless of
+  which command it's given, so the two rules overlap on that one binary by
+  design; what this rule adds is Impacket's GetNPUsers.py (a completely
+  different tool SYS-118 never sees) and the correct, more specific
+  sub-technique tag for reporting -- T1558.004, not T1558.003 -- when the
+  command line is explicit about which attack it's running.
+detection:
+  command_line|contains:
+    - 'getnpusers'
+    - 'asreproast'
+    - 'asrep'
+condition: any

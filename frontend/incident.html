@@ -102,6 +102,20 @@
             border-color: color-mix(in srgb, var(--sev-high) 40%, transparent);
         }
 
+        /* A matched correlation chain (see schemas.py's _CORRELATION_CHAINS)
+           names a specific, high-confidence attack story -- filled rather
+           than outlined like the other meta badges, so it reads as the one
+           badge worth noticing first in the row. */
+        .ih-classification-badge {
+            font-size: 10px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--bg);
+            background: var(--sev-critical);
+            padding: 2px 8px;
+        }
+
         .ih-actions {
             margin-top: 18px;
             display: flex;
@@ -437,6 +451,7 @@
       <span>score ${esc(inc.score)}</span>
       <span>${esc(inc.host)}</span>
       <span class="ih-id">#${esc(inc.id)}</span>
+      ${inc.classification ? `<span class="ih-classification-badge">${esc(inc.classification.replace(/-/g, " "))}</span>` : ""}
       ${statusBadge}
     </div>
 

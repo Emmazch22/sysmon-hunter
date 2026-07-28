@@ -1,0 +1,24 @@
+id: SYS-142
+title: Archive created with its header/file-list encrypted
+event_id: 1
+severity: medium
+attack: [T1560.001]
+description: >
+  7-Zip or WinRAR ran with `-mhe` (7-Zip's "encrypt file names/headers"
+  switch), which hides the archive's file list from anyone without the
+  password -- not just the file contents. SYS-098 already catches a
+  password-protected archive via the `-p` flag; that rule intentionally does
+  not key on plain `-a` (add-to-archive), since that flag appears in nearly
+  every ordinary 7-Zip invocation and would make the rule fire on routine
+  use. `-mhe` is the stronger, much rarer signal this rule adds on top: an
+  operator who wants the archive's *contents* hidden from a defender who
+  later finds the file sitting in a staging directory, not just password
+  protection against opening it.
+detection:
+  image|endswith:
+    - '\7z.exe'
+    - '\7za.exe'
+    - '\winrar.exe'
+    - '\rar.exe'
+  command_line|contains: '-mhe'
+condition: all
