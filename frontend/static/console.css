@@ -24,6 +24,13 @@
     --attack: #8C7BE0;
     /* ATT&CK technique identifiers */
 
+    /* Wordmark: "SYSMON" is a muted slate blue that shifts with the theme
+       (light slate on dark, dark slate on light) so it stays readable
+       against both backgrounds without competing with the severity scale
+       for saturation. "HUNTER" (.brand span) intentionally keeps --struct
+       in both themes -- the brand green never changes. */
+    --logo-sysmon: #9BB0C4;
+
     /* Severity scale — the only saturated colour in the console */
     --sev-info: #1EFF8E;
     --sev-low: #00D26A;
@@ -55,6 +62,7 @@
 
     --struct: #067A46;
     --attack: #6249B8;
+    --logo-sysmon: #23384D;
 
     --sev-info: #0C8F55;
     --sev-low: #067A46;
@@ -182,9 +190,14 @@ header {
     font-size: 15px;
     letter-spacing: .14em;
     text-transform: uppercase;
+    /* "SYSMON" -- the plain text node, not the "HUNTER" span below --
+       takes the theme-aware slate blue instead of inheriting body's --text,
+       so it reads as part of the wordmark rather than as ordinary chrome. */
+    color: var(--logo-sysmon);
 }
 
 .brand span {
+    /* "HUNTER" -- always the brand green, unaffected by theme. */
     color: var(--struct);
 }
 
