@@ -48,6 +48,10 @@ class ProcessTree:
 
     def __init__(self, ttl: timedelta) -> None:
         self._nodes: dict[tuple[str, str], ProcessNode] = {}
+        # (host, parent_guid) -> child guids, maintained incrementally so that
+        # subtree() never has to rescan every node this tree has ever seen --
+        # see subtree()'s docstring for why that rescan used to be the cost.
+        self._children: dict[tuple[str, str], list[str]] = {}
         self._ttl = ttl
 
     def observe(self, event: Event) -> ProcessNode | None:
@@ -73,6 +77,10 @@ class ProcessTree:
                 last_seen=event.timestamp,
             )
             self._nodes[key] = node
+            if node.parent_guid:
+                self._children.setdefault(
+                    (event.host, node.parent_guid), []
+                ).append(node.guid)
         else:
             # Later events (network, image load) reference a process we already
             # know from its creation event. Refresh liveness, and backfill any
@@ -80,7 +88,11 @@ class ProcessTree:
             node.last_seen = max(node.last_seen, event.timestamp)
             node.image = node.image or event.image
             node.command_line = node.command_line or event.command_line
-            node.parent_guid = node.parent_guid or event.parent_process_guid
+            if not node.parent_guid and event.parent_process_guid:
+                node.parent_guid = event.parent_process_guid
+                self._children.setdefault(
+                    (event.host, node.parent_guid), []
+                ).append(node.guid)
 
         return node
 
@@ -133,14 +145,12 @@ class ProcessTree:
         they are the branches, and a tree with holes where the quiet processes
         were is not a tree.
         """
-        # Collect the descendants by walking down from the root. Build a
-        # child-index once rather than rescanning for every node.
-        children: dict[str, list[ProcessNode]] = {}
-        for (node_host, _), node in self._nodes.items():
-            if node_host != host or not node.parent_guid:
-                continue
-            children.setdefault(node.parent_guid, []).append(node)
-
+        # The child-index (self._children) is maintained incrementally by
+        # observe(), so walking down from the root costs work proportional to
+        # the subtree itself, not to every process this host has ever run --
+        # it used to rebuild that index from the full node table on every
+        # call, which made a large, long-lived tree get slower to explore the
+        # longer the process had been running.
         out: list[dict] = []
         seen: set[str] = set()
         stack = [root_guid]
@@ -166,8 +176,8 @@ class ProcessTree:
                         "last_seen": node.last_seen.isoformat(),
                     }
                 )
-            for child in children.get(guid, []):
-                stack.append(child.guid)
+            for child_guid in self._children.get((host, guid), []):
+                stack.append(child_guid)
 
         return out
 
@@ -181,7 +191,21 @@ class ProcessTree:
         cutoff = now - self._ttl
         stale = [key for key, node in self._nodes.items() if node.last_seen < cutoff]
         for key in stale:
-            del self._nodes[key]
+            node = self._nodes.pop(key)
+            host, guid = key
+            # Drop this node's own children bucket, and remove it from its
+            # parent's -- otherwise a pruned guid lingers forever inside
+            # _children, a slow leak the node table itself doesn't have.
+            self._children.pop((host, guid), None)
+            if node.parent_guid:
+                siblings = self._children.get((host, node.parent_guid))
+                if siblings:
+                    try:
+                        siblings.remove(guid)
+                    except ValueError:
+                        pass
+                    if not siblings:
+                        del self._children[(host, node.parent_guid)]
         if stale:
             log.debug("Pruned %d stale process nodes", len(stale))
         return len(stale)
