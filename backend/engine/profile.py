@@ -60,6 +60,44 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1571": "command-and-control",
     "T1055": "defense-evasion",
     "T1490": "impact",
+    # Added when the SYS-093..123 rule batches (scheduled tasks, hive dumps,
+    # lateral movement, exfiltration tooling, and more) turned out to have
+    # shipped with no entry here at all -- see TestRuleCorpusTechniquesResolve
+    # in tests/test_profile.py, which now fails the build if this ever
+    # happens again for a technique the rule corpus actually declares.
+    "T1190": "initial-access",
+    "T1047": "execution",
+    "T1569.002": "execution",
+    "T1070.001": "defense-evasion",
+    "T1070.004": "defense-evasion",
+    "T1127.001": "defense-evasion",
+    "T1134": "defense-evasion",
+    "T1140": "defense-evasion",
+    "T1197": "defense-evasion",
+    "T1202": "defense-evasion",
+    "T1211": "defense-evasion",
+    "T1216": "defense-evasion",
+    "T1548.002": "defense-evasion",
+    "T1562.004": "defense-evasion",
+    "T1558.003": "credential-access",
+    "T1482": "discovery",
+    "T1021.001": "lateral-movement",
+    "T1021.002": "lateral-movement",
+    "T1021.006": "lateral-movement",
+    "T1563.002": "lateral-movement",
+    "T1053.005": "persistence",
+    "T1098": "persistence",
+    "T1136.001": "persistence",
+    "T1505.003": "persistence",
+    "T1543.003": "persistence",
+    "T1546.003": "persistence",
+    "T1546.015": "persistence",
+    "T1560.001": "collection",
+    "T1090.001": "command-and-control",
+    "T1567.002": "exfiltration",
+    "T1486": "impact",
+    "T1489": "impact",
+    "T1491.001": "impact",
 }
 
 # The order tactics fall in an intrusion. The narrative follows this, not the
@@ -70,11 +108,35 @@ TACTIC_ORDER = [
     "execution",
     "defense-evasion",
     "discovery",
+    "lateral-movement",
     "credential-access",
     "persistence",
+    "collection",
     "command-and-control",
+    "exfiltration",
     "impact",
 ]
+
+
+def _tactic_for(technique: str) -> str | None:
+    """Look up a technique's kill-chain phase, falling back to its parent
+    technique when the exact sub-technique is not listed above.
+
+    Mirrors `AttackLookup.get()` (engine/attack.py) and
+    `models/schemas.py`'s `_tactic_for()`: without the fallback, a rule
+    shipping a sub-technique ID not spelled out here (there will always be
+    one eventually -- MITRE adds them faster than this table gets updated)
+    silently contributes no phase at all, and an incident whose only
+    technique is that sub-technique gets no behavior profile. See
+    `schemas.py`'s note on why this table and that one are intentionally
+    different groupings of the same techniques, not copies of each other.
+    """
+    tactic = TECHNIQUE_TACTIC.get(technique)
+    if tactic is not None:
+        return tactic
+    if "." in technique:
+        return TECHNIQUE_TACTIC.get(technique.split(".")[0])
+    return None
 
 
 def _phrase_for_tactic(
@@ -89,8 +151,14 @@ def _phrase_for_tactic(
     evidence; a phrase without one is a label.
     """
     rule_ids = {d["rule_id"] for d in detections}
+    techniques = {t for d in detections for t in d.get("attack", [])}
 
     if tactic == "initial-access":
+        # T1190 (exploiting a public-facing application) is not phishing --
+        # saying so would misdescribe the incident's actual entry point, not
+        # just generalize it.
+        if "T1190" in techniques:
+            return "gained initial access by exploiting a public-facing application"
         return "gained initial access through a phishing document"
 
     if tactic == "execution":
@@ -142,7 +210,21 @@ def _phrase_for_tactic(
             return "established persistence via a registry Run key"
         if "SYS-050" in rule_ids:
             return "established persistence via the Startup folder"
+        if "T1053.005" in techniques:
+            return "established persistence via a scheduled task"
+        if "T1543.003" in techniques:
+            return "established persistence via a new Windows service"
+        if {"T1546.003", "T1546.015"} & techniques:
+            return "established persistence via an event-triggered execution hook"
         return "established persistence"
+
+    if tactic == "lateral-movement":
+        if "T1563.002" in techniques:
+            return "hijacked an existing RDP session to move laterally"
+        return "moved laterally to another host on the network"
+
+    if tactic == "collection":
+        return "staged and archived data ahead of exfiltration"
 
     if tactic == "command-and-control":
         # The beacon detection carries the interval -- the single most useful
@@ -156,6 +238,9 @@ def _phrase_for_tactic(
         if "SYS-060" in rule_ids:
             return "established C2 over a named pipe matching a known framework default"
         return "communicated with a remote command-and-control host"
+
+    if tactic == "exfiltration":
+        return "exfiltrated data to an external service"
 
     if tactic == "impact":
         if "SYS-004" in rule_ids:
@@ -177,7 +262,7 @@ def build_profile(
     # Group detections by the tactic their techniques serve.
     by_tactic: dict[str, list[dict[str, Any]]] = {}
     for detection in detections:
-        tactics_here = {TECHNIQUE_TACTIC.get(t) for t in detection.get("attack", [])}
+        tactics_here = {_tactic_for(t) for t in detection.get("attack", [])}
         tactics_here.discard(None)
         for tactic in tactics_here:
             by_tactic.setdefault(tactic, []).append(detection)

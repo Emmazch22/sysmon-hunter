@@ -95,3 +95,46 @@ class TestFallbacks:
     def test_empty_incident_has_a_safe_title(self) -> None:
         inc = Incident(host="WS-01", root_guid="g")
         assert inc.title == "Suspicious activity on WS-01"
+
+
+class TestSubTechniqueFallback:
+    """A rule that ships a sub-technique ID not spelled out in
+    `_TECHNIQUE_TACTIC` must still resolve to its parent's tactic, not vanish
+    from the title entirely. T1055.001 (mavinject) is a real shipped case:
+    only the bare T1055 is listed."""
+
+    def test_unlisted_subtechnique_falls_back_to_parent_tactic(self) -> None:
+        inc = incident_with([("SYS-111", ["T1055.001"])])  # process injection
+        assert inc.title == "Process injection on WS-01"
+
+    def test_unlisted_subtechnique_of_an_unlisted_parent_is_still_safe(self) -> None:
+        """No fabricated tactic when neither the sub-technique nor its parent
+        is known -- falls all the way to the generic, honest title."""
+        inc = incident_with([("SYS-999", ["T9999.001"])])
+        assert inc.title == "Suspicious activity on WS-01"
+
+
+class TestRuleCorpusTechniquesResolve:
+    """Guardrail: every technique any shipped rule actually declares must
+    resolve to a tactic here (directly or via the sub-technique fallback).
+    A rule shipped with a technique this table has never heard of, at any
+    granularity, silently produces an untitled incident -- this is the same
+    kind of gap `test_every_rule_has_a_test_case` in test_rules.py closes
+    for missing validation cases, applied to title coverage instead."""
+
+    def test_every_declared_technique_resolves_to_a_tactic(self) -> None:
+        from backend.config import settings
+        from backend.engine.rule_loader import RuleStore
+        from backend.models.schemas import _tactic_for
+
+        store = RuleStore()
+        store.load(settings.rules_dir)
+        assert not store.errors, f"rules failed to load: {store.errors}"
+
+        techniques = {t for rule in store.all for t in rule.attack}
+        unresolved = {t for t in techniques if _tactic_for(t) is None}
+        assert not unresolved, (
+            f"technique(s) with no tactic mapping, even via parent fallback: "
+            f"{sorted(unresolved)} -- add them to _TECHNIQUE_TACTIC in "
+            f"backend/models/schemas.py"
+        )

@@ -202,6 +202,19 @@ class ProcessNode(BaseModel):
 
 # Each technique maps to the tactic it serves. A title built from tactics reads
 # as a narrative an analyst recognises, not a list of rule IDs.
+#
+# This is a deliberately different, finer-grained breakdown than
+# `engine/profile.py`'s TECHNIQUE_TACTIC, not a copy of it that has drifted.
+# Profile.py groups by MITRE's actual kill-chain phase because it needs one
+# clean phrase per phase ("evaded defenses", "accessed credential material");
+# this one splits a few of those phases further (`download`, `masquerading`,
+# `injection` are all real MITRE *techniques*, elevated to their own tag here)
+# because a one-line title reads better as "Process masquerading on HOST"
+# than the generic "Defense evasion on HOST" both of those cases would
+# otherwise collapse into. The two are allowed to disagree on which single
+# tactic best describes a technique; what they must not do is silently drop
+# a technique the rule corpus actually ships, which is what `_tactic_for()`
+# below and the parent-fallback in `profile.py` both guard against.
 _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1566": "delivery",
     "T1566.001": "delivery",
@@ -234,7 +247,66 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1573": "command-and-control",
     "T1055": "injection",
     "T1490": "impact",
+    # Added when the SYS-093..123 rule batches turned out to have shipped with
+    # no entry here at all -- see TestRuleCorpusTechniquesResolve in
+    # tests/test_titles.py, which now fails the build if this happens again.
+    "T1190": "initial-access",
+    "T1047": "execution",
+    "T1569.002": "execution",
+    "T1070.001": "defense-evasion",
+    "T1070.004": "defense-evasion",
+    "T1127.001": "defense-evasion",
+    "T1134": "defense-evasion",
+    "T1140": "defense-evasion",
+    "T1197": "defense-evasion",
+    "T1202": "defense-evasion",
+    "T1211": "defense-evasion",
+    "T1216": "defense-evasion",
+    "T1548.002": "defense-evasion",
+    "T1562.004": "defense-evasion",
+    "T1558.003": "credential-access",
+    "T1482": "discovery",
+    "T1021.001": "lateral-movement",
+    "T1021.002": "lateral-movement",
+    "T1021.006": "lateral-movement",
+    "T1563.002": "lateral-movement",
+    "T1053.005": "persistence",
+    "T1098": "persistence",
+    "T1136.001": "persistence",
+    "T1505.003": "persistence",
+    "T1543.003": "persistence",
+    "T1546.003": "persistence",
+    "T1546.015": "persistence",
+    "T1560.001": "collection",
+    "T1090.001": "command-and-control",
+    "T1571": "command-and-control",
+    "T1567.002": "exfiltration",
+    "T1486": "impact",
+    "T1489": "impact",
+    "T1491.001": "impact",
 }
+
+
+def _tactic_for(technique: str) -> Optional[str]:
+    """Look up a technique's narrative tag, falling back to its parent
+    technique when the exact sub-technique is not listed above.
+
+    Without this, a rule that declares only a sub-technique ID not spelled
+    out in `_TECHNIQUE_TACTIC` (e.g. a new rule shipped with `T1055.001` but
+    the table only has `T1055`) silently contributes nothing to the title --
+    not the parent's tactic, nothing -- and an incident whose only technique
+    is that sub-technique falls all the way through to the generic
+    "Suspicious activity" title. `AttackLookup.get()` (engine/attack.py)
+    already does the same parent fallback for the technique-description
+    modal; this mirrors it here for the same reason.
+    """
+    tactic = _TECHNIQUE_TACTIC.get(technique)
+    if tactic is not None:
+        return tactic
+    if "." in technique:
+        return _TECHNIQUE_TACTIC.get(technique.split(".")[0])
+    return None
+
 
 # Rules whose presence alone names the incident -- unambiguous, high-signal
 # findings that outrank any narrative built from tactics.
@@ -264,6 +336,7 @@ _NARRATIVES: list[tuple[set[str], str]] = [
 # A lone tactic, made readable for the fallback title.
 _TACTIC_LABEL: dict[str, str] = {
     "delivery": "Phishing delivery",
+    "initial-access": "Initial access",
     "execution": "Suspicious execution",
     "download": "Payload download",
     "persistence": "Persistence",
@@ -271,7 +344,10 @@ _TACTIC_LABEL: dict[str, str] = {
     "masquerading": "Process masquerading",
     "credential-access": "Credential access",
     "discovery": "Host reconnaissance",
+    "lateral-movement": "Lateral movement",
+    "collection": "Data collection",
     "command-and-control": "C2 communication",
+    "exfiltration": "Data exfiltration",
     "injection": "Process injection",
     "impact": "Destructive activity",
 }
@@ -325,7 +401,7 @@ class Incident(BaseModel):
         updates itself as more land. Priority is narrative first (a multi-stage
         story), then a signature rule, then the dominant single tactic.
         """
-        tactics = {_TECHNIQUE_TACTIC.get(t) for t in self.techniques}
+        tactics = {_tactic_for(t) for t in self.techniques}
         tactics.discard(None)
 
         # 1. A multi-stage narrative whose tactics are all present.

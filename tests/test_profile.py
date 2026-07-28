@@ -93,3 +93,37 @@ class TestSummary:
             "persistence",
             "command and control",
         ]
+
+
+class TestSubTechniqueFallback:
+    def test_unlisted_subtechnique_falls_back_to_parent_phase(self) -> None:
+        """T1055.001 (mavinject) is not spelled out in TECHNIQUE_TACTIC, only
+        the bare T1055 is -- the phase must still appear via the parent."""
+        incident = {"host": "WS-01"}
+        detections = [_det("SYS-111", ["T1055.001"])]
+        profile = build_profile(incident, detections)
+        assert profile["phases"], "unlisted sub-technique produced no phase at all"
+
+
+class TestRuleCorpusTechniquesResolve:
+    """Same guardrail as test_titles.py's, for this module's independent
+    technique->phase table: every technique a shipped rule declares must
+    resolve to a phase here too, or that rule's incidents get no behavior
+    profile at all."""
+
+    def test_every_declared_technique_resolves_to_a_tactic(self) -> None:
+        from backend.config import settings
+        from backend.engine.profile import _tactic_for
+        from backend.engine.rule_loader import RuleStore
+
+        store = RuleStore()
+        store.load(settings.rules_dir)
+        assert not store.errors, f"rules failed to load: {store.errors}"
+
+        techniques = {t for rule in store.all for t in rule.attack}
+        unresolved = {t for t in techniques if _tactic_for(t) is None}
+        assert not unresolved, (
+            f"technique(s) with no phase mapping, even via parent fallback: "
+            f"{sorted(unresolved)} -- add them to TECHNIQUE_TACTIC in "
+            f"backend/engine/profile.py"
+        )
