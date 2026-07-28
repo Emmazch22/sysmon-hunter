@@ -150,7 +150,6 @@ function detectionIcon(ruleId) {
     const id = String(ruleId || "");
     if (id.startsWith("BCN")) return "i-beacon";
     if (id.startsWith("DSC")) return "i-recon";
-    if (id.startsWith("BSL")) return "i-baseline";
     return "i-process";
 }
 
@@ -762,24 +761,6 @@ function evidenceHtml(detection) {
       </div>`;
     }
 
-    // Behavioral baseline: a process/parent combination never seen on this
-    // host before -- weak evidence alone, so it always reports at low
-    // severity, but it is the one detector that can flag a technique nobody
-    // wrote a rule for.
-    if ("host_known_combinations" in evidence) {
-        return `
-      <div class="evidence">
-        <div class="evidence-head">Behavioral baseline</div>
-        <div class="metrics">
-          ${metric(evidence.host_known_combinations, "Known combinations on this host", true)}
-        </div>
-        <div class="evidence-list">
-          <div class="row">${escapeHtml(evidence.image || "unknown")}</div>
-          <div class="row">parent: ${escapeHtml(evidence.parent_image || "unknown")}</div>
-        </div>
-      </div>`;
-    }
-
     return "";
 }
 
@@ -1042,11 +1023,6 @@ function connect() {
             }
             state.incidents.set(data.id, data);
             renderQueue(data.id);
-        } else if (type === "settings") {
-            // Another console flipped a runtime setting (see /admin/settings
-            // in admin.py). Mirror it here so every open tab agrees on what
-            // is enabled, not just the one that clicked it.
-            applyBaselineToggle(!!data.behavior_baseline_enabled);
         } else if (type === "reset") {
             // The server wiped the database (see /admin/database). Every
             // connected console gets this, not just the one that clicked
@@ -1161,59 +1137,14 @@ function applyTheme(theme) {
     if (label) label.textContent = theme === "light" ? "Dark mode" : "Light mode";
 }
 
-/** The behavioral baseline detector is the one setting that lives in the
- *  database instead of a `.env` file (see backend/engine/runtime_settings.py)
- *  -- an analyst can flip it live from here, and every open console reflects
- *  the change immediately via the "settings" websocket broadcast, the same
- *  pattern the database reset already uses. */
-function applyBaselineToggle(enabled) {
-    const btn = $("baseline-toggle-btn");
-    const label = $("baseline-toggle-label");
-    if (btn) btn.setAttribute("aria-pressed", String(!!enabled));
-    if (label) label.textContent = `Behavioral baseline: ${enabled ? "on" : "off"}`;
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     const btn = $("settings-btn");
     const menu = $("settings-menu");
     const resetBtn = $("reset-db-btn");
     const themeBtn = $("theme-toggle-btn");
-    const baselineBtn = $("baseline-toggle-btn");
     if (!btn || !menu) return;
 
     applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
-
-    fetch("/admin/settings")
-        .then((r) => r.json())
-        .then((s) => applyBaselineToggle(!!s.behavior_baseline_enabled))
-        .catch(() => { });
-
-    if (baselineBtn) {
-        baselineBtn.addEventListener("click", async () => {
-            const current = baselineBtn.getAttribute("aria-pressed") === "true";
-            const next = !current;
-            baselineBtn.disabled = true;
-            try {
-                const res = await fetch("/admin/settings", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ behavior_baseline_enabled: next }),
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                // The UI here updates from the response directly rather than
-                // waiting on the "settings" broadcast -- this tab should not
-                // have to round-trip through its own websocket to see its own
-                // click take effect. Other open consoles pick it up from the
-                // broadcast (see connect()).
-                const updated = await res.json();
-                applyBaselineToggle(!!updated.behavior_baseline_enabled);
-            } catch (err) {
-                alert("Could not update setting: " + err.message);
-            } finally {
-                baselineBtn.disabled = false;
-            }
-        });
-    }
 
     if (themeBtn) {
         themeBtn.addEventListener("click", () => {
