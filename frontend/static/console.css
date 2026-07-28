@@ -31,6 +31,14 @@
        in both themes -- the brand green never changes. */
     --logo-sysmon: #9BB0C4;
 
+    /* Translucent header backdrop, blurred over the scrolling content below
+       it. Kept as its own token (rather than a color-mix of --bg at render
+       time) because it must swap per theme exactly like --bg does --
+       otherwise, as happened here, the header stays dark in light mode
+       while text sitting on top of it (like --logo-sysmon) correctly
+       switches to its light-mode value, landing dark-on-dark. */
+    --header-bg: rgba(5, 10, 18, .88);
+
     /* Severity scale — the only saturated colour in the console */
     --sev-info: #1EFF8E;
     --sev-low: #00D26A;
@@ -63,6 +71,7 @@
     --struct: #067A46;
     --attack: #6249B8;
     --logo-sysmon: #23384D;
+    --header-bg: rgba(243, 245, 247, .88);
 
     --sev-info: #0C8F55;
     --sev-low: #067A46;
@@ -180,7 +189,7 @@ header {
     flex-wrap: wrap;
     padding: 13px 22px;
     border-bottom: 1px solid var(--border);
-    background: rgba(5, 10, 18, .88);
+    background: var(--header-bg);
     backdrop-filter: blur(10px);
 }
 
