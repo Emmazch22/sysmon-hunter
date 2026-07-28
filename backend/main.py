@@ -144,11 +144,11 @@ async def console() -> FileResponse:
 
 _FAVICON = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-    '<rect width="32" height="32" rx="6" fill="#0B0F14"/>'
+    '<rect width="32" height="32" rx="6" fill="#050A12"/>'
     '<path d="M16 4l9 3.5v7c0 5.8-3.9 9.6-9 11.5-5.1-1.9-9-5.7-9-11.5v-7L16 4z" '
-    'fill="none" stroke="#3FB6C8" stroke-width="2" stroke-linejoin="round"/>'
-    '<circle cx="16" cy="15" r="2.5" fill="#3FB6C8"/>'
-    '<path d="M16 17.5v4" stroke="#3FB6C8" stroke-width="2" stroke-linecap="round"/></svg>'
+    'fill="none" stroke="#00D26A" stroke-width="2" stroke-linejoin="round"/>'
+    '<circle cx="16" cy="15" r="2.5" fill="#00D26A"/>'
+    '<path d="M16 17.5v4" stroke="#00D26A" stroke-width="2" stroke-linecap="round"/></svg>'
 )
 
 

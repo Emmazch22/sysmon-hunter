@@ -39,22 +39,22 @@ from reportlab.platypus import (
 from backend.engine.profile import build_profile
 
 # --- Palette, lifted from the console so the report is visibly the same tool ---
-BG = colors.HexColor("#0B0F14")
-SURFACE = colors.HexColor("#111821")
-SURFACE_2 = colors.HexColor("#16202B")
-BORDER = colors.HexColor("#1F2C3A")
+BG = colors.HexColor("#050A12")
+SURFACE = colors.HexColor("#0B131F")
+SURFACE_2 = colors.HexColor("#101B29")
+BORDER = colors.HexColor("#122030")
 TEXT = colors.HexColor("#C9D6E3")
 TEXT_DIM = colors.HexColor("#7E90A3")
 TEXT_MUTE = colors.HexColor("#55677A")
-STRUCT = colors.HexColor("#3FB6C8")
+STRUCT = colors.HexColor("#00D26A")
 ATTACK = colors.HexColor("#8C7BE0")
 
 SEVERITY_COLOR = {
     "critical": colors.HexColor("#E4453D"),
     "high": colors.HexColor("#E8743B"),
     "medium": colors.HexColor("#DFA83C"),
-    "low": colors.HexColor("#3FB6C8"),
-    "info": colors.HexColor("#4A7FA5"),
+    "low": colors.HexColor("#00D26A"),
+    "info": colors.HexColor("#1EFF8E"),
 }
 
 # Human labels for the forensic field keys the serializer produces.
@@ -426,7 +426,7 @@ def _code_box(text: str, styles: dict) -> Table:
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0A0E13")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#040911")),
                 ("LINEBELOW", (0, 0), (-1, -1), 0.4, BORDER),
                 ("BOX", (0, 0), (-1, -1), 0.4, BORDER),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),

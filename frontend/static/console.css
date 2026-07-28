@@ -8,25 +8,25 @@
      ============================================================ */
 
 :root {
-    --bg: #0B0F14;
-    --surface: #111821;
-    --surface-2: #16202B;
-    --sunken: #0A0E13;
-    --border: #1F2C3A;
-    --border-hi: #2C3E52;
+    --bg: #050A12;
+    --surface: #0B131F;
+    --surface-2: #101B29;
+    --sunken: #040911;
+    --border: #122030;
+    --border-hi: #1F3248;
 
     --text: #C9D6E3;
     --text-dim: #7E90A3;
     --text-mute: #55677A;
 
-    --struct: #3FB6C8;
+    --struct: #00D26A;
     /* structural accent: chrome, links, live state */
     --attack: #8C7BE0;
     /* ATT&CK technique identifiers */
 
     /* Severity scale — the only saturated colour in the console */
-    --sev-info: #4A7FA5;
-    --sev-low: #3FB6C8;
+    --sev-info: #1EFF8E;
+    --sev-low: #00D26A;
     --sev-medium: #DFA83C;
     --sev-high: #E8743B;
     --sev-critical: #E4453D;
@@ -53,11 +53,11 @@
     --text-dim: #4C5A69;
     --text-mute: #7C8A98;
 
-    --struct: #0E7C90;
+    --struct: #067A46;
     --attack: #6249B8;
 
-    --sev-info: #2F6690;
-    --sev-low: #147F91;
+    --sev-info: #0C8F55;
+    --sev-low: #067A46;
     --sev-medium: #A6741A;
     --sev-high: #BF5323;
     --sev-critical: #C22B24;
@@ -65,14 +65,14 @@
 
 :root[data-theme="light"] body {
     background-image:
-        linear-gradient(rgba(14, 124, 144, .05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(14, 124, 144, .05) 1px, transparent 1px);
+        linear-gradient(rgba(6, 122, 70, .05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(6, 122, 70, .05) 1px, transparent 1px);
 }
 
 :root[data-theme="light"] body::after {
     background: linear-gradient(to bottom,
             transparent 0%,
-            rgba(14, 124, 144, .05) 50%,
+            rgba(6, 122, 70, .05) 50%,
             transparent 100%);
 }
 
@@ -86,8 +86,8 @@ body {
     background: var(--bg);
     /* Faint grid: gives the surface a coordinate system without drawing focus */
     background-image:
-        linear-gradient(rgba(63, 182, 200, .022) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(63, 182, 200, .022) 1px, transparent 1px);
+        linear-gradient(rgba(0, 210, 106, .022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 210, 106, .022) 1px, transparent 1px);
     background-size: 32px 32px;
     color: var(--text);
     font-family: var(--mono);
@@ -108,7 +108,7 @@ body::after {
     pointer-events: none;
     background: linear-gradient(to bottom,
             transparent 0%,
-            rgba(63, 182, 200, .03) 50%,
+            rgba(0, 210, 106, .03) 50%,
             transparent 100%);
     background-size: 100% 260px;
     background-repeat: no-repeat;
@@ -172,7 +172,7 @@ header {
     flex-wrap: wrap;
     padding: 13px 22px;
     border-bottom: 1px solid var(--border);
-    background: rgba(11, 15, 20, .88);
+    background: rgba(5, 10, 18, .88);
     backdrop-filter: blur(10px);
 }
 
@@ -249,15 +249,15 @@ nav.routes a:focus-visible {
 
 @keyframes pulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(63, 182, 200, .5);
+        box-shadow: 0 0 0 0 rgba(0, 210, 106, .5);
     }
 
     70% {
-        box-shadow: 0 0 0 7px rgba(63, 182, 200, 0);
+        box-shadow: 0 0 0 7px rgba(0, 210, 106, 0);
     }
 
     100% {
-        box-shadow: 0 0 0 0 rgba(63, 182, 200, 0);
+        box-shadow: 0 0 0 0 rgba(0, 210, 106, 0);
     }
 }
 
@@ -1099,7 +1099,7 @@ main {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(6, 9, 13, .78);
+    background: rgba(4, 9, 17, .78);
     backdrop-filter: blur(3px);
 }
 
