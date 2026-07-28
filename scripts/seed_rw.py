@@ -47,57 +47,27 @@ from __future__ import annotations
 
 import argparse
 import random
-import sys
-import time
 from datetime import datetime, timedelta, timezone
 
-import httpx
+from seed_common import EventFactory, post_events
 
 HOST = "HQ-FILES-03"
 USER = "CORP\\d.reyes"
 BASE = datetime.now(timezone.utc) - timedelta(minutes=15)
 
-
-def at(offset: float) -> str:
-    return (BASE + timedelta(seconds=offset)).isoformat()
-
-
-def proc(offset, guid, parent_guid, image, cmdline, **extra):
-    """A process-creation event (EventID 1) with full forensic fields."""
-    data = {
-        "Image": image,
-        "ProcessGuid": guid,
-        "ParentProcessGuid": parent_guid,
-        "CommandLine": cmdline,
-        "User": USER,
-        "UtcTime": at(offset),
-        "IntegrityLevel": extra.pop("integrity", "Medium"),
-        "ProcessId": str(extra.pop("pid", random.randint(2000, 9000))),
-        "ParentProcessId": str(extra.pop("ppid", random.randint(2000, 9000))),
-        "LogonId": "0x8f21ac",
-        "TerminalSessionId": "2",
-        "CurrentDirectory": extra.pop("cwd", r"C:\Users\d.reyes\Downloads"),
-    }
-    if "hashes" in extra:
-        data["Hashes"] = extra.pop("hashes")
-    if "parent_cmdline" in extra:
-        data["ParentCommandLine"] = extra.pop("parent_cmdline")
-    data.update(extra)
-    return {
-        "winlog": {"event_id": 1, "computer_name": HOST, "event_data": data},
-        "@timestamp": at(offset),
-    }
-
-
-def raw_event(eid, offset, **data):
-    """A non-process-creation event. No ProcessGuid unless the caller passes
-    one -- some Sysmon event types (WMI, driver load) legitimately carry none,
-    and faking one would misrepresent what real telemetry looks like."""
-    data["UtcTime"] = at(offset)
-    return {
-        "winlog": {"event_id": eid, "computer_name": HOST, "event_data": data},
-        "@timestamp": at(offset),
-    }
+# at()/proc()/raw_event() moved to seed_common.py, shared with seed_apt.py
+# and seed_full_coverage.py. Bound as plain names so events() below, which
+# calls them bare throughout, did not need to change.
+_factory = EventFactory(
+    host=HOST,
+    user=USER,
+    base=BASE,
+    logon_id="0x8f21ac",
+    default_cwd=r"C:\Users\d.reyes\Downloads",
+)
+at = _factory.at
+proc = _factory.proc
+raw_event = _factory.raw_event
 
 
 # GUIDs for the tree
@@ -316,22 +286,7 @@ def main() -> int:
     all_events = events()
     print(f"Seeding ransomware kill chain on {HOST}: {len(all_events)} events\n")
 
-    fired: dict[str, int] = {}
-    try:
-        with httpx.Client(timeout=10.0) as client:
-            for i, evt in enumerate(all_events, 1):
-                try:
-                    result = client.post(args.url, json=evt).json()
-                except httpx.HTTPError as exc:
-                    print(f"  ! event {i}: {exc}", file=sys.stderr)
-                    continue
-                for d in result.get("detections", []):
-                    fired[d["rule_id"]] = fired.get(d["rule_id"], 0) + 1
-                    print(f"  [{d['severity'].upper():8}] {d['rule_id']:8} {d['title']}")
-                if args.delay:
-                    time.sleep(args.delay)
-    except httpx.ConnectError:
-        sys.exit(f"\nCannot reach {args.url}. Is the engine running?")
+    fired, _ = post_events(all_events, args.url, args.delay)
 
     print("\nRules fired:")
     for rule_id, count in sorted(fired.items()):

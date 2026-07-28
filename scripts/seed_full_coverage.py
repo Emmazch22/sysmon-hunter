@@ -70,11 +70,9 @@ from __future__ import annotations
 
 import argparse
 import random
-import sys
-import time
 from datetime import datetime, timedelta, timezone
 
-import httpx
+from seed_common import EventFactory, post_events
 
 HOST = "WKSTN-RANGE-01"
 USER = "CORP\\redteam.ops"
@@ -98,55 +96,22 @@ EXPECTED_RULES = {
 }
 
 
-def at(offset: float) -> str:
-    return (BASE + timedelta(seconds=offset)).isoformat()
-
-
-# Real Sysmon ProcessCreate events always carry ParentImage; several rules
-# (SYS-001, SYS-005, SYS-036, SYS-039, SYS-079, SYS-088, SYS-089, SYS-090) key
-# on it. Rather than repeating each parent's image path at every call site,
-# proc() remembers the image it was given for each guid and looks the parent
-# up automatically.
-_IMAGE_BY_GUID: dict[str, str] = {}
-
-
-def proc(offset, guid, parent_guid, image, cmdline, **extra):
-    """A process-creation event (EventID 1) with full forensic fields."""
-    _IMAGE_BY_GUID[guid] = image
-    data = {
-        "Image": image,
-        "ProcessGuid": guid,
-        "ParentProcessGuid": parent_guid,
-        "CommandLine": cmdline,
-        "User": extra.pop("user", USER),
-        "UtcTime": at(offset),
-        "IntegrityLevel": extra.pop("integrity", "Medium"),
-        "ProcessId": str(extra.pop("pid", random.randint(2000, 9000))),
-        "ParentProcessId": str(extra.pop("ppid", random.randint(2000, 9000))),
-        "LogonId": "0x9a41f7",
-        "TerminalSessionId": "2",
-        "CurrentDirectory": extra.pop("cwd", r"C:\Users\redteam.ops\Downloads"),
-    }
-    parent_image = extra.pop("parent_image", None) or _IMAGE_BY_GUID.get(parent_guid)
-    if parent_image:
-        data["ParentImage"] = parent_image
-    if "hashes" in extra:
-        data["Hashes"] = extra.pop("hashes")
-    if "parent_cmdline" in extra:
-        data["ParentCommandLine"] = extra.pop("parent_cmdline")
-    data.update(extra)
-    return {
-        "winlog": {"event_id": 1, "computer_name": HOST, "event_data": data},
-        "@timestamp": at(offset),
-    }
-
-
-def raw_event(eid, offset, **data):
-    data["UtcTime"] = at(offset)
-    return {
-        "winlog": {"event_id": eid, "computer_name": HOST, "event_data": data},
-        "@timestamp": at(offset),
-    }
+# at()/proc()/raw_event() moved to seed_common.py, shared with seed_apt.py
+# and seed_rw.py -- this script's proc() (with automatic ParentImage lookup
+# via a guid->image map, and a per-call `user` override) was the most
+# complete of the three copies, and is now EventFactory's implementation.
+# Bound as plain names so events() below, which calls them bare throughout,
+# did not need to change.
+_factory = EventFactory(
+    host=HOST,
+    user=USER,
+    base=BASE,
+    logon_id="0x9a41f7",
+    default_cwd=r"C:\Users\redteam.ops\Downloads",
+)
+at = _factory.at
+proc = _factory.proc
+raw_event = _factory.raw_event
 
 
 # GUIDs for every actor in the tree. A handful (wmiprvse, PSEXESVC, w3wp,
@@ -716,25 +681,7 @@ def main() -> int:
     all_events = events()
     print(f"Seeding full-coverage range on {HOST}: {len(all_events)} events\n")
 
-    fired: dict[str, int] = {}
-    incident_ids: set[str] = set()
-    try:
-        with httpx.Client(timeout=10.0) as client:
-            for i, evt in enumerate(all_events, 1):
-                try:
-                    result = client.post(args.url, json=evt).json()
-                except httpx.HTTPError as exc:
-                    print(f"  ! event {i}: {exc}", file=sys.stderr)
-                    continue
-                for d in result.get("detections", []):
-                    fired[d["rule_id"]] = fired.get(d["rule_id"], 0) + 1
-                    print(f"  [{d['severity'].upper():8}] {d['rule_id']:8} {d['title']}")
-                for inc in result.get("incidents", []):
-                    incident_ids.add(inc["id"])
-                if args.delay:
-                    time.sleep(args.delay)
-    except httpx.ConnectError:
-        sys.exit(f"\nCannot reach {args.url}. Is the engine running?")
+    fired, incident_ids = post_events(all_events, args.url, args.delay)
 
     print("\nRules fired:")
     for rule_id, count in sorted(fired.items()):
