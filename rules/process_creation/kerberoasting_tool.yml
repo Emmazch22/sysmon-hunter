@@ -1,0 +1,16 @@
+id: SYS-118
+title: Kerberoasting tooling executed
+event_id: 1
+severity: high
+attack: [T1558.003]
+description: >
+  Rubeus.exe ran, or a process's command line referenced "kerberoast"
+  directly. Kerberoasting requests a service ticket for every account with a
+  Service Principal Name and cracks the ticket offline, which needs no
+  elevated privilege and no interaction with the target account at all -- it
+  is one of the highest-value, lowest-noise credential-access techniques
+  against a domain, and Rubeus is the tool most commonly used to run it.
+detection:
+  image|endswith: '\rubeus.exe'
+  command_line|contains: 'kerberoast'
+condition: any

@@ -1,0 +1,16 @@
+id: SYS-110
+title: NTDS.dit extracted via ntdsutil
+event_id: 1
+severity: critical
+attack: [T1003.003]
+description: >
+  ntdsutil.exe ran an Install From Media (ifm) create command. This is the
+  documented, built-in way to pull a full copy of NTDS.dit -- every domain
+  account's password hash, on a domain controller -- into a file an attacker
+  can walk off with. It exists for legitimate DC-promotion media creation,
+  which is rare enough on a running production DC that this is worth
+  escalating every time it fires outside a planned maintenance window.
+detection:
+  image|endswith: '\ntdsutil.exe'
+  command_line|re: '(?=.*\bifm\b)(?=.*\bcreate\b)'
+condition: all

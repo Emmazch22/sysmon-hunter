@@ -1,0 +1,15 @@
+id: SYS-111
+title: mavinject used to inject into a running process
+event_id: 1
+severity: high
+attack: [T1055.001]
+description: >
+  mavinject.exe ran with /INJECTRUNNING, its documented DLL-injection switch.
+  mavinject ships with Windows (originally for App-V) and is signed by
+  Microsoft, which is what makes it attractive: it performs the same reflective
+  DLL injection an unsigned custom loader would, but under a trusted binary
+  name that most application allow-lists never think to restrict.
+detection:
+  image|endswith: '\mavinject.exe'
+  command_line|contains: '/injectrunning'
+condition: all

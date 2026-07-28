@@ -1,0 +1,17 @@
+id: SYS-121
+title: bitsadmin used to transfer a file
+event_id: 1
+severity: medium
+attack: [T1197]
+description: >
+  bitsadmin.exe ran with /transfer, the classic command-line syntax for
+  queuing a Background Intelligent Transfer Service job. SYS-076 already
+  catches the modern PowerShell Start-BitsTransfer path; this catches the
+  older bitsadmin.exe binary directly, which is deprecated but still present
+  and still functional on every supported Windows version, and still shows
+  up in LOLBAS-driven download and persistence playbooks for exactly that
+  reason.
+detection:
+  image|endswith: '\bitsadmin.exe'
+  command_line|contains: '/transfer'
+condition: all

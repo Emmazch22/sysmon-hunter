@@ -1,0 +1,20 @@
+id: SYS-113
+title: MSBuild ran a project file staged in a user-writable path
+event_id: 1
+severity: high
+attack: [T1127.001]
+description: >
+  msbuild.exe compiled and ran a project staged under Temp, AppData,
+  ProgramData, or Public. MSBuild's inline-task feature lets a .csproj embed
+  and execute arbitrary C# at build time, which makes a signed .NET build
+  tool a full code-execution engine that needs nothing but a project file --
+  no compiler, no PowerShell, nothing else an allow-list would flag.
+  Legitimate builds run from a source checkout, not a staging directory.
+detection:
+  image|endswith: '\msbuild.exe'
+  command_line|re:
+    - '\\users\\[^\\]+\\appdata\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\'
+    - '\\programdata\\'
+condition: all

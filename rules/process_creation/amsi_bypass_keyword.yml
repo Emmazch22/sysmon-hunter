@@ -1,0 +1,17 @@
+id: SYS-120
+title: Command line references a known AMSI-bypass signature
+event_id: 1
+severity: high
+attack: [T1562.001]
+description: >
+  The command line contains "amsiutils" or "amsiinitfailed" -- the .NET
+  reflection class name and the internal field name that essentially every
+  public one-liner AMSI bypass sets to force the Anti-Malware Scan Interface
+  to report success without ever scanning anything. These strings have
+  no legitimate reason to appear on a command line outside of AMSI
+  development itself.
+detection:
+  command_line|contains:
+    - amsiutils
+    - amsiinitfailed
+condition: all

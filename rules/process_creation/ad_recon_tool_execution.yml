@@ -1,0 +1,17 @@
+id: SYS-116
+title: Active Directory reconnaissance tool executed
+event_id: 1
+severity: high
+attack: [T1087, T1482]
+description: >
+  SharpHound.exe or AdFind.exe ran. Both exist for exactly one purpose --
+  mapping AD users, groups, computers, and trust relationships, in
+  SharpHound's case specifically to feed BloodHound's attack-path graph --
+  and neither is deployed as routine tooling on an endpoint. Seeing either
+  execute at all, regardless of what its output was, is close to unambiguous
+  reconnaissance.
+detection:
+  image|endswith:
+    - '\sharphound.exe'
+    - '\adfind.exe'
+condition: all

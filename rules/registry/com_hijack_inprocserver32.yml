@@ -1,0 +1,18 @@
+id: SYS-122
+title: CLSID InprocServer32 handler registered under a user's own hive
+event_id: 13
+severity: high
+attack: [T1546.015]
+description: >
+  A value was written to a CLSID's InprocServer32\(Default), the registry
+  path that names the DLL Windows loads whenever that CLSID is instantiated.
+  A per-user Classes hive lets any user register a handler for a CLSID that
+  a privileged process will later instantiate -- overriding, for that user's
+  context, whatever the system-wide HKLM registration would normally load.
+  This is the mechanism behind most documented COM-hijack persistence: no
+  admin rights needed to plant it, and it fires the next time anything
+  instantiates that CLSID.
+detection:
+  TargetObject|contains: '\Classes\CLSID\'
+  TargetObject|endswith: '\InprocServer32\(Default)'
+condition: all

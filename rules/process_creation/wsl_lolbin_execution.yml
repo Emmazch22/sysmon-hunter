@@ -1,0 +1,16 @@
+id: SYS-112
+title: WSL used to execute a command outside its Linux filesystem
+event_id: 1
+severity: medium
+attack: [T1202, T1059.004]
+description: >
+  wsl.exe ran with -e or --exec, which runs a specific command and exits
+  rather than opening an interactive shell. On a host where WSL is installed
+  for legitimate development, this is unremarkable; on a host where it is
+  not expected, wsl.exe is a signed, Windows-native way to execute a Linux
+  binary that most process-monitoring baselines built around Windows binaries
+  were never tuned to look at.
+detection:
+  image|endswith: '\wsl.exe'
+  command_line|re: '(?<!\S)(-e|--exec)(?!\S)'
+condition: all

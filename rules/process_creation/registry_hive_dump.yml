@@ -1,0 +1,16 @@
+id: SYS-108
+title: Credential hive saved to disk via reg.exe
+event_id: 1
+severity: critical
+attack: [T1003.002]
+description: >
+  reg.exe saved the SAM, SYSTEM, or SECURITY hive to a file. Together, SAM and
+  SYSTEM are everything an offline tool needs to recover every local account's
+  password hash, and SECURITY holds cached domain credentials and LSA
+  secrets -- this is the fileless-free, no-download alternative to Mimikatz
+  that ships with Windows itself. There is no routine administrative reason
+  to export these hives to a file; backup tools use VSS, not reg save.
+detection:
+  image|endswith: '\reg.exe'
+  command_line|re: '(?=.*\bsave\b)(?=.*hklm\\(sam|system|security)\b)'
+condition: all

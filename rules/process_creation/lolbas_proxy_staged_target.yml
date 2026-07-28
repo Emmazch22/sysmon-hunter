@@ -1,0 +1,27 @@
+id: SYS-114
+title: Uncommon signed proxy-execution binary run against a staged target
+event_id: 1
+severity: medium
+attack: [T1218, T1216]
+description: >
+  forfiles.exe, pcalua.exe, verclsid.exe, or register-cimprovider.exe ran
+  against a target staged under Temp, AppData, ProgramData, or Public. All
+  four are obscure enough that most environments never see them invoked at
+  all, and all four are documented signed-binary proxy-execution techniques
+  -- forfiles runs an arbitrary command via /c, pcalua launches a program
+  through the compatibility-assistant COM interface, verclsid instantiates
+  an arbitrary COM CLSID, and register-cimprovider loads an arbitrary DLL as
+  a WMI provider. Seeing any of the four at all is unusual; seeing one
+  against a staging-path target is the technique.
+detection:
+  image|endswith:
+    - '\forfiles.exe'
+    - '\pcalua.exe'
+    - '\verclsid.exe'
+    - '\register-cimprovider.exe'
+  command_line|re:
+    - '\\users\\[^\\]+\\appdata\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\'
+    - '\\programdata\\'
+condition: all

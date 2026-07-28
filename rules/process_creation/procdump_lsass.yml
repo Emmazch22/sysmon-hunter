@@ -1,0 +1,19 @@
+id: SYS-109
+title: Sysinternals procdump run against LSASS
+event_id: 1
+severity: critical
+attack: [T1003.001]
+description: >
+  procdump.exe or procdump64.exe ran with lsass in its command line.
+  procdump is a signed Microsoft tool, which is exactly why it shows up in
+  credential-theft playbooks alongside Mimikatz and comsvcs.dll: the dump it
+  produces is identical fuel for an offline hash-extraction tool, and the
+  binary itself is unlikely to be flagged just for being present. SYS-041 and
+  SYS-095 catch this same goal by handle access and remote-thread injection;
+  this is the third, command-line-visible route to it.
+detection:
+  image|endswith:
+    - '\procdump.exe'
+    - '\procdump64.exe'
+  command_line|contains: 'lsass'
+condition: all

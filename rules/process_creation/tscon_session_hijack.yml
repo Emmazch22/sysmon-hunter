@@ -1,0 +1,16 @@
+id: SYS-115
+title: RDP session hijacked via tscon
+event_id: 1
+severity: high
+attack: [T1563.002]
+description: >
+  tscon.exe ran with /dest:, which reconnects the current session to another
+  session's desktop -- and, run as SYSTEM (which tscon allows without the
+  target session's password), takes over another logged-on user's session
+  outright, no credentials needed. This is a documented lateral-movement and
+  privilege-escalation trick on hosts with other users still logged in, most
+  often RDS/Terminal Server boxes and jump hosts.
+detection:
+  image|endswith: '\tscon.exe'
+  command_line|contains: '/dest:'
+condition: all

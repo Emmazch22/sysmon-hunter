@@ -1,0 +1,20 @@
+id: SYS-117
+title: Cloud sync/transfer tool executed
+event_id: 1
+severity: medium
+attack: [T1567.002]
+description: >
+  rclone.exe, mega.exe, megacmd.exe, or megasync.exe ran. Any of the four
+  moves large amounts of data to a cloud provider in a way that blends into
+  ordinary HTTPS traffic and needs no attacker-controlled infrastructure --
+  rclone in particular is a fixture of ransomware exfiltration playbooks
+  precisely because it is a legitimate open-source tool a defender cannot
+  simply blocklist. Weigh this against whether the tool is IT-sanctioned on
+  this host before treating it as anything more than a lead.
+detection:
+  image|endswith:
+    - '\rclone.exe'
+    - '\mega.exe'
+    - '\megacmd.exe'
+    - '\megasync.exe'
+condition: all

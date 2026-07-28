@@ -1,0 +1,16 @@
+id: SYS-119
+title: PowerShell launched in version-2 downgrade mode
+event_id: 1
+severity: high
+attack: [T1059.001]
+description: >
+  powershell.exe ran with -version 2. PowerShell v2 predates
+  ScriptBlockLogging, AMSI, and the Constrained Language Mode enforcement
+  that modern versions rely on, and Windows keeps it installed for backward
+  compatibility even where it is otherwise disabled by policy. Forcing v2 is
+  a documented way to run a payload while blinding every logging and
+  scanning control an environment has layered on top of PowerShell 5+.
+detection:
+  image|endswith: '\powershell.exe'
+  command_line|contains: '-version 2'
+condition: all
