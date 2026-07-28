@@ -1,9 +1,11 @@
 """Administrative actions.
 
-A single destructive action lives here today: wiping the database. Kept in
-its own router, tagged distinctly from the read/write endpoints an analyst
-reaches for moment to moment, so it is easy to find -- and easy to lock down
-or remove -- independently of everything else.
+A destructive action (wiping the database) and the runtime settings an
+analyst can flip live from the console -- currently just the behavioral
+baseline toggle. Kept in its own router, tagged distinctly from the
+read/write endpoints an analyst reaches for moment to moment, so it is easy
+to find -- and easy to lock down or remove -- independently of everything
+else.
 """
 
 from __future__ import annotations
@@ -12,13 +14,19 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from backend.api.ws import manager
 from backend.engine.pipeline import pipeline
+from backend.engine.runtime_settings import runtime_settings
 from backend.models import db
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["admin"])
+
+
+class SettingsUpdate(BaseModel):
+    behavior_baseline_enabled: bool
 
 
 @router.delete("/admin/database")
@@ -41,3 +49,30 @@ async def reset_database() -> dict[str, Any]:
 
     log.warning("Database reset via /admin/database")
     return {"status": "reset"}
+
+
+@router.get("/admin/settings")
+async def get_settings() -> dict[str, bool]:
+    """Current value of every runtime-editable setting.
+
+    Read by the console on load, so a toggle flipped from one analyst's tab
+    shows correctly the next time any tab (re)opens the settings menu.
+    """
+    return runtime_settings.as_dict()
+
+
+@router.put("/admin/settings")
+async def update_settings(update: SettingsUpdate) -> dict[str, bool]:
+    """Flip a runtime setting, effective immediately for this process and
+    persisted for the next one.
+
+    Broadcast over the websocket like the database reset above -- if one
+    analyst turns the baseline detector on, every open console should reflect
+    that, not just the tab that clicked it.
+    """
+    await runtime_settings.set_behavior_baseline_enabled(
+        update.behavior_baseline_enabled
+    )
+    payload = runtime_settings.as_dict()
+    await manager.broadcast({"type": "settings", "data": payload})
+    return payload

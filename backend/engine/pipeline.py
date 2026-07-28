@@ -16,12 +16,14 @@ from datetime import timedelta
 from typing import Any
 
 from backend.config import settings
+from backend.engine.baseline import baseline_detector
 from backend.engine.beacon import BeaconDetector
 from backend.engine.correlator import IncidentEngine, ProcessTree
 from backend.engine.discovery import DiscoveryDetector
 from backend.engine.matcher import evaluate
 from backend.engine.normalizer import normalize
 from backend.engine.rule_loader import rule_store
+from backend.engine.runtime_settings import runtime_settings
 from backend.models import db
 from backend.models.schemas import Detection, Event, Incident
 
@@ -105,6 +107,14 @@ class Pipeline:
             burst = self.discovery.observe(event)
             if burst is not None:
                 detections.append(burst)
+
+        # Checked against runtime_settings, not the static settings object --
+        # this is the one detector an analyst can flip on or off from the
+        # console without a restart. See runtime_settings.py.
+        if runtime_settings.behavior_baseline_enabled:
+            novel = await baseline_detector.observe(event)
+            if novel is not None:
+                detections.append(novel)
 
         raised: list[Incident] = []
         for detection in detections:
@@ -191,6 +201,7 @@ class Pipeline:
             "incidents_open": self.incidents.open_count,
             "channels_watched": self.beacons.tracked_channels,
             "recon_trees_watched": self.discovery.tracked_bursts,
+            "baseline_hosts_tracked": baseline_detector.hosts_tracked,
         }
 
 

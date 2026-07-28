@@ -99,6 +99,22 @@ class Settings(BaseSettings):
     discovery_window_minutes: int = 5
     discovery_cooldown_minutes: int = 15
 
+    # --- Behavioral baseline ---
+    # Learns, per host, which (image, parent image) combinations are normal, and
+    # flags the ones it has never seen. Off by default: a fresh baseline has
+    # nothing learned yet, so the first stretch of activity on any host would
+    # otherwise look "new" and alert on everything. Runtime-editable from the
+    # console's settings dropdown (see /admin/settings) -- that toggle, once
+    # flipped, overrides this default on every future start; this value is only
+    # the fallback for a database that has never had the setting written to it.
+    behavior_baseline_enabled: bool = False
+
+    # Distinct (image, parent image) combinations a host must contribute before
+    # the detector starts alerting on new ones. Below this, everything is still
+    # baseline -- silently learned, never reported -- so a host's first hour of
+    # ordinary activity does not read as a hundred anomalies.
+    baseline_learning_events: int = 50
+
     # --- IOC enrichment ---
     # Both are optional. With neither set, enrichment still runs and simply
     # reports every provider as unavailable -- the feature degrades, it does not

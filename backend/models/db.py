@@ -116,6 +116,43 @@ class IncidentRow(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
+class SettingRow(Base):
+    """A runtime-editable setting, keyed by name.
+
+    Everything in `config.py` is read once at startup and frozen for the
+    life of the process. This table exists for the handful of settings that
+    need to change without a restart -- the behavior-baseline toggle is the
+    first, reached from the console's settings dropdown. Deliberately generic
+    (one key, one value) so the next such setting is a new row, not a new
+    migration.
+    """
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(256))
+
+
+class BaselineObservationRow(Base):
+    """One (host, image, parent_image) combination the baseline detector has
+    ever seen.
+
+    This is long-term memory, not a session cache: it is what lets the
+    detector recognise "we've seen this before" across restarts, and it is
+    deliberately untouched by `reset_database` -- an analyst clearing out
+    detections and incidents is not asking to forget a host's learned
+    behavior too.
+    """
+
+    __tablename__ = "baseline_observations"
+
+    host: Mapped[str] = mapped_column(String(128), primary_key=True, index=True)
+    image: Mapped[str] = mapped_column(Text, primary_key=True)
+    parent_image: Mapped[str] = mapped_column(Text, primary_key=True)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    seen_count: Mapped[int] = mapped_column(Integer, default=1)
+
+
 engine = create_async_engine(settings.db_url, echo=False)
 Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -136,7 +173,7 @@ async def init_db() -> None:
             lambda sync_conn: inspect(sync_conn).get_table_names()
         )
 
-    missing = {"detections", "incidents"} - set(tables)
+    missing = {"detections", "incidents", "settings", "baseline_observations"} - set(tables)
     if missing:
         raise RuntimeError(
             f"Database is not migrated (missing tables: {', '.join(sorted(missing))}).\n"
@@ -281,3 +318,53 @@ async def reset_database() -> None:
         await session.execute(delete(IncidentRow))
         await session.commit()
     log.warning("Database reset: all detections and incidents deleted")
+
+
+async def get_setting(key: str, default: str) -> str:
+    """Read a runtime setting, falling back to `default` if it was never set."""
+    async with Session() as session:
+        row = await session.get(SettingRow, key)
+        return row.value if row is not None else default
+
+
+async def set_setting(key: str, value: str) -> None:
+    """Write a runtime setting, creating it on first use."""
+    async with Session() as session:
+        row = await session.get(SettingRow, key)
+        if row is None:
+            row = SettingRow(key=key, value=value)
+            session.add(row)
+        else:
+            row.value = value
+        await session.commit()
+
+
+async def list_baseline_observations() -> list[BaselineObservationRow]:
+    """Every (host, image, parent_image) combination on record.
+
+    Loaded once, in full, at startup -- the detector keeps its own in-memory
+    copy for the life of the process rather than round-tripping to the
+    database on every event. Fine at the scale this tool targets; see
+    `BaselineDetector` for why that trade-off is safe here.
+    """
+    async with Session() as session:
+        result = await session.execute(select(BaselineObservationRow))
+        return list(result.scalars().all())
+
+
+async def record_baseline_observation(
+    host: str, image: str, parent_image: str, first_seen: datetime
+) -> None:
+    """Persist a newly-learned (host, image, parent_image) combination.
+
+    Only called once per combination -- the detector's in-memory set is what
+    prevents this from running on every matching event afterward, so write
+    volume stays bounded by how many distinct combinations exist, not by
+    event volume.
+    """
+    async with Session() as session:
+        row = BaselineObservationRow(
+            host=host, image=image, parent_image=parent_image, first_seen=first_seen
+        )
+        await session.merge(row)
+        await session.commit()
