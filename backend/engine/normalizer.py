@@ -62,8 +62,17 @@ def _parse_timestamp(value: Any) -> datetime:
     return utcnow()
 
 
-def _extract_host(payload: dict[str, Any], winlog: dict[str, Any]) -> str:
-    """Find the hostname across the several places collectors put it."""
+def _extract_host(
+    payload: dict[str, Any], winlog: dict[str, Any], data: dict[str, Any]
+) -> str:
+    """Find the hostname across the several places collectors put it.
+
+    `Computer` is Sysmon's own field name for the hostname -- the one that
+    shows up in a raw EVTX record or a flat/hand-built payload with no
+    Winlogbeat envelope around it. It has to be checked alongside the
+    Winlogbeat-specific `host`/`computer_name` shapes, or a perfectly valid
+    Sysmon-shaped event silently normalizes to host="unknown".
+    """
     host = payload.get("host")
     if isinstance(host, dict) and host.get("name"):
         return str(host["name"])
@@ -71,6 +80,8 @@ def _extract_host(payload: dict[str, Any], winlog: dict[str, Any]) -> str:
         return str(winlog["computer_name"])
     if isinstance(host, str) and host:
         return host
+    if data.get("Computer"):
+        return str(data["Computer"])
     return "unknown"
 
 
@@ -116,7 +127,7 @@ def normalize(payload: dict[str, Any]) -> Event:
     return Event(
         event_id=event_id,
         timestamp=_parse_timestamp(payload.get("@timestamp") or data.get("UtcTime")),
-        host=_extract_host(payload, winlog),
+        host=_extract_host(payload, winlog, data),
         raw=data,
         **fields,
     )
