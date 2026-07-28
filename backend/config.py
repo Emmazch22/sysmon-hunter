@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     rules_dir: Path = BASE_DIR / "rules"
     db_url: str = f"sqlite+aiosqlite:///{DATA_DIR / 'hunter.db'}"
 
+    # --- Auth ---
+    # Shared secret for the API, checked against the X-API-Key header (see
+    # backend/api/auth.py). Empty by default so a fresh checkout keeps working
+    # with zero setup -- the console is meant to run on a trusted network out
+    # of the box. Set HUNTER_API_KEY once the server is reachable from
+    # anywhere you would not want reading detections or POSTing to /ingest.
+    api_key: str = ""
+
     # --- Correlation ---
     # Detections that share a process-tree root within this window are grouped
     # into the same incident. Too wide and unrelated activity merges together;

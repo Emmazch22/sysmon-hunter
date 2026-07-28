@@ -354,13 +354,27 @@ HUNTER_ABUSEIPDB_API_KEY=...    # https://www.abuseipdb.com/register
 HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 ```
 
+### Optional: API key
+
+The server binds `0.0.0.0` by default, so it's reachable from anywhere on the
+network it runs on. With no key set, that's fine for a single trusted
+network. If it's reachable more broadly than that, set a shared secret and
+every JSON endpoint (not the console's own pages) starts requiring it:
+
+```
+HUNTER_API_KEY=some-long-random-string
+```
+
+The console detects a `401` on its own and prompts once for the key, then
+remembers it in the browser for next time — no other setup needed.
+
 ---
 
 ## Tests
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 342 tests
+python -m pytest        # 361 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for

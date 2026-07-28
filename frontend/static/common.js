@@ -56,3 +56,62 @@ function humanGap(ms) {
     const h = Math.round(m / 60);
     return `${h}h`;
 }
+
+/* ============================================================
+   Optional API-key gate.
+
+   backend/api/auth.py enforces an X-API-Key header on every JSON router,
+   but only if HUNTER_API_KEY is set server-side -- by default it's a no-op
+   and none of this ever triggers. When it is set, every existing fetch()
+   call site across console.js/incident.html/tree.html needs that header,
+   and none of them know auth exists. Rather than touching 17 call sites,
+   wrap window.fetch once here: attach the stored key if there is one, and
+   on a 401, prompt for it exactly once and remember it in localStorage.
+   ============================================================ */
+(function () {
+    const STORAGE_KEY = "hunter_api_key";
+    const nativeFetch = window.fetch.bind(window);
+
+    function storedKey() {
+        try {
+            return localStorage.getItem(STORAGE_KEY) || "";
+        } catch {
+            // Private browsing / storage disabled: the key just won't persist
+            // across reloads, which is a UX regression, not a broken app.
+            return "";
+        }
+    }
+
+    function rememberKey(key) {
+        try {
+            localStorage.setItem(STORAGE_KEY, key);
+        } catch {
+            /* see storedKey() */
+        }
+    }
+
+    window.fetch = async function (input, init) {
+        init = init || {};
+        const headers = new Headers(init.headers || {});
+        const key = storedKey();
+        if (key && !headers.has("X-API-Key")) {
+            headers.set("X-API-Key", key);
+        }
+        init.headers = headers;
+
+        let response = await nativeFetch(input, init);
+
+        if (response.status === 401) {
+            const entered = window.prompt(
+                "This server requires an API key (HUNTER_API_KEY is set). Enter it:"
+            );
+            if (entered) {
+                rememberKey(entered);
+                headers.set("X-API-Key", entered);
+                response = await nativeFetch(input, { ...init, headers });
+            }
+        }
+
+        return response;
+    };
+})();

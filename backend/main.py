@@ -17,7 +17,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -35,6 +35,7 @@ from backend.api import (
     status,
     ws,
 )
+from backend.api.auth import require_api_key
 from backend.config import BASE_DIR, settings
 from backend.engine.attack import attack_lookup
 from backend.engine.enrichment import enrichment_service
@@ -109,18 +110,26 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
-app.include_router(ingest.router)
-app.include_router(detections.router)
-app.include_router(incidents.router)
+# Every JSON API router is gated by the optional API-key dependency (see
+# backend/api/auth.py) -- a no-op unless HUNTER_API_KEY is set. ws.router is
+# deliberately excluded: browsers cannot attach custom headers to a
+# WebSocket handshake, so there is no way for require_api_key to see the key
+# on that connection. The console falling back to polling if the socket is
+# ever actually locked down is a gap worth knowing about, not one this
+# dependency can close.
+_api_key_gate = [Depends(require_api_key)]
+app.include_router(ingest.router, dependencies=_api_key_gate)
+app.include_router(detections.router, dependencies=_api_key_gate)
+app.include_router(incidents.router, dependencies=_api_key_gate)
 app.include_router(ws.router)
-app.include_router(attack.router)
-app.include_router(enrich.router)
-app.include_router(report.router)
-app.include_router(search.router)
-app.include_router(profile.router)
-app.include_router(notes.router)
-app.include_router(status.router)
-app.include_router(admin.router)
+app.include_router(attack.router, dependencies=_api_key_gate)
+app.include_router(enrich.router, dependencies=_api_key_gate)
+app.include_router(report.router, dependencies=_api_key_gate)
+app.include_router(search.router, dependencies=_api_key_gate)
+app.include_router(profile.router, dependencies=_api_key_gate)
+app.include_router(notes.router, dependencies=_api_key_gate)
+app.include_router(status.router, dependencies=_api_key_gate)
+app.include_router(admin.router, dependencies=_api_key_gate)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
