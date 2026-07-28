@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.3.3"
+VERSION = "0.3.2"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -312,8 +312,6 @@ API_ROUTES = [
     ("GET", "/attack/{technique_id}", "MITRE ATT&amp;CK technique description, from the local dataset."),
     ("GET", "/enrich", "On-demand reputation lookup for an IP, domain, or hash."),
     ("DELETE", "/admin/database", "Wipe all detections and incidents; reset the live engine."),
-    ("GET", "/admin/settings", "Current value of every runtime-editable setting (e.g. the baseline toggle)."),
-    ("PUT", "/admin/settings", "Flip a runtime setting; effective immediately, broadcast to every console."),
     ("GET", "/health", "Liveness/readiness probe: rule count, tracked processes."),
     ("WS", "/ws", "Live event stream: new detections, incident updates, resets."),
     ("GET", "/", "The analyst console (single page app)."),
@@ -334,8 +332,6 @@ CONFIG_SETTINGS = [
     ("HUNTER_BEACON_MAX_INTERVAL_SECONDS", "3600.0", "Slowest interval still distinguishable from a scheduled task."),
     ("HUNTER_DISCOVERY_ENABLED", "true", "Enable/disable reconnaissance-burst detection."),
     ("HUNTER_DISCOVERY_MIN_DISTINCT", "4", "Distinct recon techniques required to flag a burst."),
-    ("HUNTER_BEHAVIOR_BASELINE_ENABLED", "false", "Fallback default for the baseline detector; overridden by the live console toggle once set."),
-    ("HUNTER_BASELINE_LEARNING_EVENTS", "50", "Distinct combinations a host must contribute before the detector starts alerting."),
     ("HUNTER_ABUSEIPDB_API_KEY", "(unset)", "Optional key for IP reputation enrichment."),
     ("HUNTER_VIRUSTOTAL_API_KEY", "(unset)", "Optional key for hash/IP/domain reputation enrichment."),
     ("HUNTER_ENRICHMENT_CACHE_TTL_SECONDS", "3600", "How long a reputation lookup is cached."),
@@ -389,8 +385,8 @@ TOC_SECTIONS = [
     ("3", "Detection Engine", [
         "3.1 Rule-Based Detection", "3.2 Process-Tree Correlation",
         "3.3 Statistical Beacon Detection", "3.4 Reconnaissance-Burst Detection",
-        "3.5 Behavioral Baseline Detection", "3.6 Ransomware Detection",
-        "3.7 Behavior Profiling &amp; Derived Titles", "3.8 Incident Scoring",
+        "3.5 Ransomware Detection", "3.6 Behavior Profiling &amp; Derived Titles",
+        "3.7 Incident Scoring",
     ]),
     ("4", "Detection Rule Catalog", []),
     ("5", "The Analyst Console", [
@@ -398,7 +394,7 @@ TOC_SECTIONS = [
         "5.3 Explore View", "5.4 Search",
         "5.5 IOC Enrichment", "5.6 ATT&amp;CK Technique Reference",
         "5.7 Analyst Notes", "5.8 PDF Incident Reports",
-        "5.9 Incident Triage", "5.10 Theme, Baseline Toggle &amp; Database Reset",
+        "5.9 Incident Triage", "5.10 Theme &amp; Database Reset",
         "5.11 Live WebSocket Feed",
     ]),
     ("6", "REST API Reference", []),
@@ -465,7 +461,7 @@ pipeline_rows = [
     ["1", "Ingest", "POST /ingest receives one normalized event and hands it to the pipeline. Holds no logic of its own."],
     ["2", "Normalize", "Winlogbeat/Sysmon JSON is converted into a uniform internal Event, so downstream code never branches on source format."],
     ["3", "Observe", "Every event feeds the in-memory process tree, not just the ones that match a rule -- a malicious process's ancestors are usually benign and must still be recorded."],
-    ["4", "Detect", "The event is run against the YAML rule engine, the statistical beacon detector, the reconnaissance-burst detector, and -- when enabled -- the behavioral baseline detector."],
+    ["4", "Detect", "The event is run against three parallel detectors: the YAML rule engine, the statistical beacon detector, and the reconnaissance-burst detector."],
     ["5", "Correlate", "New detections are grouped with existing ones that share a process-tree root within the correlation window, forming or extending an incident."],
     ["6", "Persist &amp; Broadcast", "The detection and incident are written to SQLite and pushed to every connected console over the WebSocket feed."],
 ]
@@ -547,32 +543,7 @@ story.append(P(
     "in quick succession is variety, and is flagged as a reconnaissance burst."
 ))
 
-story.append(H2("3.5&nbsp;&nbsp;Behavioral Baseline Detection"))
-story.append(P(
-    "Every detector above looks for a known bad pattern -- a rule matches a "
-    "specific field shape, beaconing matches a specific statistical "
-    "signature, a reconnaissance burst matches a specific breadth of recon "
-    "commands. The baseline detector looks for the opposite: not whether "
-    "something is bad, but whether it has ever been seen before on this host "
-    "at all, which is what lets it catch a technique nobody has written a "
-    "rule for yet. It learns, per host, which (process image, parent image) "
-    "combinations are normal, and flags the first occurrence of a "
-    "combination it has never recorded. The signal is deliberately weak on "
-    "its own -- most first-time-seen processes are ordinary software updates "
-    "or one-off admin tasks -- so it always reports at low severity and "
-    "never alone drives a verdict; its role is to widen the net, not "
-    "replace the rules that already cover well-understood techniques. A "
-    "per-host learning phase (a configurable number of distinct "
-    "combinations, unlogged and silent) keeps a fresh host's first stretch "
-    "of ordinary activity from reading as a flood of anomalies, and what a "
-    "host has learned persists across restarts independently of the "
-    "detection and incident history, so an analyst clearing the database "
-    "does not also reset a host's learned baseline. Off by default, this is "
-    "the one detector an analyst can switch on or off live from the "
-    "console's settings menu -- see &sect;5.10 -- with no restart required."
-))
-
-story.append(H2("3.6&nbsp;&nbsp;Ransomware Detection"))
+story.append(H2("3.5&nbsp;&nbsp;Ransomware Detection"))
 story.append(P(
     "Two rules target the file-write behavior that precedes and accompanies a "
     "ransomware encryption event, in addition to the shadow-copy-deletion and "
@@ -590,7 +561,7 @@ story.append(P(
     "the full-screen tree viewer."
 ))
 
-story.append(H2("3.7&nbsp;&nbsp;Behavior Profiling &amp; Derived Titles"))
+story.append(H2("3.6&nbsp;&nbsp;Behavior Profiling &amp; Derived Titles"))
 story.append(P(
     "Rather than leaving an analyst to read a flat list of N detections, the "
     "profiling engine turns an incident's detections into a plain-language, "
@@ -603,7 +574,7 @@ story.append(P(
     "#4821.”"
 ))
 
-story.append(H2("3.8&nbsp;&nbsp;Incident Scoring"))
+story.append(H2("3.7&nbsp;&nbsp;Incident Scoring"))
 story.append(P(
     "Incident severity scoring is non-linear by design: one critical LSASS "
     "access outweighs three medium-severity suspicious-path executions, and "
@@ -773,19 +744,13 @@ story.append(P(
     "decision."
 ))
 
-story.append(H2("5.10&nbsp;&nbsp;Theme, Baseline Toggle &amp; Database Reset"))
+story.append(H2("5.10&nbsp;&nbsp;Theme &amp; Database Reset"))
 story.append(P(
-    "A settings menu in the console header holds a light/dark theme toggle, "
-    "a live on/off switch for the behavioral baseline detector (&sect;3.5), "
-    "and one destructive action: wiping the database. The baseline switch is "
-    "the one setting in this project that changes without a restart -- it "
-    "writes through to the database and takes effect on the very next event, "
-    "and every connected console reflects the change immediately over the "
-    "same WebSocket feed used for live updates, not just the tab that "
-    "clicked it. The reset is confirmed with a dialog, since there is no "
-    "undo -- every detection and incident is permanently removed, on every "
-    "connected console, via that same broadcast mechanism. Note that a "
-    "database reset does not erase a host's learned baseline -- see &sect;3.5."
+    "A settings menu in the console header holds a light/dark theme toggle "
+    "and one destructive action: wiping the database. The reset is confirmed "
+    "with a dialog, since there is no undo -- every detection and incident is "
+    "permanently removed, on every connected console, via the same WebSocket "
+    "broadcast that delivers live updates."
 ))
 
 story.append(H2("5.11&nbsp;&nbsp;Live WebSocket Feed"))
@@ -874,7 +839,7 @@ story.append(Paragraph(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 357 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 342 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -921,11 +886,6 @@ design_points = [
      "A script re-running one command in a loop is volume without variety. An operator "
      "running several different reconnaissance commands in quick succession is variety, and "
      "only the second pattern is flagged."),
-    ("The baseline detector's learning phase is scoped per host and persisted, not per session.",
-     "Gating on distinct combinations a host has already contributed, loaded from the database "
-     "at startup, means a host with a mature baseline keeps alerting immediately after a "
-     "restart, while a host genuinely new to the detector still gets a quiet learning period -- "
-     "either way, no cold-start alert storm."),
     ("Enrichment works with no API keys, and never leaks internal data.",
      "Every provider degrades to “unavailable” without a key rather than failing the request. "
      "Private IP ranges are never sent to a third party. The strongest available hash is "
@@ -956,7 +916,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;357 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;342 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))
