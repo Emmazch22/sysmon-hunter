@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 class ConnectionManager:
-    """Mantiene las sesiones del dashboard y difunde detecciones en vivo."""
+    """Tracks connected console sessions and broadcasts live detections."""
 
     def __init__(self) -> None:
         self._clients: set[WebSocket] = set()
