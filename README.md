@@ -83,6 +83,12 @@ about it.
 - **Derived incident titles** — each incident is named from its contents:
   "Phishing to reconnaissance", "Credential access with C2", "Ransomware
   preparation".
+- **Correlation chains** — three named, rule-ID-level patterns
+  (`_CORRELATION_CHAINS` in `backend/models/schemas.py`) recognise a specific
+  multi-stage story — a ransomware activity chain, a credential-theft
+  campaign, an Office-to-PowerShell infection chain — and outrank the
+  tactic-based titles above when they match, surfaced as both the incident
+  title and a `classification` badge in the console and the incident page.
 - **IOC enrichment** — IPs, domains and file hashes against AbuseIPDB and
   VirusTotal, on demand, cached, degrading gracefully with no API keys.
 - **Analyst notes** — a free-text note per incident (500-word limit), on its
@@ -383,14 +389,39 @@ HUNTER_VIRUSTOTAL_API_KEY=...   # https://www.virustotal.com/gui/join-us
 The server binds `0.0.0.0` by default, so it's reachable from anywhere on the
 network it runs on. With no key set, that's fine for a single trusted
 network. If it's reachable more broadly than that, set a shared secret and
-every JSON endpoint (not the console's own pages) starts requiring it:
+every JSON endpoint (not the console's own pages) starts requiring a matching
+`X-API-Key` header — see `backend/api/auth.py`.
+
+Generate one (any of these produce a suitably long random string — pick
+whichever tool you already have):
+
+```bash
+# Cross-platform, no extra dependency (Python is already required)
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# Linux / macOS
+openssl rand -hex 32
+```
+
+```powershell
+# Windows PowerShell
+-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
+```
+
+Then add it to your `.env` file:
 
 ```
-HUNTER_API_KEY=some-long-random-string
+HUNTER_API_KEY=<paste the generated string here>
 ```
+
+(Running under Docker Compose instead? Set it under `environment:` in
+`docker-compose.yml` the same way `HUNTER_DB_URL` is set there.)
 
 The console detects a `401` on its own and prompts once for the key, then
-remembers it in the browser for next time — no other setup needed.
+remembers it in the browser for next time — no other setup needed. The key
+travels as a plain header, not a secret exchange, so treat it like a
+password: don't commit it, and prefer HTTPS (e.g. behind a reverse proxy) if
+the server is reachable outside a network you trust.
 
 ---
 

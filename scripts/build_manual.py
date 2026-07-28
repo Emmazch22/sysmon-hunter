@@ -345,6 +345,7 @@ API_ROUTES = [
 
 CONFIG_SETTINGS = [
     ("HUNTER_DB_URL", "sqlite+aiosqlite:///data/hunter.db", "Database connection string."),
+    ("HUNTER_API_KEY", "(unset)", "Shared secret for the JSON API. Unset = no auth (trusted network)."),
     ("HUNTER_CORRELATION_WINDOW_MINUTES", "10", "Time window for grouping detections into one incident."),
     ("HUNTER_INCIDENT_SCORE_THRESHOLD", "12", "Cumulative severity score to promote an incident to active."),
     ("HUNTER_PROCESS_TTL_MINUTES", "120", "How long an inactive process stays in the in-memory tree."),
@@ -608,6 +609,27 @@ story.append(P(
     "score crosses a configurable threshold (12, by default)."
 ))
 
+story.append(H2("3.8&nbsp;&nbsp;Correlation Chains &amp; Classification"))
+story.append(P(
+    "Beyond the tactic-based titles in Section 3.6, three named, rule-ID-"
+    "level patterns recognise a specific multi-stage story and outrank the "
+    "generic titles when they match: a <b>ransomware activity chain</b> "
+    "(shadow-copy deletion together with a ransom note or an encrypted-"
+    "extension write), a <b>credential-theft campaign</b> (at least two "
+    "distinct credential-access rules -- LSASS access, Mimikatz, DCSync, "
+    "browser/KeePass credential-database staging, Kerberoasting, or AS-REP "
+    "roasting -- firing on the same incident), and an "
+    "<b>Office-to-PowerShell infection chain</b> (an Office application "
+    "spawning a shell, followed by a PowerShell download cradle). A matched "
+    "chain sets both the incident's title and a machine-readable "
+    "<font face=\"Courier\">classification</font> field, shown as a badge in "
+    "the console queue and on the incident's full page. This is deliberately "
+    "an identity mechanism, not a scoring one -- every rule referenced by a "
+    "chain is itself high or critical severity, so a matched chain has "
+    "already cleared the actionable threshold on the ordinary scoring scale "
+    "described in Section 3.7 before it is ever classified."
+))
+
 story.append(PageBreak())
 
 story.append(H1("4.&nbsp;&nbsp;Detection Rule Catalog"))
@@ -657,7 +679,10 @@ story.append(P(
     "“Closed” (incidents an analyst has already resolved -- see Section 5.9). "
     "Each row shows the derived title, severity, host, cumulative score, the "
     "process chain, and ATT&amp;CK technique chips at a glance, before any "
-    "drill-down."
+    "drill-down. An incident that matches one of the correlation chains from "
+    "Section 3.8 (ransomware, credential-theft campaign, Office-to-"
+    "PowerShell) additionally carries a filled classification badge next to "
+    "its title, repeated on the incident's full page."
 ))
 
 story.append(H2("5.2&nbsp;&nbsp;Incident Detail Views"))
@@ -857,6 +882,34 @@ story.append(Paragraph(
     "HUNTER_ABUSEIPDB_API_KEY=...<br/>"
     "HUNTER_VIRUSTOTAL_API_KEY=...",
     styles["Mono"]
+))
+
+story.append(H3("Optional: API key (authentication)"))
+story.append(P(
+    "The server binds to all interfaces (0.0.0.0) by default, so it is "
+    "reachable from anywhere on the network it runs on -- fine for a single "
+    "trusted network, not fine once it is reachable more broadly. Setting "
+    "<font face=\"Courier\">HUNTER_API_KEY</font> makes every JSON endpoint "
+    "(not the console's own HTML pages) require a matching "
+    "<font face=\"Courier\">X-API-Key</font> header; see "
+    "<font face=\"Courier\">backend/api/auth.py</font>."
+))
+story.append(P("Generate a random secret with whichever tool is on hand:"))
+story.append(Paragraph(
+    "python -c \"import secrets; print(secrets.token_hex(32))\"&nbsp;&nbsp;# any platform<br/>"
+    "openssl rand -hex 32&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Linux / macOS",
+    styles["Mono"]
+))
+story.append(P("Then set it in .env:"))
+story.append(Paragraph(
+    "HUNTER_API_KEY=&lt;paste the generated string here&gt;",
+    styles["Mono"]
+))
+story.append(P(
+    "The console detects a 401 on its own and prompts once for the key, "
+    "then remembers it in the browser -- no other setup needed. Treat the "
+    "key like a password: do not commit it, and prefer HTTPS (e.g. behind a "
+    "reverse proxy) if the server is reachable outside a trusted network."
 ))
 
 story.append(H1("9.&nbsp;&nbsp;Testing"))
