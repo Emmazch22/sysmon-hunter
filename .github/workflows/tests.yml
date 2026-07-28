@@ -1,0 +1,47 @@
+name: Tests
+
+# The full pytest suite doubles as documentation (see README.md), but only if
+# it actually runs on every change. It has caught the exact kind of drift
+# fixed by hand throughout this project's history -- ATT&CK tactic tables
+# falling behind the rule corpus, an API endpoint nobody wrote a test for --
+# and none of that is worth anything sitting only on a developer's machine.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # README documents "Python 3.11+"; both are exercised so that claim
+        # is checked, not just asserted.
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest -v
+
+      - name: Verify Alembic migrations apply cleanly
+        # A fresh SQLite file, migrated head from nothing. This is exactly
+        # the check that would have caught a migration that fails to apply
+        # -- something the test suite's tmp_db fixture never exercises,
+        # since it builds its schema straight from the ORM models instead.
+        run: |
+          python -m alembic upgrade head
+        env:
+          HUNTER_DB_URL: "sqlite+aiosqlite:///${{ github.workspace }}/ci-check.db"
