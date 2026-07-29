@@ -330,6 +330,7 @@ API_ROUTES = [
     ("DELETE", "/incidents/{id}/notes", "Clear the incident's analyst note."),
     ("GET", "/incidents/{id}/profile", "Kill-chain narrative summary for the incident."),
     ("GET", "/incidents/{id}/report", "Generate and download the incident's PDF report."),
+    ("GET", "/incidents/{id}/stix", "Generate and download the incident as a STIX 2.1 bundle."),
     ("GET", "/detections", "List raw detections, most recent first."),
     ("GET", "/search", "Free-text and field-filtered search across incidents."),
     ("GET", "/attack/{technique_id}", "MITRE ATT&amp;CK technique description, from the local dataset."),
@@ -669,6 +670,41 @@ story.append(P(
     "skipped, never silently wrong and never fatal to the batch."
 ))
 
+story.append(H2("3.10&nbsp;&nbsp;STIX 2.1 Export"))
+story.append(P(
+    "The counterpart to Sigma import: any incident can be downloaded as a "
+    "STIX 2.1 bundle from <font face=\"Courier\">GET /incidents/{id}/stix"
+    "</font> (or the “Download STIX bundle” button next to the PDF report "
+    "button), for another threat-intel platform to ingest without ever "
+    "needing to know this engine's own schema. "
+    "<font face=\"Courier\">backend/engine/stix_export.py</font> builds an "
+    "<font face=\"Courier\">identity</font> object for this engine, one "
+    "<font face=\"Courier\">attack-pattern</font> per distinct ATT&amp;CK "
+    "technique the incident's detections carry, one "
+    "<font face=\"Courier\">indicator</font> per pivotable IOC already "
+    "surfaced by the key-indicators consolidation in Section 5 (a C2 "
+    "destination IP or domain, a file's SHA256, a persistence registry key "
+    "-- deduplicated across detections, never one indicator per detection), "
+    "and a <font face=\"Courier\">report</font> object whose "
+    "<font face=\"Courier\">object_refs</font> ties all of it together, "
+    "named and described from the incident's own title and behavior-"
+    "profile narrative."
+))
+story.append(P(
+    "Object identifiers are deterministic -- a UUIDv5 seeded on stable "
+    "content (a technique ID, an indicator's own pattern string, the "
+    "incident ID) rather than randomly generated -- so exporting the same "
+    "incident twice, or the same technique across two different incidents, "
+    "produces the same STIX ID both times. That is what lets a receiving "
+    "platform de-duplicate objects across imports instead of accumulating a "
+    "new copy of the same technique on every download. No "
+    "<font face=\"Courier\">relationship</font> objects are generated "
+    "between indicators and techniques: the underlying data is incident-"
+    "level, not per-IOC, so asserting that a specific indicator indicates a "
+    "specific technique would claim precision the source data does not "
+    "have."
+))
+
 story.append(PageBreak())
 
 story.append(H1("4.&nbsp;&nbsp;Detection Rule Catalog"))
@@ -808,14 +844,17 @@ story.append(P(
     "page and a live word counter."
 ))
 
-story.append(H2("5.8&nbsp;&nbsp;PDF Incident Reports"))
+story.append(H2("5.8&nbsp;&nbsp;PDF Reports &amp; STIX Export"))
 story.append(P(
     "Every incident can be downloaded as a self-contained PDF report, suitable "
     "for attaching to a ticket or handing to an incident-response lead. It is "
     "not a screenshot of the console -- it is the investigation written down: "
     "the behavior-profile narrative, the process chain, every detection with "
     "its forensics, and the incident's key indicators. Generated server-side "
-    "with reportlab, requiring no headless browser in the deployment image."
+    "with reportlab, requiring no headless browser in the deployment image. "
+    "The button beside it, “Download STIX bundle”, exports the same incident "
+    "as a machine-readable STIX 2.1 bundle instead -- see Section 3.10 for "
+    "exactly what it contains."
 ))
 
 story.append(H2("5.9&nbsp;&nbsp;Incident Triage"))
@@ -967,7 +1006,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 461 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 485 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1035,7 +1074,8 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, enrichment, search,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline, sigma_import<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline, sigma_import,<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
     "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;103 YAML detection rules, by Event ID, plus<br/>"
@@ -1045,7 +1085,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;461 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;485 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

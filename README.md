@@ -126,6 +126,21 @@ about it.
   modifiers) with the specific reason, per rule, rather than importing it
   wrong. Accepted rules are written under `rules/imported_sigma/` alongside
   the hand-written corpus.
+- **STIX 2.1 export** — download any incident as a STIX bundle
+  (`GET /incidents/{id}/stix`, next to the PDF report button) for another
+  threat-intel platform to ingest. `backend/engine/stix_export.py` builds an
+  `identity`, one `attack-pattern` per ATT&CK technique the incident's
+  detections carry, one `indicator` per pivotable IOC already surfaced by
+  `engine/indicators.py` (C2 destination IP/domain, file SHA256, persistence
+  registry key — deduplicated across detections), and a `report` object
+  tying it all together with the incident's title and behavior-profile
+  narrative. Object IDs are deterministic (content-seeded UUIDv5, not
+  random), so the same technique or the same incident always maps to the
+  same STIX ID across exports, letting a receiving platform de-duplicate on
+  import instead of accumulating copies. No relationship objects are
+  invented between indicators and techniques — the source data is
+  incident-level, not per-IOC, so claiming that precision would be STIX-
+  shaped noise, not signal.
 
 ---
 
@@ -441,7 +456,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 461 tests
+python -m pytest        # 485 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -473,7 +488,8 @@ sysmon-hunter/
 │   │                        report, search, notes, admin, ws, serializers
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, enrichment, search,
-│   │                        report, profile, pipeline, sigma_import
+│   │                        report, profile, pipeline, sigma_import,
+│   │                        stix_export
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
 ├── rules/                   103 YAML detection rules, by EventID, plus
@@ -484,7 +500,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   461 tests
+└── tests/                   485 tests
 ```
 
 ---
