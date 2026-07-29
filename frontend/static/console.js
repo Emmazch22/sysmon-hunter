@@ -1109,6 +1109,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const menu = $("settings-menu");
     const resetBtn = $("reset-db-btn");
     const themeBtn = $("theme-toggle-btn");
+    const sigmaBtn = $("sigma-import-btn");
+    const sigmaInput = $("sigma-import-input");
     if (!btn || !menu) return;
 
     applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
@@ -1143,6 +1145,32 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") closeMenu();
     });
+
+    if (sigmaBtn && sigmaInput) {
+        sigmaBtn.addEventListener("click", () => {
+            closeMenu();
+            sigmaInput.click();
+        });
+
+        sigmaInput.addEventListener("change", async () => {
+            const files = Array.from(sigmaInput.files || []);
+            if (!files.length) return;
+
+            const form = new FormData();
+            files.forEach((file) => form.append("files", file));
+
+            try {
+                const res = await fetch("/admin/rules/import-sigma", { method: "POST", body: form });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                renderSigmaImportReport(await res.json());
+            } catch (err) {
+                alert("Sigma import failed: " + err.message);
+            } finally {
+                // Reset so choosing the exact same file(s) again still fires "change".
+                sigmaInput.value = "";
+            }
+        });
+    }
 
     if (resetBtn) {
         resetBtn.addEventListener("click", async () => {
@@ -1271,6 +1299,56 @@ function closeTechnique() {
     document.getElementById("tech-overlay").classList.remove("open");
 }
 
+/* ------------------------------------------------------------------------
+   Sigma import report.
+
+   Populated once, right after the /admin/rules/import-sigma response comes
+   back -- unlike the technique modal there is no loading state, since the
+   whole point of the report is to show a result that already happened.
+   ------------------------------------------------------------------------ */
+
+function sigmaImportEls() {
+    return {
+        overlay: document.getElementById("sigma-import-overlay"),
+        summary: document.getElementById("sigma-import-summary"),
+        body: document.getElementById("sigma-import-body"),
+    };
+}
+
+function renderSigmaImportReport(result) {
+    const el = sigmaImportEls();
+    const accepted = result.accepted || [];
+    const rejected = result.rejected || [];
+
+    el.summary.textContent =
+        `${accepted.length} accepted · ${rejected.length} rejected · ${result.rules_loaded} rules live`;
+
+    if (!accepted.length && !rejected.length) {
+        el.body.innerHTML = '<p class="sigma-import-empty">No Sigma documents were found in the uploaded file(s).</p>';
+    } else {
+        const rows = [
+            ...accepted.map((r) => `
+                <div class="sigma-result-item">
+                    <div class="sigma-result-title">✓ ${escapeHtml(r.title)}</div>
+                    <div class="sigma-result-reason">${escapeHtml(r.id)} · from ${escapeHtml(r.source)}</div>
+                </div>`),
+            ...rejected.map((r) => `
+                <div class="sigma-result-item rejected">
+                    <div class="sigma-result-title">✕ ${escapeHtml(r.title)}</div>
+                    <div class="sigma-result-reason">${escapeHtml(r.reason)} · from ${escapeHtml(r.source)}</div>
+                </div>`),
+        ];
+        el.body.innerHTML = `<div class="sigma-result-list">${rows.join("")}</div>`;
+    }
+
+    el.overlay.classList.add("open");
+    document.getElementById("sigma-import-close").focus();
+}
+
+function closeSigmaImportReport() {
+    document.getElementById("sigma-import-overlay").classList.remove("open");
+}
+
 // Delegated activation: click, or Enter/Space on a focused chip.
 document.addEventListener("click", (event) => {
     const chip = event.target.closest("[data-technique]");
@@ -1308,7 +1386,10 @@ document.addEventListener("click", (event) => {
     }
 });
 document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeTechnique();
+    if (event.key === "Escape") {
+        closeTechnique();
+        closeSigmaImportReport();
+    }
     const chip = event.target.closest?.("[data-technique]");
     if (chip && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
@@ -1323,6 +1404,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target === overlay) closeTechnique();
     });
     document.getElementById("tech-close").addEventListener("click", closeTechnique);
+
+    const sigmaOverlay = document.getElementById("sigma-import-overlay");
+    sigmaOverlay.addEventListener("click", (event) => {
+        if (event.target === sigmaOverlay) closeSigmaImportReport();
+    });
+    document.getElementById("sigma-import-close").addEventListener("click", closeSigmaImportReport);
 });
 
 

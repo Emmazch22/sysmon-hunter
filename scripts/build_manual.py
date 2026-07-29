@@ -335,6 +335,7 @@ API_ROUTES = [
     ("GET", "/attack/{technique_id}", "MITRE ATT&amp;CK technique description, from the local dataset."),
     ("GET", "/enrich", "On-demand reputation lookup for an IP, domain, or hash."),
     ("DELETE", "/admin/database", "Wipe all detections and incidents; reset the live engine."),
+    ("POST", "/admin/rules/import-sigma", "Convert and load one or more Sigma YAML files; live immediately."),
     ("GET", "/health", "Liveness/readiness probe: rule count, tracked processes."),
     ("WS", "/ws", "Live event stream: new detections, incident updates, resets."),
     ("GET", "/", "The analyst console (single page app)."),
@@ -630,6 +631,44 @@ story.append(P(
     "described in Section 3.7 before it is ever classified."
 ))
 
+story.append(H2("3.9&nbsp;&nbsp;Sigma Rule Import"))
+story.append(P(
+    "The hand-written rule catalog in Section 4 can be extended at runtime "
+    "by uploading Sigma YAML files (from the public SigmaHQ corpus or "
+    "written by hand) through the console's settings menu, which posts to "
+    "<font face=\"Courier\">POST /admin/rules/import-sigma</font>. Each "
+    "document is converted independently by "
+    "<font face=\"Courier\">backend/engine/sigma_import.py</font> into this "
+    "engine's own rule schema and written under "
+    "<font face=\"Courier\">rules/imported_sigma/</font>, then the whole "
+    "rule store reloads from disk -- an import is live for the very next "
+    "ingested event, no restart required."
+))
+story.append(P(
+    "Sigma is a considerably richer language than the matcher in Section "
+    "3.1 implements, so the importer supports a deliberately bounded "
+    "subset: Windows Sysmon logsource categories mapped to the matching "
+    "EventID, a single selection or several combined with a plain "
+    "<font face=\"Courier\">and</font> / <font face=\"Courier\">or</font> / "
+    "<font face=\"Courier\">1 of x*</font> / <font face=\"Courier\">all of "
+    "x*</font> condition, one trailing <font face=\"Courier\">and not "
+    "&lt;filter&gt;</font> exclusion, the "
+    "<font face=\"Courier\">contains</font> / "
+    "<font face=\"Courier\">startswith</font> / "
+    "<font face=\"Courier\">endswith</font> / <font face=\"Courier\">re"
+    "</font> modifiers, and automatic translation of bare glob wildcards "
+    "(<font face=\"Courier\">*</font>, <font face=\"Courier\">?</font>) into "
+    "the matching operator. A Sigma rule that needs nested boolean groups, "
+    "an aggregation (<font face=\"Courier\">count()</font>, "
+    "<font face=\"Courier\">near</font>), or a modifier this matcher cannot "
+    "reproduce (<font face=\"Courier\">|all</font>, "
+    "<font face=\"Courier\">|base64</font>, <font face=\"Courier\">|cidr"
+    "</font>, numeric comparisons) is rejected with the specific reason "
+    "rather than approximated -- the same policy the rule loader already "
+    "applies to a malformed YAML file on disk: one bad rule is reported and "
+    "skipped, never silently wrong and never fatal to the batch."
+))
+
 story.append(PageBreak())
 
 story.append(H1("4.&nbsp;&nbsp;Detection Rule Catalog"))
@@ -792,7 +831,20 @@ story.append(P(
     "decision."
 ))
 
-story.append(H2("5.10&nbsp;&nbsp;Theme &amp; Database Reset"))
+story.append(H2("5.10&nbsp;&nbsp;Sigma Rule Import"))
+story.append(P(
+    "The same settings menu that holds the theme toggle also holds "
+    "“Import Sigma rules”, which opens a file picker accepting one or more "
+    "<font face=\"Courier\">.yml</font>/<font face=\"Courier\">.yaml</font> "
+    "files. Selecting files immediately uploads them to "
+    "<font face=\"Courier\">POST /admin/rules/import-sigma</font>; a report "
+    "modal then lists every document that was accepted (with its generated "
+    "rule ID) and every one that was rejected (with the specific reason), so "
+    "a partially-successful batch is never a silent partial success. See "
+    "Section 3.9 for exactly what subset of Sigma is supported."
+))
+
+story.append(H2("5.11&nbsp;&nbsp;Theme &amp; Database Reset"))
 story.append(P(
     "A settings menu in the console header holds a light/dark theme toggle "
     "and one destructive action: wiping the database. The reset is confirmed "
@@ -801,7 +853,7 @@ story.append(P(
     "broadcast that delivers live updates."
 ))
 
-story.append(H2("5.11&nbsp;&nbsp;Live WebSocket Feed"))
+story.append(H2("5.12&nbsp;&nbsp;Live WebSocket Feed"))
 story.append(P(
     "The console holds a persistent WebSocket connection and reconnects "
     "automatically on drop, so it can be left open on a wall display "
@@ -915,7 +967,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 412 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 461 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -983,16 +1035,17 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, enrichment, search,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline, sigma_import<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;103 YAML detection rules, by Event ID<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;103 YAML detection rules, by Event ID, plus<br/>"
+    "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;412 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;461 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

@@ -114,6 +114,18 @@ about it.
   techniques with MITRE descriptions, inline base64 decoding of encoded
   command lines, a light/dark theme toggle, and a database-reset control, all
   in the settings menu.
+- **Sigma rule import** — upload one or more Sigma YAML files from the
+  settings menu (`POST /admin/rules/import-sigma`) and they convert straight
+  into this engine's own rule schema and go live immediately, no restart.
+  `backend/engine/sigma_import.py` supports the subset of Sigma that maps
+  cleanly onto the matcher's flat field-spec model — Sysmon logsource
+  categories, `and`/`or`/`1 of x*`/`all of x*` conditions, one trailing
+  `and not <filter>`, the `contains`/`startswith`/`endswith`/`re` modifiers,
+  and automatic glob-to-operator translation for bare wildcard values — and
+  rejects anything richer (nested boolean groups, aggregations, unsupported
+  modifiers) with the specific reason, per rule, rather than importing it
+  wrong. Accepted rules are written under `rules/imported_sigma/` alongside
+  the hand-written corpus.
 
 ---
 
@@ -429,7 +441,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 412 tests
+python -m pytest        # 461 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -461,17 +473,18 @@ sysmon-hunter/
 │   │                        report, search, notes, admin, ws, serializers
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, enrichment, search,
-│   │                        report, profile, pipeline
+│   │                        report, profile, pipeline, sigma_import
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup)
-├── rules/                   103 YAML detection rules, by EventID
+├── rules/                   103 YAML detection rules, by EventID, plus
+│                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   412 tests
+└── tests/                   461 tests
 ```
 
 ---

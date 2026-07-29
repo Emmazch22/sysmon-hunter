@@ -88,6 +88,11 @@
             <circle cx="12" cy="12" r="4" />
             <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
         </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <path d="M17 8l-5-5-5 5" />
+            <path d="M12 3v12" />
+        </symbol>
         <symbol id="i-moon" viewBox="0 0 24 24">
             <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
         </symbol>
@@ -124,6 +129,13 @@
                     </svg>
                     <span id="theme-toggle-label">Dark mode</span>
                 </button>
+                <button class="settings-item" id="sigma-import-btn" role="menuitem">
+                    <svg class="ico">
+                        <use href="#i-upload" />
+                    </svg>
+                    Import Sigma rules
+                </button>
+                <input type="file" id="sigma-import-input" accept=".yml,.yaml" multiple hidden>
                 <button class="settings-item settings-danger" id="reset-db-btn" role="menuitem">
                     <svg class="ico">
                         <use href="#i-trash" />
@@ -293,6 +305,21 @@
                     </svg>
                 </a>
             </div>
+        </div>
+    </div>
+
+    <!-- Sigma import report: populated after a POST to /admin/rules/import-sigma. -->
+    <div class="tech-overlay" id="sigma-import-overlay" role="dialog" aria-modal="true"
+        aria-labelledby="sigma-import-title">
+        <div class="tech-modal">
+            <div class="tech-modal-head">
+                <div class="tech-modal-titles">
+                    <div class="tech-modal-name" id="sigma-import-title">Sigma import</div>
+                    <div class="tech-modal-tactics" id="sigma-import-summary"></div>
+                </div>
+                <button class="tech-close" id="sigma-import-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="tech-modal-body" id="sigma-import-body"></div>
         </div>
     </div>
 

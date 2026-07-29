@@ -1308,6 +1308,43 @@ main {
     padding: 1px 5px;
 }
 
+/* Sigma import report: one row per document, accepted or rejected. */
+.sigma-result-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sigma-result-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--struct);
+    background: var(--surface-2);
+}
+
+.sigma-result-item.rejected {
+    border-left-color: var(--sev-critical);
+}
+
+.sigma-result-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: normal;
+}
+
+.sigma-result-reason {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-mute);
+    white-space: normal;
+}
+
+.sigma-import-empty {
+    color: var(--text-mute);
+    font-style: italic;
+}
+
 /* ---------- IOC enrichment ----------
      Rendered inline in the beacon evidence panel when the analyst asks. The
      verdict dot and heading follow the severity scale: a malicious IP glows the
