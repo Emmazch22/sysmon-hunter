@@ -333,6 +333,8 @@ API_ROUTES = [
     ("GET", "/incidents/{id}/stix", "Generate and download the incident as a STIX 2.1 bundle."),
     ("GET", "/detections", "List raw detections, most recent first."),
     ("GET", "/search", "Free-text and field-filtered search across incidents."),
+    ("GET", "/attack/coverage", "Rule-coverage report: rule/detector count per ATT&amp;CK technique."),
+    ("GET", "/attack/coverage/navigator", "The coverage report as a downloadable MITRE ATT&amp;CK Navigator layer."),
     ("GET", "/attack/{technique_id}", "MITRE ATT&amp;CK technique description, from the local dataset."),
     ("GET", "/enrich", "On-demand reputation lookup for an IP, domain, or hash."),
     ("DELETE", "/admin/database", "Wipe all detections and incidents; reset the live engine."),
@@ -412,16 +414,18 @@ TOC_SECTIONS = [
         "3.1 Rule-Based Detection", "3.2 Process-Tree Correlation",
         "3.3 Statistical Beacon Detection", "3.4 Reconnaissance-Burst Detection",
         "3.5 Ransomware Detection", "3.6 Behavior Profiling &amp; Derived Titles",
-        "3.7 Incident Scoring",
+        "3.7 Incident Scoring", "3.9 Sigma Rule Import", "3.10 STIX 2.1 Export",
+        "3.11 ATT&amp;CK Coverage Report &amp; Navigator Export",
     ]),
     ("4", "Detection Rule Catalog", []),
     ("5", "The Analyst Console", [
         "5.1 Incident Queue", "5.2 Incident Detail Views",
         "5.3 Explore View", "5.4 Search",
         "5.5 IOC Enrichment", "5.6 ATT&amp;CK Technique Reference",
-        "5.7 Analyst Notes", "5.8 PDF Incident Reports",
-        "5.9 Incident Triage", "5.10 Theme &amp; Database Reset",
-        "5.11 Live WebSocket Feed",
+        "5.7 Analyst Notes", "5.8 PDF Reports &amp; STIX Export",
+        "5.9 Incident Triage", "5.10 Sigma Rule Import",
+        "5.11 Theme &amp; Database Reset", "5.12 Live WebSocket Feed",
+        "5.13 ATT&amp;CK Coverage Download",
     ]),
     ("6", "REST API Reference", []),
     ("7", "Configuration Reference", []),
@@ -705,6 +709,40 @@ story.append(P(
     "have."
 ))
 
+story.append(H2("3.11&nbsp;&nbsp;ATT&amp;CK Coverage Report &amp; Navigator Export"))
+story.append(P(
+    "Every other view in this manual answers what the engine has detected; "
+    "this one answers what it never could. "
+    "<font face=\"Courier\">GET /attack/coverage</font> counts how many "
+    "rules and statistical detectors raise each ATT&amp;CK technique across "
+    "the whole corpus, and <font face=\"Courier\">GET /attack/coverage/"
+    "navigator</font> (also reachable from the settings menu as “Download "
+    "ATT&amp;CK coverage”) renders that count as a MITRE ATT&amp;CK "
+    "Navigator layer -- open it at the public Navigator and every technique "
+    "is colored red through green by how many rules cover it, turning "
+    "months of reactive rule-writing into a single prioritized worklist for "
+    "the next rule."
+))
+story.append(P(
+    "The report has two honesty levels, and it says which one it is giving "
+    "you. <font face=\"Courier\">backend/data/attack_data.json</font> (Section "
+    "5.6) only ever contains techniques this project already references, by "
+    "design -- so on its own it can rank covered techniques against each "
+    "other but can never show a technique with zero rules, since that "
+    "technique was filtered out before the report ever runs. "
+    "<font face=\"Courier\">scripts/fetch_attack.py</font> also writes a "
+    "second, full-catalog file, <font face=\"Courier\">backend/data/"
+    "attack_index.json</font> -- every non-deprecated Enterprise technique, "
+    "covered or not, with just enough data (ID, name, tactics) to plot on a "
+    "layer. When that file is present, "
+    "<font face=\"Courier\">backend/engine/coverage.py</font> produces a "
+    "true gap analysis; when it is absent, the report still runs, it is "
+    "just explicitly marked <font face=\"Courier\">partial</font> in both "
+    "the JSON response and the layer's own description -- a missing "
+    "optional file changes how much the report can show, never whether it "
+    "works."
+))
+
 story.append(PageBreak())
 
 story.append(H1("4.&nbsp;&nbsp;Detection Rule Catalog"))
@@ -901,6 +939,16 @@ story.append(P(
     "polling and no manual refresh."
 ))
 
+story.append(H2("5.13&nbsp;&nbsp;ATT&amp;CK Coverage Download"))
+story.append(P(
+    "The same settings menu holds “Download ATT&amp;CK coverage”, a direct "
+    "link to <font face=\"Courier\">GET /attack/coverage/navigator</font> -- "
+    "no upload step, no report modal, just a MITRE ATT&amp;CK Navigator "
+    "layer file ready to open at the public Navigator. See Section 3.11 for "
+    "what it contains and how it degrades when the full technique index is "
+    "not present."
+))
+
 story.append(PageBreak())
 
 story.append(H1("6.&nbsp;&nbsp;REST API Reference"))
@@ -1006,7 +1054,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 485 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 506 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1057,6 +1105,10 @@ design_points = [
      "Every provider degrades to “unavailable” without a key rather than failing the request. "
      "Private IP ranges are never sent to a third party. The strongest available hash is "
      "always preferred over a weaker one."),
+    ("A missing optional data file degrades the ATT&amp;CK coverage report, never crashes it.",
+     "Without the full technique index the coverage report and its Navigator export still run "
+     "-- they just say so, falling back to ranking only the techniques this project already "
+     "covers instead of refusing to answer at all."),
 ]
 for title, body in design_points:
     story.append(KeepTogether([
@@ -1073,11 +1125,12 @@ layout_text = (
     "|&nbsp;&nbsp;+-- api/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ingest, detections, incidents, attack, enrich,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, enrichment, search,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, profile, pipeline, sigma_import,<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, coverage, enrichment,<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;search, report, profile, pipeline, sigma_import,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
-    "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup)<br/>"
+    "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
+    "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
     "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;103 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
@@ -1085,7 +1138,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;485 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;506 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

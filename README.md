@@ -141,6 +141,23 @@ about it.
   invented between indicators and techniques — the source data is
   incident-level, not per-IOC, so claiming that precision would be STIX-
   shaped noise, not signal.
+- **ATT&CK coverage report and Navigator export** — a settings-menu download
+  (`GET /attack/coverage/navigator`) that renders every ATT&CK technique this
+  project can detect — the rule corpus plus the two statistical detectors —
+  as a MITRE ATT&CK Navigator layer, colored red (no coverage) through green
+  (several rules), so opening it at
+  [mitre-attack.github.io/attack-navigator](https://mitre-attack.github.io/attack-navigator/)
+  is a prioritized worklist for the next rule to write, not just a tally of
+  what already exists. `backend/engine/coverage.py` reads the small,
+  always-committed `backend/data/attack_data.json` for covered techniques,
+  and, when present, the full-catalog `backend/data/attack_index.json`
+  (also written by `scripts/fetch_attack.py`) for every technique this
+  project has *no* rule for — the true gap analysis `attack_data.json` alone
+  cannot show, since it only ever contained what was already referenced.
+  Without the index file the report still works, just partially: it degrades
+  to ranking covered techniques against each other rather than refusing to
+  run. The underlying JSON report is also available directly at
+  `GET /attack/coverage`.
 
 ---
 
@@ -456,7 +473,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 485 tests
+python -m pytest        # 506 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -487,11 +504,12 @@ sysmon-hunter/
 │   ├── api/                 ingest, detections, incidents, attack, enrich,
 │   │                        report, search, notes, admin, ws, serializers
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
-│   │                        beacon, discovery, attack, enrichment, search,
-│   │                        report, profile, pipeline, sigma_import,
-│   │                        stix_export
+│   │                        beacon, discovery, attack, coverage,
+│   │                        enrichment, search, report, profile, pipeline,
+│   │                        sigma_import, stix_export
 │   ├── models/              schemas, db
-│   └── data/                attack_data.json (ATT&CK technique lookup)
+│   └── data/                attack_data.json (ATT&CK technique lookup),
+│                            attack_index.json (full catalog, coverage gaps)
 ├── rules/                   103 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
@@ -500,7 +518,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   485 tests
+└── tests/                   506 tests
 ```
 
 ---

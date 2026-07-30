@@ -96,6 +96,9 @@
         <symbol id="i-moon" viewBox="0 0 24 24">
             <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
         </symbol>
+        <symbol id="i-download" viewBox="0 0 24 24">
+            <path d="M12 3v12M7 10l5 5 5-5M4 19h16" />
+        </symbol>
     </svg>
 
     <header>
@@ -136,6 +139,13 @@
                     Import Sigma rules
                 </button>
                 <input type="file" id="sigma-import-input" accept=".yml,.yaml" multiple hidden>
+                <a class="settings-item" href="/attack/coverage/navigator" target="_blank" rel="noopener"
+                    role="menuitem">
+                    <svg class="ico">
+                        <use href="#i-download" />
+                    </svg>
+                    Download ATT&amp;CK coverage
+                </a>
                 <button class="settings-item settings-danger" id="reset-db-btn" role="menuitem">
                     <svg class="ico">
                         <use href="#i-trash" />

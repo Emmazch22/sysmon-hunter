@@ -340,6 +340,7 @@ nav.routes a:focus-visible {
     font-size: 11px;
     letter-spacing: .04em;
     text-align: left;
+    text-decoration: none;
     cursor: pointer;
     transition: color .12s, background .12s;
 }
