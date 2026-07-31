@@ -1,0 +1,19 @@
+id: SYS-157
+title: PowerShell reads and overwrites the clipboard in the same command
+event_id: 1
+severity: high
+attack: [T1115]
+description: >
+  Crypto-clipper malware's whole method is this pair of calls together:
+  read whatever the victim last copied (Get-Clipboard), then immediately
+  overwrite it (Set-Clipboard) -- typically swapping a copied cryptocurrency
+  wallet address for the attacker's own before the victim pastes it into a
+  transaction. Neither call alone is a useful signal (SYS-154 already covers
+  a bare Get-Clipboard as part of ClickFix's second-stage payload retrieval,
+  and Set-Clipboard alone is an ordinary thing for a legitimate utility
+  script to do), but a script that reads the clipboard and writes it back
+  in the same breath has no ordinary explanation.
+detection:
+  image|endswith: ['\powershell.exe', '\pwsh.exe']
+  command_line|re: '(?=.*\b(?:get-clipboard|gcb)\b)(?=.*\b(?:set-clipboard|scb)\b)'
+condition: all

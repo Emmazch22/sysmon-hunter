@@ -1,0 +1,29 @@
+id: SYS-155
+title: Remote-access/RMM software launched by a script or document, not a user double-click
+event_id: 1
+severity: high
+attack: [T1219]
+description: >
+  RMM abuse appeared in the large majority of ransomware incidents analyzed
+  in 2024-2025 -- AnyDesk, TeamViewer, ScreenConnect, RustDesk, Atera,
+  Splashtop, LogMeIn, and Quick Assist are all legitimate IT tools that give
+  an operator interactive hands-on-keyboard access once installed, which is
+  exactly why intrusions increasingly end their initial-access chain by
+  installing one instead of a bespoke RAT: it blends into normal helpdesk
+  traffic and evades signature-based tooling built to catch malware, not
+  commercial remote-support software.
+
+  A user who wants remote support double-clicks the installer themselves, so
+  its parent is explorer.exe. One delivered by a phishing macro, a ClickFix
+  paste, a dropped script, or a browser download runs from something else
+  entirely -- that mismatch, not the tool's mere presence, is the signal
+  this rule keys on. An environment that pushes these tools out via its own
+  RMM/GPO deployment script rather than a user's double-click will see this
+  rule fire on that legitimate rollout too; that specific parent process
+  should be added to the `image` exclusion list here once identified, the
+  same way `settings.beacon_excluded_images` names known-legitimate periodic
+  callers instead of disabling detection entirely.
+detection:
+  image|re: 'anydesk|teamviewer|screenconnect|connectwisecontrol|rustdesk|ateraagent|splashtop|logmein|quickassist'
+  parent_image|endswith|not: '\explorer.exe'
+condition: all

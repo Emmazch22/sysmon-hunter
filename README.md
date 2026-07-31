@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 107 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 111 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -80,6 +80,17 @@ about it.
   both produce it), since that is what separates a ClickFix paste from an
   administrator's identical-looking manual PowerShell session launched from
   a script or scheduled task.
+- **RMM abuse and clipboard/screen collection** — four more rules
+  (SYS-155 through SYS-158) closing gaps a coverage-report pass turned up:
+  a remote-access tool (AnyDesk, TeamViewer, ScreenConnect, RustDesk, Atera,
+  Splashtop, LogMeIn, Quick Assist) launched by something other than a
+  user's own double-click, or installed with a silent/unattended flag —
+  RMM software shows up in the large majority of 2024-2025 ransomware
+  incidents specifically because it blends into normal IT traffic — plus a
+  PowerShell clipboard-hijack pattern (crypto-clipper: read the clipboard,
+  overwrite it before the victim pastes) and Problem Steps Recorder
+  (`psr.exe`) abused for silent screenshot capture, a signed built-in LOLBAS
+  technique with no third-party tool required.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -354,7 +365,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 107 end to end as a single correlated incident and confirms its
+fires all 111 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -484,7 +495,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 515 tests
+python -m pytest        # 523 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -521,7 +532,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   107 YAML detection rules, by EventID, plus
+├── rules/                   111 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
@@ -529,7 +540,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   515 tests
+└── tests/                   523 tests
 ```
 
 ---

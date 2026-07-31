@@ -1,0 +1,24 @@
+id: SYS-158
+title: Problem Steps Recorder (psr.exe) invoked to silently capture screenshots
+event_id: 1
+severity: high
+attack: [T1113]
+description: >
+  psr.exe is a signed, built-in Windows diagnostic tool meant to record a
+  user's on-screen steps -- with screenshots -- for a support ticket. Its
+  `/start` switch begins that recording with no visible window if paired
+  with `/gui 0`, and needs no third-party tool or admin rights, which is
+  exactly why it shows up as a LOLBAS screen-capture technique: a
+  living-off-the-land alternative to shipping a custom screenshot-stealer,
+  running under a binary that appears in Microsoft's own signed inventory
+  and blends into any allowlisting that trusts Windows-signed executables by
+  name. `/start` alone is the signal -- a legitimate helpdesk session
+  starting a normal, user-visible recording still passes through the same
+  command, but this project has no way to see the resulting on-screen GUI
+  from process-creation telemetry alone, so this rule is scoped to catch the
+  technique's presence and leave the intent judgment to the analyst who
+  reviews the process tree it fired under.
+detection:
+  image|endswith: '\psr.exe'
+  command_line|contains: '/start'
+condition: all

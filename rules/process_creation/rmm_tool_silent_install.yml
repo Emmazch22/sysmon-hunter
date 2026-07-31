@@ -1,0 +1,18 @@
+id: SYS-156
+title: Remote-access/RMM software installed with unattended/silent flags
+event_id: 1
+severity: high
+attack: [T1219]
+description: >
+  Complementary to SYS-155, and independent of it: this one fires at
+  install time rather than run time, and does not care what the parent
+  process was. A silent or unattended installer flag (`--silent`,
+  `/S`, `/qn`, `/quiet`, `/verysilent`) on one of these tools means nobody
+  is meant to see a setup wizard -- an operator pre-staged the install to
+  run without an on-screen prompt a victim (or an alert admin glancing at
+  the screen) might question, which is a deliberate choice a legitimate
+  self-service install has no reason to make.
+detection:
+  image|re: 'anydesk|teamviewer|screenconnect|connectwisecontrol|rustdesk|ateraagent|splashtop|logmein'
+  command_line|re: '(?:^|[\s/-])(?:-{1,2}silent|-{1,2}verysilent|/s\b|/qn\b|/quiet\b|--start-with-win)'
+condition: all
