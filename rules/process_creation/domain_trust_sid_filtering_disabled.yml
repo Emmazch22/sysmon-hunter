@@ -1,0 +1,23 @@
+id: SYS-166
+title: Domain trust modified to disable SID-filtering protections
+event_id: 1
+severity: critical
+attack: [T1484.002]
+description: >
+  SID filtering exists so that a trusted external or child domain cannot
+  forge a SID-history claim of membership in a privileged group on this
+  side of the trust -- disabling it with netdom's `/quarantine:no` or
+  `/EnableSIDHistory:yes` is what turns a routine cross-forest or
+  cross-domain trust into a privilege-escalation bridge, most notoriously as
+  the last step before a forged SID-history Golden Ticket walks straight
+  into Domain Admins on the trusting side. Scoped to the flag value that
+  disables the protection specifically -- both flags also have a legitimate
+  "on" direction this rule does not match -- and to netdom itself, not
+  merely the word "trust" appearing with either flag name, since standing
+  up a new trust in the first place (`/add` with neither flag touched) is
+  routine one-time AD administration that would otherwise make this rule
+  fire on ordinary infrastructure work.
+detection:
+  image|endswith: '\netdom.exe'
+  command_line|re: '(?=.*\btrust\b)(?=.*(?:quarantine:no|sidhistory:yes))'
+condition: all

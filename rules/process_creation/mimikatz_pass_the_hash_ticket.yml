@@ -1,0 +1,20 @@
+id: SYS-164
+title: Mimikatz used to pass a hash or a Kerberos ticket
+event_id: 1
+severity: critical
+attack: [T1550.002, T1550.003]
+description: >
+  Both sekurlsa::pth and kerberos::ptt already sit inside SYS-131's list of
+  Mimikatz module signatures, tagged T1003.001 (credential access) alongside
+  sekurlsa::logonpasswords and lsadump::sam -- accurate for the dumping
+  commands, but sekurlsa::pth and kerberos::ptt are not dumping anything,
+  they inject a hash or ticket someone already has into a new logon session
+  to authenticate as that account elsewhere. This rule exists purely to give
+  those two specific invocations their own correct tag; it deliberately
+  fires alongside SYS-131 on the same event rather than being carved out of
+  it, the same overlap-by-design SYS-118/SYS-150 and SYS-163 already use
+  elsewhere in this corpus for exactly this "generic tool signature plus a
+  more specific one" situation.
+detection:
+  command_line|re: 'sekurlsa::pth|kerberos::ptt'
+condition: any

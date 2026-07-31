@@ -1958,6 +1958,120 @@ CASES = [
             command_line=r"robocopy.exe C:\Users\bob\Documents D:\backup",
         ),
     ),
+    # --- Rubeus used to pass or renew a Kerberos ticket (SYS-163) ---
+    (
+        "SYS-163",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\Rubeus.exe",
+            command_line=r"Rubeus.exe ptt /ticket:doIFvjCCBbqgAwIBBaEDAgEW",
+        ),
+    ),
+    (
+        "SYS-163",
+        False,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\Rubeus.exe",
+            command_line="Rubeus.exe kerberoast /outfile:hashes.txt",
+        ),
+    ),
+    # --- Mimikatz used to pass a hash or ticket (SYS-164) ---
+    (
+        "SYS-164",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\mimikatz.exe",
+            command_line=(
+                'mimikatz.exe "sekurlsa::pth /user:admin /domain:corp.local '
+                '/ntlm:aad3b435b51404eeaad3b435b51404ee"'
+            ),
+        ),
+    ),
+    (
+        "SYS-164",
+        False,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\mimikatz.exe",
+            command_line='mimikatz.exe "sekurlsa::logonpasswords"',
+        ),
+    ),
+    # --- Known GPO-abuse tooling or cmdlet invoked (SYS-165) ---
+    (
+        "SYS-165",
+        True,
+        event(
+            1,
+            image=r"C:\Users\bob\AppData\Local\Temp\SharpGPOAbuse.exe",
+            command_line=(
+                'SharpGPOAbuse.exe --AddComputerTask --TaskName "Update" '
+                '--GPOName "Default Domain Policy"'
+            ),
+        ),
+    ),
+    (
+        "SYS-165",
+        False,
+        event(1, image=r"C:\Windows\System32\gpupdate.exe", command_line="gpupdate /force"),
+    ),
+    # --- Domain trust modified to disable SID-filtering (SYS-166) ---
+    (
+        "SYS-166",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\netdom.exe",
+            command_line=(
+                "netdom trust corp.local /domain:partner.local /EnableSIDHistory:yes"
+            ),
+        ),
+    ),
+    (
+        "SYS-166",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\netdom.exe",
+            command_line="netdom trust corp.local /domain:partner.local /add",
+        ),
+    ),
+    # --- Command-line destructive wipe (SYS-167) ---
+    (
+        "SYS-167",
+        True,
+        event(1, image=r"C:\Windows\System32\format.com", command_line="format.com D: /y /q"),
+    ),
+    (
+        "SYS-167",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            command_line=r"cmd.exe /c del C:\Users\bob\Documents\notes.txt",
+        ),
+    ),
+    # --- PowerShell bulk-disabled or reset AD accounts (SYS-168) ---
+    (
+        "SYS-168",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line='powershell -c "Get-ADUser -Filter * | Disable-ADAccount"',
+        ),
+    ),
+    (
+        "SYS-168",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line='powershell -c "Get-ADUser -Identity jdoe | Disable-ADAccount"',
+        ),
+    ),
 ]
 
 

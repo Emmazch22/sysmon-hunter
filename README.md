@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 115 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 121 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -100,6 +100,19 @@ about it.
   Desktop/user-profile tree, and robocopy mass-mirroring one to a remote
   share — the bulk-collection step nearly every exfiltrate-then-encrypt
   ransomware playbook performs before anything actually leaves the host.
+- **AD-specific detections** — six more rules (SYS-163 through SYS-168)
+  closing the remaining, more domain-specific ATT&CK gaps: Rubeus `ptt`/
+  `renew` and Mimikatz `sekurlsa::pth`/`kerberos::ptt` giving the correct
+  pass-the-hash/pass-the-ticket tag alongside the existing generic
+  rubeus.exe and Mimikatz-module-signature rules (deliberate overlap, not
+  duplication — the same pattern SYS-118/SYS-150 already use), SharpGPOAbuse
+  and PowerSploit's `New-GPOImmediateTask`/`Set-GPPrefRegistryValue` for GPO
+  abuse, `netdom trust` with SID-filtering explicitly disabled
+  (`/quarantine:no` or `/EnableSIDHistory:yes`) as a domain-trust
+  privilege-escalation bridge, a silent unattended `format /y` or a forced
+  recursive wipe of a broad user directory as destruction-for-its-own-sake,
+  and a bulk `Get-ADUser -Filter | Disable-ADAccount` one-liner as the mass
+  account lockout that often closes out a ransomware operation.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -374,7 +387,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 115 end to end as a single correlated incident and confirms its
+fires all 121 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -504,7 +517,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 531 tests
+python -m pytest        # 543 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -541,7 +554,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   115 YAML detection rules, by EventID, plus
+├── rules/                   121 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
@@ -549,7 +562,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   531 tests
+└── tests/                   543 tests
 ```
 
 ---

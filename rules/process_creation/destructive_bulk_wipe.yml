@@ -1,0 +1,21 @@
+id: SYS-167
+title: Command-line destructive wipe of a broad user directory or volume
+event_id: 1
+severity: critical
+attack: [T1485]
+description: >
+  Distinct from SYS-105/SYS-106 (sdelete, cipher /w -- covering tracks
+  after the fact, tagged T1070.004) and SYS-004's shadow-copy deletion
+  (inhibiting recovery, T1490): this is destruction as the goal itself,
+  not a side effect of hiding something else. `format.com` run with `/y`
+  (suppress the confirmation prompt) against a drive letter has essentially
+  no legitimate unattended use outside imaging/deployment tooling: a human
+  reformatting a drive sees and answers the prompt. A forced, recursive
+  delete (`del /f /s /q`, or PowerShell's `Remove-Item -Recurse -Force`)
+  targeting a whole Documents, Desktop, or user-profile tree is the same
+  intent through a different tool -- wipe first, or wipe instead of
+  encrypt, when an operator does not need the leverage a ransom note buys
+  and only wants the damage.
+detection:
+  command_line|re: '\bformat(?:\.com)?\s+[a-z]:.*\s/y\b|(?=.*\bdel\b)(?=.*/f\b)(?=.*/s\b)(?=.*/q\b)(?=.*\\(?:documents|desktop|users)\\)|(?=.*remove-item\b)(?=.*-recurse\b)(?=.*-force\b)(?=.*\\(?:documents|desktop|users)\\)'
+condition: any

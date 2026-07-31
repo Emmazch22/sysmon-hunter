@@ -1,0 +1,20 @@
+id: SYS-168
+title: PowerShell bulk-disabled or reset a broad set of AD accounts
+event_id: 1
+severity: critical
+attack: [T1531]
+description: >
+  Mass account lockout is a common closing move in a ransomware
+  operation -- disable or reset every account you can reach right before
+  the ransom note drops, so the response team cannot log back in to fight
+  it. A single `Get-ADUser -Identity <name> | Disable-ADAccount` is
+  ordinary, one-off account offboarding; the wildcard/broad `-Filter`
+  combined with a destructive-to-access cmdlet piped straight after it
+  (Disable-ADAccount, Set-ADAccountPassword, Remove-ADGroupMember) is what
+  turns the same two cmdlets into a bulk operation against however many
+  accounts the filter matches, in one command instead of one script that
+  loops and logs each target -- itself a choice that trades auditability
+  for speed, exactly what an operator running out the clock wants.
+detection:
+  command_line|re: '(?=.*get-aduser\b)(?=.*-filter\b)(?=.*(?:disable-adaccount|set-adaccountpassword|remove-adgroupmember))'
+condition: any

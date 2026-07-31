@@ -1,0 +1,23 @@
+id: SYS-165
+title: Known Group Policy abuse tooling or cmdlet invoked
+event_id: 1
+severity: critical
+attack: [T1484.001]
+description: >
+  A Group Policy Object applies to every computer and user it is linked to,
+  which is exactly why abusing one is such high-leverage privilege
+  escalation and persistence: one edit becomes a domain-wide backdoor with
+  no need to touch each target machine individually. SharpGPOAbuse (a
+  purpose-built offensive tool with no other purpose) and PowerSploit's
+  New-GPOImmediateTask push an immediate scheduled task through a GPO;
+  Set-GPPrefRegistryValue -- a legitimate Microsoft GroupPolicy-module
+  cmdlet for pushing a registry value via Group Policy Preferences -- is
+  the same mechanism repurposed to plant a Run key or similar persistence
+  domain-wide instead of a one-off local edit. None of these three strings
+  has a routine reason to appear on an ordinary workstation's command line;
+  a domain controller or GPO-management workstation running legitimate
+  Group Policy administration through this exact cmdlet is the expected
+  false positive to tune out once identified.
+detection:
+  command_line|re: 'sharpgpoabuse|new-gpoimmediatetask|set-gppregistryvalue'
+condition: any

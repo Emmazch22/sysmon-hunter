@@ -1,0 +1,20 @@
+id: SYS-163
+title: Rubeus used to pass or renew a Kerberos ticket
+event_id: 1
+severity: critical
+attack: [T1550.003]
+description: >
+  SYS-118 already fires on any invocation of rubeus.exe, tagged T1558.003
+  (Kerberoasting) since that is the tool's single most common use -- but
+  `Rubeus.exe ptt` (inject a stolen or forged ticket into the current
+  logon session) and `Rubeus.exe renew` are not Kerberoasting at all, they
+  are the *use* of a ticket someone already has, the step that actually
+  moves an attacker laterally with someone else's Kerberos identity. This
+  rule gives that specific invocation the correct, more specific tag, the
+  same way SYS-150 does for AS-REP roasting against SYS-118's generic
+  catch-all -- the two rules are expected to co-fire on the same event by
+  design, not a duplicate to be pruned.
+detection:
+  image|endswith: '\rubeus.exe'
+  command_line|re: '\b(?:ptt|renew)\b'
+condition: all
