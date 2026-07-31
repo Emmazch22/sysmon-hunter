@@ -110,6 +110,12 @@ def serialize_incident(incident: Incident, actionable: bool) -> dict[str, Any]:
         # here. The same reasoning as the "notes": "" line below.
         "status": "open",
         "notes": "",
+        # Scoring against the false-positive history needs a DB round trip
+        # (engine/noise.py), which the correlator's live-push path does not
+        # do -- a freshly-pushed incident always carries no score, the same
+        # way it always carries "" for notes above, until the console's next
+        # GET /incidents load fills it in.
+        "noise": None,
         "first_seen": incident.first_seen.isoformat(),
         "last_seen": incident.last_seen.isoformat(),
     }

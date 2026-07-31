@@ -378,6 +378,7 @@ CONFIG_SETTINGS = [
     ("HUNTER_BEACON_MAX_INTERVAL_SECONDS", "3600.0", "Slowest interval still distinguishable from a scheduled task."),
     ("HUNTER_DISCOVERY_ENABLED", "true", "Enable/disable reconnaissance-burst detection."),
     ("HUNTER_DISCOVERY_MIN_DISTINCT", "4", "Distinct recon techniques required to flag a burst."),
+    ("HUNTER_NOISE_SIMILARITY_THRESHOLD", "0.6", "Similarity score (0-1) an open incident needs to be flagged as probable noise."),
     ("HUNTER_ABUSEIPDB_API_KEY", "(unset)", "Optional key for IP reputation enrichment."),
     ("HUNTER_VIRUSTOTAL_API_KEY", "(unset)", "Optional key for hash/IP/domain reputation enrichment."),
     ("HUNTER_ENRICHMENT_CACHE_TTL_SECONDS", "3600", "How long a reputation lookup is cached."),
@@ -434,6 +435,7 @@ TOC_SECTIONS = [
         "3.5 Ransomware Detection", "3.6 Behavior Profiling &amp; Derived Titles",
         "3.7 Incident Scoring", "3.9 Sigma Rule Import", "3.10 STIX 2.1 Export",
         "3.11 ATT&amp;CK Coverage Report &amp; Navigator Export",
+        "3.12 False-Positive Similarity",
     ]),
     ("4", "Detection Rule Catalog", []),
     ("5", "The Analyst Console", [
@@ -761,6 +763,37 @@ story.append(P(
     "works."
 ))
 
+story.append(H2("3.12&nbsp;&nbsp;False-Positive Similarity"))
+story.append(P(
+    "Every incident an analyst marks a false positive is a labeled example "
+    "of noise -- <font face=\"Courier\">backend/engine/noise.py</font> is "
+    "what makes that marking pay off for the next incident, without a "
+    "trained model or a mountain of data to get there. A newly-opened "
+    "incident is compared against the deployment's own history of confirmed "
+    "false positives on four explainable signals: which detection rules "
+    "fired (the most precise statement of “this is the same pattern” "
+    "available, weighted highest), which ATT&amp;CK techniques were "
+    "involved, whether the same process was the root of the tree, and how "
+    "much of the process chain overlaps (weighted lowest, since two "
+    "unrelated incidents can share common ancestor processes like "
+    "<font face=\"Courier\">explorer.exe</font> by platform convention "
+    "alone)."
+))
+story.append(P(
+    "This is deliberately not a classifier. It produces a score -- e.g. "
+    "“78% similar to incident abc123, because: same detection rules, same "
+    "root process” -- from the very first false positive an analyst ever "
+    "marks, and the explanation is exactly the weighted arithmetic that "
+    "produced it, nothing hidden and nothing to retrain. A match at or "
+    "above <font face=\"Courier\">HUNTER_NOISE_SIMILARITY_THRESHOLD</font> "
+    "(default 0.6, Section 7) surfaces as a dashed “probable noise” badge "
+    "in the console queue and on the incident page, naming the past "
+    "incident it resembles and the specific signals that matched -- a hint "
+    "for an analyst to weigh, never an automatic dismissal. Only open "
+    "incidents are scored; a closed or already-dismissed incident has "
+    "nothing left to warn about."
+))
+
 story.append(PageBreak())
 
 story.append(H1("4.&nbsp;&nbsp;Detection Rule Catalog"))
@@ -925,6 +958,12 @@ story.append(P(
     "(Section 5.1), so a shift's queue only ever shows what still needs a "
     "decision."
 ))
+story.append(P(
+    "Once at least one incident has been marked a false positive, later "
+    "open incidents that resemble it closely enough gain a dashed “probable "
+    "noise” badge next to the status badge, naming the similarity "
+    "percentage -- see Section 3.12 for the scoring behind it."
+))
 
 story.append(H2("5.10&nbsp;&nbsp;Sigma Rule Import"))
 story.append(P(
@@ -1072,7 +1111,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 543 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 561 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1145,7 +1184,7 @@ layout_text = (
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, coverage, enrichment,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;search, report, profile, pipeline, sigma_import,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
@@ -1156,7 +1195,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;543 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;561 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

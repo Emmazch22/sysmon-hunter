@@ -148,6 +148,17 @@ about it.
   positive from the console or its full-page view, through a "Set verdict"
   menu. Closed and false-positive incidents drop out of the default "needs
   triage" filter without disappearing from "all" or "closed".
+- **False-positive similarity** — every incident an analyst marks a false
+  positive becomes a labeled example (`backend/engine/noise.py`): the next
+  open incident is compared against that history on four explainable
+  signals — shared detection rules, shared ATT&CK techniques, the same root
+  process, and process-chain overlap, weighted in that order — and a match
+  above threshold (`HUNTER_NOISE_SIMILARITY_THRESHOLD`, default 0.6) surfaces
+  a dashed "probable noise · NN%" badge naming exactly which past incident it
+  resembles and why, in both the console queue and the incident page. Not a
+  classifier and never auto-dismisses anything — it starts working from the
+  very first false positive an analyst marks, with a score an analyst can
+  audit down to the arithmetic that produced it.
 - **Explore view** — a dedicated full-screen page per incident: a pan-and-zoom
   process tree, an equally full-screen timeline, and a plain scrollable log of
   every detection's full forensic detail — for a tree or sequence too wide or
@@ -517,7 +528,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 543 tests
+python -m pytest        # 561 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -550,7 +561,7 @@ sysmon-hunter/
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, coverage,
 │   │                        enrichment, search, report, profile, pipeline,
-│   │                        sigma_import, stix_export
+│   │                        sigma_import, stix_export, noise
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
@@ -562,7 +573,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   543 tests
+└── tests/                   561 tests
 ```
 
 ---

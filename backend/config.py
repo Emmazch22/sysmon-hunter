@@ -107,6 +107,15 @@ class Settings(BaseSettings):
     discovery_window_minutes: int = 5
     discovery_cooldown_minutes: int = 15
 
+    # --- Noise heuristic ---
+    # How similar (0.0-1.0, weighted Jaccard across rule IDs, ATT&CK
+    # techniques, root process, and process chain) an open incident must be
+    # to a past false positive before the console flags it. See
+    # engine/noise.py for the weighting rationale. Lower this if the console
+    # under-flags real recurring noise; raise it if analysts start ignoring
+    # the badge because it fires on coincidental overlap.
+    noise_similarity_threshold: float = 0.6
+
     # --- IOC enrichment ---
     # Both are optional. With neither set, enrichment still runs and simply
     # reports every provider as unavailable -- the feature degrades, it does not

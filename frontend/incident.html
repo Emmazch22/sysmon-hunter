@@ -116,6 +116,31 @@
             padding: 2px 8px;
         }
 
+        /* engine/noise.py's similarity score against confirmed false positives
+           -- dashed, not filled, since this is a hint to weigh, not a verdict
+           like the badges above it. */
+        .ih-noise-badge {
+            font-size: 10px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--sev-medium);
+            border: 1px dashed color-mix(in srgb, var(--sev-medium) 55%, transparent);
+            padding: 2px 8px;
+        }
+
+        .ih-noise-note {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border: 1px dashed color-mix(in srgb, var(--sev-medium) 45%, transparent);
+            color: var(--text-dim);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .ih-noise-note b {
+            color: var(--sev-medium);
+        }
+
         .ih-actions {
             margin-top: 18px;
             display: flex;
@@ -422,6 +447,23 @@
                      </div>
                    </div>`;
 
+            // engine/noise.py's similarity score against this range's confirmed
+            // false positives -- only ever set on an open incident (see
+            // backend/api/incidents.py). A hint, not a verdict: shown so an
+            // analyst can weigh it, never used to auto-dismiss anything.
+            const noise = inc.noise;
+            const noiseBadge = noise
+                ? `<span class="ih-noise-badge" title="${esc(`${Math.round(noise.score * 100)}% similar to a past false positive`)}">probable noise &middot; ${Math.round(noise.score * 100)}%</span>`
+                : "";
+            const noiseNote = noise
+                ? `<div class="ih-noise-note">
+             <b>Probable noise:</b> ${Math.round(noise.score * 100)}% similar to
+             ${noise.matches.length === 1 ? "a past false positive" : `${noise.matches.length} past false positives`}
+             (${noise.matches.map((m) => `<a href="/incident/${esc(m.incident_id)}" target="_blank" rel="noopener">${esc(m.incident_id)}</a> &mdash; ${esc(Math.round(m.score * 100))}%`).join(", ")}).
+             Matched on: ${esc(noise.matches[0].matched_on.join(", ") || "weighted overlap")}.
+           </div>`
+                : "";
+
             const summary = [
                 ["Host", inc.host],
                 ["Severity", `${sev} · score ${inc.score}`],
@@ -453,6 +495,7 @@
       <span class="ih-id">#${esc(inc.id)}</span>
       ${inc.classification ? `<span class="ih-classification-badge">${esc(inc.classification.replace(/-/g, " "))}</span>` : ""}
       ${statusBadge}
+      ${noiseBadge}
     </div>
 
     <div class="ih-actions">
@@ -464,6 +507,8 @@
       </a>
       ${statusActions}
     </div>
+
+    ${noiseNote}
 
     <div class="section">
       <div class="section-title"><svg class="ico"><use href="#i-clock"/></svg> Summary</div>

@@ -232,6 +232,43 @@ async def list_incidents(
         return list(result.scalars().all())
 
 
+async def list_incidents_by_status(status: str, limit: int = 500) -> list[IncidentRow]:
+    """Every incident in one triage state, most recent first.
+
+    Unlike `list_incidents`, this is not the live queue -- it backs
+    `engine/noise.py`'s false-positive history, a bounded historical scan
+    an analyst never sees directly, so it is keyed on `status` rather than
+    `actionable` and capped generously rather than paginated.
+    """
+    async with Session() as session:
+        stmt = (
+            select(IncidentRow)
+            .where(IncidentRow.status == status)
+            .order_by(IncidentRow.last_seen.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+
+async def get_rule_ids_by_incident(incident_ids: list[str]) -> dict[str, set[str]]:
+    """Distinct rule IDs fired per incident, for a batch of incidents in one
+    query. `engine/noise.py`'s most precise similarity signal depends on
+    this; fetching it one incident at a time would turn scoring a page of
+    open incidents against the false-positive history into an N+1 query."""
+    if not incident_ids:
+        return {}
+    async with Session() as session:
+        stmt = select(DetectionRow.incident_id, DetectionRow.rule_id).where(
+            DetectionRow.incident_id.in_(incident_ids)
+        )
+        result = await session.execute(stmt)
+        grouped: dict[str, set[str]] = {}
+        for incident_id, rule_id in result.all():
+            grouped.setdefault(incident_id, set()).add(rule_id)
+        return grouped
+
+
 async def get_incident(incident_id: str) -> "IncidentRow | None":
     """One incident by id, or None.
 

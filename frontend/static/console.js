@@ -174,6 +174,20 @@ function incidentHtml(incident, isFresh) {
     const classificationBadge = incident.classification
         ? `<span class="inc-classification-badge">${escapeHtml(incident.classification.replace(/-/g, " "))}</span>`
         : "";
+
+    // engine/noise.py's similarity score against this range's confirmed false
+    // positives (backend/api/incidents.py). A hint to look at first, not a
+    // verdict -- an analyst still triages the incident, this just moves it up
+    // the "probably safe to skip" queue. Only ever set on an open incident.
+    const noise = incident.noise;
+    const noiseBadge = noise
+        ? `<span class="inc-noise-badge" title="${escapeHtml(
+            `${Math.round(noise.score * 100)}% similar to a past false positive` +
+            (noise.matches[0] && noise.matches[0].matched_on.length
+                ? ` — ${noise.matches[0].matched_on.join(", ")}`
+                : "")
+        )}">probable noise &middot; ${Math.round(noise.score * 100)}%</span>`
+        : "";
     // "Set verdict" is a menu trigger, not a direct action -- it must not look
     // like a value already attached to the incident (that was the FP button's
     // problem), so it opens a small dropdown instead of firing on its own click.
@@ -201,7 +215,7 @@ function incidentHtml(incident, isFresh) {
       <div class="spine"></div>
       <div class="inc-body">
         <div class="inc-top">
-          ${badge}${statusBadge}${classificationBadge}
+          ${badge}${statusBadge}${classificationBadge}${noiseBadge}
           <span class="inc-name">${escapeHtml(incident.title || "Suspicious activity")}</span>
           <span class="inc-score">
             <b>${incident.score}</b><span>score</span>

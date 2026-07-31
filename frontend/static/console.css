@@ -2312,6 +2312,22 @@ main {
     margin-left: 6px;
 }
 
+/* engine/noise.py's similarity score against past false positives -- dashed,
+     not filled, deliberately: this is a hint for an analyst to weigh, not a
+     verdict like the status or classification badges next to it. Amber
+     (--sev-medium) reads as "worth a second look", not "confirmed bad" or
+     "confirmed handled". */
+.inc-noise-badge {
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--sev-medium);
+    border: 1px dashed color-mix(in srgb, var(--sev-medium) 55%, transparent);
+    padding: 1px 6px;
+    margin-left: 6px;
+    cursor: help;
+}
+
 /* Close / set verdict / reopen -- the manual triage actions in the incident
      card's meta row, styled between .drill (text-only) and .open-tab
      (icon-only): a bordered icon+label button, quiet until hovered.
