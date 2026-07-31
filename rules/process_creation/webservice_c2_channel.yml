@@ -1,0 +1,23 @@
+id: SYS-159
+title: Chat-service webhook or bot API used as a covert channel
+event_id: 1
+severity: high
+attack: [T1102]
+description: >
+  Discord webhooks, Telegram bot API calls, and Slack incoming webhooks are
+  a favorite dead-simple C2/exfil channel precisely because the traffic
+  terminates at a mainstream, almost-never-blocked domain and needs no
+  attacker-owned infrastructure at all -- a webhook URL is free, disposable,
+  and looks identical to a thousand legitimate CI/notification integrations
+  on the wire. What is not identical is who makes the call: those
+  legitimate integrations run through the app itself or a purpose-built
+  script, not through curl/PowerShell/certutil naming the full webhook or
+  bot-token URL directly on a workstation's command line. A CI or build
+  server that posts its own status to Slack/Discord this way is the
+  expected false positive this rule will surface -- exclude that specific
+  parent/image once identified, the same way other LOLBAS-adjacent rules in
+  this corpus expect an analyst to tune out one identified legitimate
+  caller rather than disabling the rule entirely.
+detection:
+  command_line|re: 'discord(?:app)?\.com/api/(?:v\d+/)?webhooks/|api\.telegram\.org/bot|hooks\.slack\.com/services/'
+condition: any

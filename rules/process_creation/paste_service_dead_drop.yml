@@ -1,0 +1,21 @@
+id: SYS-160
+title: Public paste service used as a C2 dead-drop
+event_id: 1
+severity: high
+attack: [T1102]
+description: >
+  Pastebin, GitHub Gist raw content, and Hastebin are free, anonymous,
+  never-expiring text hosts -- an operator drops a stager, a config, or the
+  next stage's URL there once and every infected host can fetch it forever,
+  with no attacker-owned domain to burn and no reason for a defender to
+  block a site that also serves a thousand legitimate developer links every
+  day. SYS-009 (PowerShell download cradle) and SYS-153 (script host from
+  Explorer fetching remote code) already catch the download-and-execute
+  idiom generically, regardless of host; this rule adds the complementary,
+  narrower signal of exactly which hosting service is acting as the
+  dead-drop, which is useful on its own for attribution and for spotting
+  the cases where the generic cradle rules' broader net misses a host that
+  does not otherwise look unusual.
+detection:
+  command_line|re: '(?=.*(?:pastebin\.com/raw|hastebin\.com/raw|gist\.githubusercontent\.com))(?=.*\b(?:iex|invoke-expression|invoke-webrequest|iwr|downloadstring|downloadfile)\b)'
+condition: any

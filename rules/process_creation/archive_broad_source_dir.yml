@@ -1,0 +1,22 @@
+id: SYS-161
+title: Archive utility packaged a broad user data directory
+event_id: 1
+severity: medium
+attack: [T1074]
+description: >
+  SYS-098 and SYS-142 already flag *how* an archive was made (a password, or
+  encrypted headers); this one flags *what went into it*. 7-Zip, WinRAR, or
+  rar naming a whole Documents, Desktop, Pictures, or user-profile tree as
+  the source is the staging step almost every exfiltration-then-encrypt
+  ransomware playbook performs before moving anything off the host at
+  all -- collecting broadly first, so whatever turns out to be valuable is
+  already sitting in one file when the actual transfer happens. A routine
+  personal backup script looks identical to this on the command line alone,
+  which is exactly why this is a medium-severity lead, not a verdict: its
+  value is in what incident it correlates into (a nearby SYS-144 upload or
+  SYS-143 rclone sync turns "someone zipped their Documents folder" into
+  "someone staged their Documents folder for exfil").
+detection:
+  image|endswith: ['\7z.exe', '\7za.exe', '\winrar.exe', '\rar.exe']
+  command_line|re: '\\(?:documents|desktop|pictures|users)\\'
+condition: all

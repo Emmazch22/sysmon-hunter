@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 111 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 115 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -91,6 +91,15 @@ about it.
   overwrite it before the victim pastes) and Problem Steps Recorder
   (`psr.exe`) abused for silent screenshot capture, a signed built-in LOLBAS
   technique with no third-party tool required.
+- **Web-service C2 and data-staging detection** — four more rules
+  (SYS-159 through SYS-162) from the same coverage-gap pass: a command line
+  naming a Discord webhook, Telegram bot API, or Slack incoming webhook —
+  free, disposable C2/exfil channels that terminate at a mainstream domain
+  no egress filter blocks — a Pastebin/Gist raw dead-drop combined with a
+  download-and-execute idiom, an archive tool packaging a whole Documents/
+  Desktop/user-profile tree, and robocopy mass-mirroring one to a remote
+  share — the bulk-collection step nearly every exfiltrate-then-encrypt
+  ransomware playbook performs before anything actually leaves the host.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -365,7 +374,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 111 end to end as a single correlated incident and confirms its
+fires all 115 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -495,7 +504,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 523 tests
+python -m pytest        # 531 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -532,7 +541,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   111 YAML detection rules, by EventID, plus
+├── rules/                   115 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
@@ -540,7 +549,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   523 tests
+└── tests/                   531 tests
 ```
 
 ---

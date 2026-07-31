@@ -1,0 +1,22 @@
+id: SYS-162
+title: robocopy mass-mirrored a broad user directory tree
+event_id: 1
+severity: medium
+attack: [T1119, T1074]
+description: >
+  robocopy ships on every modern Windows install, so an operator gets
+  automated, recursive bulk collection (`/MIR` mirrors a whole tree,
+  `/E` copies every subdirectory including empty ones) with a
+  Microsoft-signed binary and no archive or transfer tool to drop on disk
+  at all -- the same living-off-the-land appeal that makes it a recurring
+  choice in real intrusions for hoovering up a user's Documents or Desktop
+  wholesale before the actual exfiltration step. Also the reason this is
+  medium, not high: an IT department's own profile-migration or backup
+  script runs the identical command, so this is scoped as tightly as
+  robocopy's own syntax allows -- the mirror/recurse flag AND a broad
+  source directory both have to be present, exactly like SYS-161's
+  narrower archive-based version of the same signal.
+detection:
+  image|endswith: '\robocopy.exe'
+  command_line|re: '(?=.*(?:/mir\b|/e\b))(?=.*\\(?:documents|desktop|users)\\)'
+condition: all
