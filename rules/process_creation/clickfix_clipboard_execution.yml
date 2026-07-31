@@ -1,0 +1,21 @@
+id: SYS-154
+title: PowerShell reads and executes clipboard contents
+event_id: 1
+severity: high
+attack: [T1204.004, T1059.001]
+description: >
+  A newer ClickFix variant keeps the string the victim pastes into the Run
+  dialog short and unremarkable, and has that short command itself call
+  Get-Clipboard (or its `gcb` alias) to pull the real, larger payload back
+  out of the clipboard and pipe it into Invoke-Expression -- one more layer
+  between what a victim (or a distracted analyst glancing at RunMRU) sees
+  and what actually executes. Deliberately not scoped to an explorer.exe
+  parent like SYS-151/152/153: by the time this second-stage PowerShell
+  process exists, its own parent may already be an intermediate cmd.exe or
+  conhost.exe wrapper rather than Explorer directly, so the reliable signal
+  left is the Get-Clipboard call itself -- something almost no legitimate
+  one-line command has any reason to make.
+detection:
+  image|endswith: ['\powershell.exe', '\pwsh.exe']
+  command_line|re: '\b(?:get-clipboard|gcb)\b'
+condition: all

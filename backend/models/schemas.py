@@ -219,7 +219,9 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1566": "delivery",
     "T1566.001": "delivery",
     "T1204": "execution",
+    "T1204.001": "execution",
     "T1204.002": "execution",
+    "T1204.004": "execution",
     "T1059": "execution",
     "T1059.001": "execution",
     "T1027": "execution",
@@ -335,6 +337,7 @@ _SIGNATURE_RULES: dict[str, str] = {
     "SYS-010": "Credential theft",
     "SYS-060": "Named-pipe C2",  # Cobalt Strike / Meterpreter pipe
     "SYS-031": "Defender tampering",
+    "SYS-151": "ClickFix social engineering",  # decoy-lure paste from Explorer
     "BCN-001": "C2 beacon",
     "DSC-001": "Host reconnaissance",
 }

@@ -70,6 +70,10 @@ class TestSignatureRules:
         inc = incident_with([("BCN-001", ["T1071.001", "T1573"])])
         assert inc.title == "C2 beacon on WS-01"
 
+    def test_clickfix_lure_is_social_engineering(self) -> None:
+        inc = incident_with([("SYS-151", ["T1204.004", "T1204.001"])], host="FIN-WS-07")
+        assert inc.title == "ClickFix social engineering on FIN-WS-07"
+
 
 class TestFallbacks:
     def test_single_tactic_is_named_readably(self) -> None:

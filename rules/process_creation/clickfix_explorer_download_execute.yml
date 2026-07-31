@@ -1,0 +1,23 @@
+id: SYS-153
+title: Script host launched from Explorer immediately fetching remote code
+event_id: 1
+severity: high
+attack: [T1204.004, T1105]
+description: >
+  The second stage of most ClickFix/FileFix chains: whatever the victim
+  pasted into the Run dialog or address bar either names a URL directly
+  (mshta's classic remote-HTA pattern also fits here) or is a one-line
+  download cradle -- IEX/Invoke-Expression against a WebClient or
+  Invoke-WebRequest, or curl/certutil/bitsadmin pulling a file down -- so
+  that a two-word paste can retrieve and run an arbitrarily large payload.
+  Independent of SYS-100 (mshta + URL) and SYS-009 (PowerShell download
+  cradle): both of those key on the command line alone regardless of parent,
+  while this one is scoped to the explorer.exe-as-parent shape that is
+  specific to the clipboard-paste delivery method, and widened to the other
+  script hosts a ClickFix payload commonly names besides PowerShell and
+  mshta.
+detection:
+  parent_image|endswith: '\explorer.exe'
+  image|endswith: ['\powershell.exe', '\pwsh.exe', '\cmd.exe', '\mshta.exe', '\wscript.exe', '\cscript.exe']
+  command_line|re: 'https?://|\b(?:iex|invoke-expression|invoke-webrequest|iwr)\b|downloadstring|downloadfile|downloaddata|curl(?:\.exe)?\s+-o|certutil[^\n]*-urlcache|bitsadmin[^\n]*\/transfer'
+condition: all

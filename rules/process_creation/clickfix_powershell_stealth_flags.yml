@@ -1,0 +1,18 @@
+id: SYS-152
+title: PowerShell launched from Explorer with execution-policy bypass and a hidden window
+event_id: 1
+severity: high
+attack: [T1204.004, T1059.001]
+description: >
+  Either `-ExecutionPolicy Bypass` or `-WindowStyle Hidden` alone shows up in
+  plenty of legitimate deployment tooling, so neither is a reliable signal by
+  itself. The combination is: a ClickFix/FileFix payload wants no policy
+  prompt in the way and no visible console window the victim might notice,
+  and it wants both at once, launched directly from explorer.exe (the Run
+  dialog or address bar) rather than from a script or scheduled task that
+  would carry its own, unrelated parent.
+detection:
+  parent_image|endswith: '\explorer.exe'
+  image|endswith: ['\powershell.exe', '\pwsh.exe']
+  command_line|re: '(?=.*-(?:ep|executionpolicy)\s+bypass)(?=.*-(?:w|windowstyle)\s+hidden)'
+condition: all
