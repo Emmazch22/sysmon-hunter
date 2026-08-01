@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 121 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 127 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -113,6 +113,24 @@ about it.
   recursive wipe of a broad user directory as destruction-for-its-own-sake,
   and a bulk `Get-ADUser -Filter | Disable-ADAccount` one-liner as the mass
   account lockout that often closes out a ransomware operation.
+- **Cloud, SSH, WMI, and DCOM detections** — six more rules (SYS-169 through
+  SYS-174) for gaps genuinely out of the mainstream but still detectable
+  from Windows Sysmon telemetry alone: a script interpreter staging a copy
+  of an AWS/Azure/gcloud CLI credential file, a Docker config, or a
+  Kubernetes config; a curl/PowerShell request to the cloud instance
+  metadata address (`169.254.169.254`) that every AWS/Azure/GCP instance
+  exposes IAM credentials on with no authentication required, the same
+  pivot the 2019 Capital One breach depended on; a staged SSH or PuTTY
+  private key; `wmic process call create` or PowerShell's
+  `Invoke-CimMethod`/`Invoke-WmiMethod` against `Win32_Process` — the
+  decades-old fileless remote-execution primitive Impacket's wmiexec.py
+  and Cobalt Strike both still use; `mmc.exe` spawning a shell, the
+  signature of MMC20.Application DCOM lateral movement; and
+  `docker run --privileged`, a container-escape precursor. Closing this
+  batch also surfaced and fixed a real gap from the previous rule batch:
+  the privilege-escalation tactic (added for the GPO-abuse rules) resolved
+  correctly but was silently dropped from both the incident title fallback
+  and the kill-chain narrative, since neither had a slot for it yet.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -398,7 +416,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 121 end to end as a single correlated incident and confirms its
+fires all 127 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -528,7 +546,7 @@ the server is reachable outside a network you trust.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 561 tests
+python -m pytest        # 576 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -565,7 +583,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   121 YAML detection rules, by EventID, plus
+├── rules/                   127 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            static/{css,js}
@@ -573,7 +591,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   561 tests
+└── tests/                   576 tests
 ```
 
 ---

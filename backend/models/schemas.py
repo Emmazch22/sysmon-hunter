@@ -298,6 +298,11 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1531": "impact",
     "T1484.001": "privilege-escalation",
     "T1484.002": "privilege-escalation",
+    # SYS-169..174. (T1047 already mapped above, for SYS-078.)
+    "T1552.004": "credential-access",
+    "T1552.005": "credential-access",
+    "T1021.003": "lateral-movement",
+    "T1611": "privilege-escalation",
     # SYS-124..131.
     "T1568": "command-and-control",
     "T1070.006": "defense-evasion",
@@ -453,6 +458,7 @@ _TACTIC_LABEL: dict[str, str] = {
     "credential-access": "Credential access",
     "discovery": "Host reconnaissance",
     "lateral-movement": "Lateral movement",
+    "privilege-escalation": "Privilege escalation",
     "collection": "Data collection",
     "command-and-control": "C2 communication",
     "exfiltration": "Data exfiltration",

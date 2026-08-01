@@ -1,0 +1,18 @@
+id: SYS-174
+title: Docker container launched with --privileged
+event_id: 1
+severity: high
+attack: [T1611]
+description: >
+  A `--privileged` container has no meaningful security boundary left --
+  full device access, no seccomp/AppArmor confinement, and (on the Linux VM
+  every Docker Desktop for Windows install runs containers inside of) an
+  almost mechanical path to mounting the host's own filesystem and writing
+  to it, which is what "container escape" actually means in practice.
+  Legitimate uses exist (some hardware-passthrough or nested-virtualization
+  workloads genuinely need it), but they are rare enough, and the flag
+  consequential enough, that seeing it at all is worth a look -- unlike a
+  broad volume mount, which has far too many ordinary uses to key on alone.
+detection:
+  command_line|re: '(?=.*\bdocker(?:\.exe)?\b)(?=.*\brun\b)(?=.*--privileged\b)'
+condition: all

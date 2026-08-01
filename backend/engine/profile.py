@@ -111,6 +111,10 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1531": "impact",
     "T1484.001": "privilege-escalation",
     "T1484.002": "privilege-escalation",
+    "T1611": "privilege-escalation",
+    "T1552.004": "credential-access",
+    "T1552.005": "credential-access",
+    "T1021.003": "lateral-movement",
     # SYS-124..131.
     "T1568": "command-and-control",
     "T1070.006": "defense-evasion",
@@ -133,6 +137,7 @@ TECHNIQUE_TACTIC: dict[str, str] = {
 TACTIC_ORDER = [
     "initial-access",
     "execution",
+    "privilege-escalation",
     "defense-evasion",
     "discovery",
     "lateral-movement",
@@ -194,6 +199,13 @@ def _phrase_for_tactic(
         if "SYS-035" in rule_ids:
             return "executed an encoded script via the Windows Script Host"
         return "executed a suspicious payload"
+
+    if tactic == "privilege-escalation":
+        if "T1611" in techniques:
+            return "escaped a privileged container to reach the underlying host"
+        if {"T1484.001", "T1484.002"} & techniques:
+            return "escalated privileges by abusing Group Policy or a domain trust"
+        return "escalated privileges"
 
     if tactic == "defense-evasion":
         details = []

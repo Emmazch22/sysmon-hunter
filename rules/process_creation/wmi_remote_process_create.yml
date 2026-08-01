@@ -1,0 +1,27 @@
+id: SYS-172
+title: WMI used to create a process via Win32_Process
+event_id: 1
+severity: high
+attack: [T1047]
+description: >
+  `wmic process call create`, PowerShell's `Invoke-CimMethod`/
+  `Invoke-WmiMethod -Class Win32_Process -Name Create`, and Impacket's
+  wmiexec.py all boil down to the same WMI method call: create a process
+  through Win32_Process rather than a shell. It is one of the oldest
+  fileless lateral-movement primitives precisely because it never spawns a
+  visible child of the interactive shell an EDR product is watching -- the
+  new process on the target appears to originate from WmiPrvSE with no
+  parent-child relationship an analyst would recognise. Matched two ways
+  because the two tool families use genuinely different vocabulary: wmic's
+  `process call create` never contains the literal class name, while the
+  PowerShell CIM/WMI cmdlets always name `Win32_Process` explicitly (with a
+  word-boundary check so that string alone doesn't false-positive on
+  `Get-CimInstance -ClassName Win32_Process`, a read-only enumeration with
+  no "create" anywhere in the line).
+detection:
+  image|endswith:
+    - '\wmic.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+  command_line|re: '(?=.*\bprocess\b)(?=.*\bcall\b)(?=.*\bcreate\b)|(?=.*win32_process)(?=.*\bcreate\b)'
+condition: all

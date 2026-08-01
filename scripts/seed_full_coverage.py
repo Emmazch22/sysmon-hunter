@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 121 rules
+job: it is a regression fixture and a coverage demo, built to fire all 127 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -95,6 +95,12 @@ machine. The phases, roughly in kill-chain order:
       │   sekurlsa::pth/kerberos::ptt, SharpGPOAbuse, netdom trust with SID
       │   filtering disabled, a silent format /y, and a bulk
       │   Get-ADUser | Disable-ADAccount one-liner (SYS-163 through SYS-168)
+      ├─ coverage-expansion pass 9: the marginal, out-of-the-mainstream
+      │   ATT&CK gaps -- a staged AWS credentials file, a curl request to
+      │   the cloud instance metadata address, a staged SSH private key, a
+      │   wmic Win32_Process remote-exec command line, mmc.exe spawning a
+      │   shell (MMC20.Application DCOM lateral movement), and a
+      │   `docker run --privileged` invocation (SYS-169 through SYS-174)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -139,7 +145,8 @@ EXPECTED_RULES = {
     "SYS-143", "SYS-144", "SYS-148", "SYS-149", "SYS-150", "SYS-151", "SYS-152",
     "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158", "SYS-159",
     "SYS-160", "SYS-161", "SYS-162", "SYS-163", "SYS-164", "SYS-165", "SYS-166",
-    "SYS-167", "SYS-168",
+    "SYS-167", "SYS-168", "SYS-169", "SYS-170", "SYS-171", "SYS-172", "SYS-173",
+    "SYS-174",
 }
 
 
@@ -286,6 +293,14 @@ G = {
     "trust_sidhistory": "{rng-trust-sidhistory}",
     "destructive_wipe": "{rng-destructive-wipe}",
     "bulk_disable": "{rng-bulk-disable}",
+    # Coverage-expansion pass 9: marginal ATT&CK gaps -- cloud, SSH, WMI,
+    # DCOM, containers (SYS-169..174).
+    "cloud_cred_staged": "{rng-cloud-cred-staged}",
+    "imds_theft": "{rng-imds-theft}",
+    "ssh_key_staged": "{rng-ssh-key-staged}",
+    "wmi_remote_exec": "{rng-wmi-remote-exec}",
+    "dcom_mmc": "{rng-dcom-mmc}",
+    "docker_privileged": "{rng-docker-privileged}",
 }
 
 
@@ -957,6 +972,55 @@ def events() -> list[dict]:
                     r"powershell -nop -c \"Get-ADUser -Filter 'Enabled -eq $true' "
                     r"| Disable-ADAccount\"",
                     pid=5720, ppid=4510))
+
+    # === Coverage-expansion pass 9: marginal ATT&CK gaps, off "ops" ===
+    # A PowerShell process stages a copy of the AWS CLI's credentials file
+    # (SYS-169).
+    ev.append(proc(step(1), G["cloud_cred_staged"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "Copy-Item $env:USERPROFILE\.aws\credentials '
+                    r'C:\Users\redteam.ops\AppData\Local\Temp\credentials"',
+                    pid=5730, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["cloud_cred_staged"],
+                         TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Temp\.aws\credentials"))
+
+    # curl reaching the cloud instance metadata address for IAM role
+    # credentials (SYS-170).
+    ev.append(proc(step(1), G["imds_theft"], G["ops"], r"C:\Windows\System32\curl.exe",
+                    "curl.exe http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+                    pid=5740, ppid=4510))
+
+    # A script interpreter stages a copy of the user's SSH private key
+    # (SYS-171).
+    ev.append(proc(step(1), G["ssh_key_staged"], G["ops"], r"C:\Windows\System32\cmd.exe",
+                    r"cmd.exe /c copy %USERPROFILE%\.ssh\id_rsa "
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\id_rsa",
+                    pid=5750, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\cmd.exe",
+                         ProcessGuid=G["ssh_key_staged"],
+                         TargetFilename=r"C:\Users\redteam.ops\AppData\Local\Temp\id_rsa"))
+
+    # wmic remote Win32_Process creation -- fileless lateral movement
+    # (SYS-172).
+    ev.append(proc(step(1), G["wmi_remote_exec"], G["ops"], r"C:\Windows\System32\wbem\WMIC.exe",
+                    r'wmic.exe /node:10.10.10.20 /user:administrator process call create '
+                    r'"cmd.exe /c whoami"',
+                    pid=5760, ppid=4510))
+
+    # mmc.exe spawns a shell -- MMC20.Application DCOM lateral movement
+    # (SYS-173). Parented directly at root, not "ops": the whole point of
+    # the technique is that mmc.exe itself is the entry point on the
+    # target, not a child of an existing dispatcher.
+    ev.append(proc(step(1), G["dcom_mmc"], G["root"], r"C:\Windows\System32\cmd.exe",
+                    "cmd.exe /c whoami", pid=5770, ppid=3120,
+                    parent_image=r"C:\Windows\System32\mmc.exe"))
+
+    # docker run --privileged -- a container-escape precursor (SYS-174).
+    ev.append(proc(step(1), G["docker_privileged"], G["ops"],
+                    r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+                    "docker.exe run --rm --privileged alpine sh",
+                    pid=5780, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

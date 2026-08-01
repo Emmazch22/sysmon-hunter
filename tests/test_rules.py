@@ -2072,6 +2072,114 @@ CASES = [
             command_line='powershell -c "Get-ADUser -Identity jdoe | Disable-ADAccount"',
         ),
     ),
+    # --- Script interpreter staged a cloud CLI credential file (SYS-169) ---
+    (
+        "SYS-169",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\.aws\credentials",
+        ),
+    ),
+    (
+        "SYS-169",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\Documents\notes.txt",
+        ),
+    ),
+    # --- Cloud instance metadata service queried by a non-agent process (SYS-170) ---
+    (
+        "SYS-170",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\curl.exe",
+            command_line="curl.exe http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+        ),
+    ),
+    (
+        "SYS-170",
+        False,
+        event(1, image=r"C:\Windows\System32\curl.exe", command_line="curl.exe https://example.com"),
+    ),
+    # --- Script interpreter staged an SSH or PuTTY private key (SYS-171) ---
+    (
+        "SYS-171",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\cmd.exe",
+            TargetFilename=r"C:\Users\bob\AppData\Local\Temp\id_rsa",
+        ),
+    ),
+    (
+        "SYS-171",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\System32\OpenSSH\ssh.exe",
+            TargetFilename=r"C:\Users\bob\.ssh\id_rsa",
+        ),
+    ),
+    # --- WMI used to create a process via Win32_Process (SYS-172) ---
+    (
+        "SYS-172",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\wbem\WMIC.exe",
+            command_line='wmic /node:10.0.0.5 process call create "cmd.exe /c whoami"',
+        ),
+    ),
+    (
+        "SYS-172",
+        False,
+        event(1, image=r"C:\Windows\System32\wbem\WMIC.exe", command_line="wmic process list brief"),
+    ),
+    # --- mmc.exe spawned a shell consistent with MMC20.Application DCOM abuse (SYS-173) ---
+    (
+        "SYS-173",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\cmd.exe",
+            parent_image=r"C:\Windows\System32\mmc.exe",
+            command_line="cmd.exe /c whoami",
+        ),
+    ),
+    (
+        "SYS-173",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\mmc.exe",
+            parent_image=r"C:\Windows\explorer.exe",
+            command_line="mmc.exe",
+        ),
+    ),
+    # --- Docker container launched with --privileged (SYS-174) ---
+    (
+        "SYS-174",
+        True,
+        event(
+            1,
+            image=r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+            command_line="docker.exe run --rm --privileged alpine sh",
+        ),
+    ),
+    (
+        "SYS-174",
+        False,
+        event(
+            1,
+            image=r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+            command_line="docker.exe run --rm alpine sh",
+        ),
+    ),
 ]
 
 

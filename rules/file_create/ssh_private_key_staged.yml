@@ -1,0 +1,28 @@
+id: SYS-171
+title: Script interpreter staged an SSH or PuTTY private key
+event_id: 11
+severity: high
+attack: [T1552.004]
+description: >
+  id_rsa, id_ed25519, and id_ecdsa are OpenSSH's default private-key
+  filenames; .ppk is PuTTY's own format. Sysmon cannot see a private key
+  being opened for read where it lives, only being written -- so this
+  targets the same "staged, not opened" signal SYS-135/SYS-136 use for
+  browser and KeePass credential stores: a script interpreter or LOLBin
+  writing a file with one of these exact names anywhere on disk. An
+  unprotected private key is standing access to every host and service
+  that trusts its matching public key, often well beyond the one machine
+  it was stolen from.
+detection:
+  TargetFilename|endswith:
+    - '\id_rsa'
+    - '\id_ed25519'
+    - '\id_ecdsa'
+    - '.ppk'
+  image|endswith:
+    - '\powershell.exe'
+    - '\cmd.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\rundll32.exe'
+condition: all

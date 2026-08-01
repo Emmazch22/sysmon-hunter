@@ -95,6 +95,40 @@ class TestSummary:
         ]
 
 
+class TestPrivilegeEscalationPhase:
+    """Regression test: T1484.001/.002 (GPO/domain-trust abuse) resolved to
+    "privilege-escalation" in TECHNIQUE_TACTIC from the session that added
+    them, but that tactic was missing from TACTIC_ORDER and had no
+    _phrase_for_tactic branch -- so the phase silently vanished from every
+    profile and summary instead of erroring, the same class of bug
+    TestRuleCorpusTechniquesResolve below cannot catch (it only proves the
+    technique resolves to *some* tactic name, not that the tactic actually
+    produces a phase)."""
+
+    def test_gpo_abuse_produces_a_privilege_escalation_phase(self) -> None:
+        incident = {"host": "WS-01"}
+        detections = [_det("SYS-165", ["T1484.001"])]
+        profile = build_profile(incident, detections)
+        assert any(p["tactic"] == "privilege escalation" for p in profile["phases"])
+
+    def test_container_escape_produces_a_privilege_escalation_phase(self) -> None:
+        incident = {"host": "WS-01"}
+        detections = [_det("SYS-174", ["T1611"])]
+        profile = build_profile(incident, detections)
+        phase = next(p for p in profile["phases"] if p["tactic"] == "privilege escalation")
+        assert "container" in phase["phrase"]
+
+    def test_privilege_escalation_falls_between_execution_and_defense_evasion(self) -> None:
+        incident = {"host": "WS-01"}
+        detections = [
+            _det("SYS-002", ["T1059.001"]),
+            _det("SYS-165", ["T1484.001"]),
+            _det("SYS-031", ["T1685"]),
+        ]
+        tactics = [p["tactic"] for p in build_profile(incident, detections)["phases"]]
+        assert tactics == ["execution", "privilege escalation", "defense evasion"]
+
+
 class TestSubTechniqueFallback:
     def test_unlisted_subtechnique_falls_back_to_parent_phase(self) -> None:
         """T1055.001 (mavinject) is not spelled out in TECHNIQUE_TACTIC, only

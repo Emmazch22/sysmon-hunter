@@ -1,0 +1,26 @@
+id: SYS-173
+title: mmc.exe spawned a shell consistent with MMC20.Application DCOM abuse
+event_id: 1
+severity: high
+attack: [T1021.003]
+description: >
+  MMC20.Application is a COM object every Windows host exposes over DCOM by
+  default, and one of its methods
+  (Document.ActiveView.ExecuteShellCommand) runs an arbitrary command on
+  the target -- one of the best-documented "fileless" lateral-movement
+  techniques (Cobalt Strike's own `dcom` module automates it) precisely
+  because no new service, scheduled task, or file is ever written on the
+  target: the only trace left behind is mmc.exe, normally a quiet console
+  host a user opens by hand and never scripts, appearing as the parent of
+  a shell or script interpreter it never launches in ordinary
+  administration.
+detection:
+  parent_image|endswith: '\mmc.exe'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\cscript.exe'
+    - '\wscript.exe'
+    - '\rundll32.exe'
+condition: all
