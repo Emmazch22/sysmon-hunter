@@ -20,6 +20,7 @@ from backend.engine.beacon import BeaconDetector
 from backend.engine.correlator import IncidentEngine, ProcessTree
 from backend.engine.discovery import DiscoveryDetector
 from backend.engine.matcher import evaluate
+from backend.engine import metrics
 from backend.engine.normalizer import normalize
 from backend.engine.rule_loader import rule_store
 from backend.models import db
@@ -108,6 +109,7 @@ class Pipeline:
 
         raised: list[Incident] = []
         for detection in detections:
+            metrics.detections_total.inc(rule_id=detection.rule_id)
             incident = self.incidents.correlate(detection)
             actionable = self.incidents.is_actionable(incident)
 

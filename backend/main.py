@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from fastapi import Depends, FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.api import (
@@ -36,18 +37,17 @@ from backend.api import (
     ws,
 )
 from backend.api.auth import require_api_key
+from backend.api.rate_limit import enforce_ingest_rate_limit
 from backend.config import BASE_DIR, settings
+from backend.engine import metrics
 from backend.engine.attack import attack_lookup
 from backend.engine.enrichment import enrichment_service
 from backend.engine.pipeline import pipeline
 from backend.engine.rule_loader import rule_store
+from backend.logging_setup import configure_logging
 from backend.models import db
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+configure_logging(json_format=settings.log_json)
 log = logging.getLogger("hunter")
 
 FRONTEND = BASE_DIR / "frontend"
@@ -118,7 +118,13 @@ app = FastAPI(
 # ever actually locked down is a gap worth knowing about, not one this
 # dependency can close.
 _api_key_gate = [Depends(require_api_key)]
-app.include_router(ingest.router, dependencies=_api_key_gate)
+# ingest also gets the (opt-in, off-by-default) rate limiter -- no other
+# router accepts unbounded external write volume the way /ingest does, so
+# only this one needs a third dependency layered on.
+app.include_router(
+    ingest.router,
+    dependencies=[*_api_key_gate, Depends(enforce_ingest_rate_limit)],
+)
 app.include_router(detections.router, dependencies=_api_key_gate)
 app.include_router(incidents.router, dependencies=_api_key_gate)
 app.include_router(ws.router)
@@ -134,6 +140,35 @@ app.include_router(admin.router, dependencies=_api_key_gate)
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
 app.mount("/static", StaticFiles(directory=str(FRONTEND / "static")), name="static")
+
+
+@app.middleware("http")
+async def _metrics_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """Times every request and records it against `/metrics`.
+
+    Labeled by the matched route's *template* ("/incidents/{incident_id}"),
+    not the raw URL -- using the raw path would give a distinct-forever
+    label to every incident ID or bogus probed path a client ever requests,
+    which is exactly the unbounded-cardinality mistake that turns a metrics
+    endpoint into a memory leak. The route is only known after `call_next`
+    resolves it, and is `None` for anything that never matched (a 404),
+    which falls back to a fixed "unmatched" label instead of the raw path
+    for the same reason.
+    """
+    start = time.monotonic()
+    response = await call_next(request)
+    duration = time.monotonic() - start
+
+    route = request.scope.get("route")
+    path_label = getattr(route, "path", None) or "unmatched"
+
+    metrics.http_requests_total.inc(
+        method=request.method, path=path_label, status=str(response.status_code)
+    )
+    metrics.http_request_duration_seconds.observe(
+        duration, method=request.method, path=path_label
+    )
+    return response
 
 
 @app.get("/", include_in_schema=False)
@@ -201,3 +236,26 @@ async def health() -> dict[str, Any]:
         "coverage_by_event_id": rule_store.coverage,
         **pipeline.stats,
     }
+
+
+@app.get("/metrics", tags=["ops"], include_in_schema=False)
+async def metrics_endpoint() -> PlainTextResponse:
+    """Prometheus text-exposition scrape target.
+
+    Deliberately not behind `_api_key_gate`, matching `/health`'s existing
+    precedent: a monitoring endpoint that a scraper hits unauthenticated on
+    an internal network, same as the liveness check next to it.
+    """
+    extra_gauges = {
+        "hunter_rule_errors": float(len(rule_store.errors)),
+        "hunter_consoles_connected": float(ws.manager.count),
+        **{
+            f"hunter_{key}": float(value)
+            for key, value in pipeline.stats.items()
+            if isinstance(value, (int, float))
+        },
+    }
+    return PlainTextResponse(
+        metrics.render_prometheus_text(extra_gauges=extra_gauges),
+        media_type="text/plain; version=0.0.4",
+    )

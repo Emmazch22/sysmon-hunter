@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
+from backend.engine import metrics
 from backend.engine.pipeline import pipeline
 
 log = logging.getLogger(__name__)
@@ -35,10 +36,13 @@ async def ingest(payload: dict[str, Any]) -> dict[str, Any]:
     a collector that retries a payload we cannot parse will retry it forever.
     """
     try:
-        return await pipeline.process(payload)
+        result = await pipeline.process(payload)
     except Exception as exc:  # noqa: BLE001 - the boundary must not leak stack traces
         log.exception("Failed to process inbound event")
+        metrics.ingest_requests_total.inc(outcome="malformed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Malformed event payload: {exc}",
         ) from exc
+    metrics.ingest_requests_total.inc(outcome="accepted")
+    return result

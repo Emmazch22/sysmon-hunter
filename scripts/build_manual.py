@@ -364,6 +364,7 @@ API_ROUTES = [
     ("DELETE", "/admin/database", "Wipe all detections and incidents; reset the live engine."),
     ("POST", "/admin/rules/import-sigma", "Convert and load one or more Sigma YAML files; live immediately."),
     ("GET", "/health", "Liveness/readiness probe: rule count, tracked processes."),
+    ("GET", "/metrics", "Prometheus text-exposition scrape target: request, ingest, and detection counters."),
     ("WS", "/ws", "Live event stream: new detections, incident updates, resets."),
     ("GET", "/", "The analyst console (single page app)."),
     ("GET", "/incident/{id}", "Full-page view of one incident, with notes editor."),
@@ -388,6 +389,9 @@ CONFIG_SETTINGS = [
     ("HUNTER_ABUSEIPDB_API_KEY", "(unset)", "Optional key for IP reputation enrichment."),
     ("HUNTER_VIRUSTOTAL_API_KEY", "(unset)", "Optional key for hash/IP/domain reputation enrichment."),
     ("HUNTER_ENRICHMENT_CACHE_TTL_SECONDS", "3600", "How long a reputation lookup is cached."),
+    ("HUNTER_LOG_JSON", "false", "One JSON object per log line, for log aggregators, instead of human-readable text."),
+    ("HUNTER_INGEST_RATE_LIMIT_PER_SECOND", "0", "Token-bucket rate limit on /ingest per source IP. 0 disables it."),
+    ("HUNTER_INGEST_RATE_LIMIT_BURST", "50", "Burst allowance above the steady-state /ingest rate limit."),
 ]
 
 
@@ -1117,7 +1121,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 576 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 598 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1183,14 +1187,16 @@ story.append(H1("12.&nbsp;&nbsp;Project Layout"))
 layout_text = (
     "sysmon-hunter/<br/>"
     "+-- backend/<br/>"
-    "|&nbsp;&nbsp;+-- main.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FastAPI app, lifespan, background sweep<br/>"
+    "|&nbsp;&nbsp;+-- main.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FastAPI app, lifespan, background sweep, /metrics<br/>"
     "|&nbsp;&nbsp;+-- config.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all tunables<br/>"
+    "|&nbsp;&nbsp;+-- logging_setup.py&nbsp;text/JSON log formatting<br/>"
     "|&nbsp;&nbsp;+-- api/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ingest, detections, incidents, attack, enrich,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers,<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rate_limit<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, coverage, enrichment,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;search, report, profile, pipeline, sigma_import,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise, metrics<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
@@ -1201,7 +1207,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;576 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;598 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

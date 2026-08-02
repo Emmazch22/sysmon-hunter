@@ -231,6 +231,19 @@ about it.
   to ranking covered techniques against each other rather than refusing to
   run. The underlying JSON report is also available directly at
   `GET /attack/coverage`.
+- **Production hardening** — a Prometheus text-exposition scrape target at
+  `GET /metrics` (`backend/engine/metrics.py`, hand-rolled Counter/Histogram,
+  no `prometheus_client` dependency) reporting ingest outcomes, detections by
+  rule ID, HTTP request counts and latency by route, and every `/health`
+  gauge under a `hunter_` prefix; structured single-line JSON logging via
+  `HUNTER_LOG_JSON=true` (`backend/logging_setup.py`) for log aggregators
+  that expect one parseable record per line instead of the human-readable
+  text format kept as the default; and an opt-in token-bucket rate limiter
+  on `/ingest` (`HUNTER_INGEST_RATE_LIMIT_PER_SECOND`, 0 = disabled by
+  default) so a single collector reachable from an untrusted network can be
+  throttled without touching every other router. All three follow the same
+  "off by default, opt-in via settings" shape `HUNTER_API_KEY` already
+  established — a fresh checkout behaves exactly as it always did.
 
 ---
 
@@ -540,13 +553,28 @@ travels as a plain header, not a secret exchange, so treat it like a
 password: don't commit it, and prefer HTTPS (e.g. behind a reverse proxy) if
 the server is reachable outside a network you trust.
 
+### Optional: production hardening
+
+Three more knobs, all off by default so a fresh checkout is unaffected:
+
+```
+HUNTER_LOG_JSON=true                        # one JSON object per log line, for log aggregators
+HUNTER_INGEST_RATE_LIMIT_PER_SECOND=10      # 0 (default) disables the limiter entirely
+HUNTER_INGEST_RATE_LIMIT_BURST=50           # tokens a client can spend in a burst before throttling
+```
+
+`GET /metrics` is always on and unauthenticated (same precedent as `/health`)
+— point Prometheus, Grafana Agent, or any compatible scraper at it. It
+reports every `/health` gauge under a `hunter_` prefix, plus request counts
+and latency histograms by route and detections raised by rule ID.
+
 ---
 
 ## Tests
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 576 tests
+python -m pytest        # 598 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -572,14 +600,16 @@ health-checks `/health`.
 ```
 sysmon-hunter/
 ├── backend/
-│   ├── main.py              FastAPI app, lifespan, background sweep
+│   ├── main.py              FastAPI app, lifespan, background sweep, /metrics
 │   ├── config.py            all tunables
+│   ├── logging_setup.py     text/JSON log formatting
 │   ├── api/                 ingest, detections, incidents, attack, enrich,
-│   │                        report, search, notes, admin, ws, serializers
+│   │                        report, search, notes, admin, ws, serializers,
+│   │                        rate_limit
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, coverage,
 │   │                        enrichment, search, report, profile, pipeline,
-│   │                        sigma_import, stix_export, noise
+│   │                        sigma_import, stix_export, noise, metrics
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
@@ -591,7 +621,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   576 tests
+└── tests/                   598 tests
 ```
 
 ---

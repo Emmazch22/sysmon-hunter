@@ -129,5 +129,26 @@ class Settings(BaseSettings):
     # spending the daily quota re-checking the same IP.
     enrichment_cache_ttl_seconds: int = 3600
 
+    # --- Operations ---
+    # One JSON object per log line instead of the human-readable text format,
+    # for log aggregators (CloudWatch, Loki, the ELK stack) that expect
+    # structured records rather than a format string to parse back apart.
+    # Off by default: a fresh checkout run by hand from a terminal wants the
+    # readable format, not JSON scrolling past.
+    log_json: bool = False
+
+    # Requests per second a single client (by source IP) may POST to
+    # /ingest before getting a 429, refilled continuously (a token bucket,
+    # not a fixed window). 0 disables the limiter entirely -- the default,
+    # since a single trusted collector on an internal network has no
+    # obvious reason to be throttled by the server it is feeding. Set this
+    # once /ingest is reachable from anywhere a misbehaving or malicious
+    # sender could otherwise flood it.
+    ingest_rate_limit_per_second: float = 0
+    # Burst allowance above the steady-state rate -- lets a collector that
+    # was briefly offline catch up on a backlog without being throttled the
+    # moment it reconnects.
+    ingest_rate_limit_burst: float = 50
+
 
 settings = Settings()
