@@ -244,6 +244,18 @@ about it.
   throttled without touching every other router. All three follow the same
   "off by default, opt-in via settings" shape `HUNTER_API_KEY` already
   established — a fresh checkout behaves exactly as it always did.
+- **Stats dashboard** — a fourth console view (`GET /dashboard`, next to the
+  console, incident page, and Explore) charting the whole rule corpus's
+  behavior over time: incidents per day (7/14/30/90-day range, zero-filled
+  so a quiet day is a visible flat bar, not a gap), severity distribution,
+  triage status breakdown, and the top 10 rules and top 10 ATT&CK
+  techniques by detection count, each technique linking straight to its
+  MITRE page. Backed by `GET /stats` (`backend/engine/stats.py`), which
+  reads the narrow column set it needs from SQLite and tallies it in
+  Python rather than fighting SQLite into a "group by calendar day" it has
+  no clean way to express. Rendered as plain HTML/CSS bar charts — no
+  charting library, the same zero-new-dependency approach as everything
+  else in the frontend.
 
 ---
 
@@ -574,7 +586,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 598 tests
+python -m pytest        # 614 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -605,23 +617,23 @@ sysmon-hunter/
 │   ├── logging_setup.py     text/JSON log formatting
 │   ├── api/                 ingest, detections, incidents, attack, enrich,
 │   │                        report, search, notes, admin, ws, serializers,
-│   │                        rate_limit
+│   │                        rate_limit, stats
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, coverage,
 │   │                        enrichment, search, report, profile, pipeline,
-│   │                        sigma_import, stix_export, noise, metrics
+│   │                        sigma_import, stix_export, noise, metrics, stats
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
 ├── rules/                   127 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
-│                            static/{css,js}
+│                            dashboard.html, static/{css,js}
 ├── migrations/              Alembic
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   598 tests
+└── tests/                   614 tests
 ```
 
 ---

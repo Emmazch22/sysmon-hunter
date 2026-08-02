@@ -360,6 +360,7 @@ API_ROUTES = [
     ("GET", "/attack/coverage", "Rule-coverage report: rule/detector count per ATT&amp;CK technique."),
     ("GET", "/attack/coverage/navigator", "The coverage report as a downloadable MITRE ATT&amp;CK Navigator layer."),
     ("GET", "/attack/{technique_id}", "MITRE ATT&amp;CK technique description, from the local dataset."),
+    ("GET", "/stats", "Dashboard aggregates: incidents/day, severity mix, triage totals, top rules and techniques."),
     ("GET", "/enrich", "On-demand reputation lookup for an IP, domain, or hash."),
     ("DELETE", "/admin/database", "Wipe all detections and incidents; reset the live engine."),
     ("POST", "/admin/rules/import-sigma", "Convert and load one or more Sigma YAML files; live immediately."),
@@ -370,6 +371,7 @@ API_ROUTES = [
     ("GET", "/incident/{id}", "Full-page view of one incident, with notes editor."),
     ("GET", "/incident/{id}/explore", "Full-screen Explore view: process tree, timeline, or logs, picked by tab."),
     ("GET", "/incident/{id}/tree", "Alias for /explore?view=tree, kept for old links."),
+    ("GET", "/dashboard", "The stats dashboard page: incident trends and top rules/techniques, charted."),
 ]
 
 CONFIG_SETTINGS = [
@@ -455,7 +457,7 @@ TOC_SECTIONS = [
         "5.7 Analyst Notes", "5.8 PDF Reports &amp; STIX Export",
         "5.9 Incident Triage", "5.10 Sigma Rule Import",
         "5.11 Theme &amp; Database Reset", "5.12 Live WebSocket Feed",
-        "5.13 ATT&amp;CK Coverage Download",
+        "5.13 ATT&amp;CK Coverage Download", "5.14 Stats Dashboard",
     ]),
     ("6", "REST API Reference", []),
     ("7", "Configuration Reference", []),
@@ -1016,6 +1018,24 @@ story.append(P(
     "not present."
 ))
 
+story.append(H2("5.14&nbsp;&nbsp;Stats Dashboard"))
+story.append(P(
+    "A fourth console view, linked from the header (<font face=\"Courier\">"
+    "GET /dashboard</font>), independent of any one incident: incidents per "
+    "day over a 7/14/30/90-day range with every day in the window shown, "
+    "including the zero-count ones, so a quiet stretch reads as a flat "
+    "bar rather than a gap in the series; severity distribution and triage "
+    "status across every incident on record; and the top 10 rules and top "
+    "10 ATT&amp;CK techniques by detection count, each technique linking "
+    "directly to its MITRE page. Backed by "
+    "<font face=\"Courier\">GET /stats</font> "
+    "(<font face=\"Courier\">backend/engine/stats.py</font>), which reads a "
+    "narrow column set from SQLite and tallies it in Python rather than "
+    "expressing a “group by calendar day” in SQL. Charted as plain "
+    "HTML/CSS bars -- no charting library, matching the rest of the "
+    "frontend's zero-dependency approach."
+))
+
 story.append(PageBreak())
 
 story.append(H1("6.&nbsp;&nbsp;REST API Reference"))
@@ -1121,7 +1141,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 598 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 614 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1192,22 +1212,23 @@ layout_text = (
     "|&nbsp;&nbsp;+-- logging_setup.py&nbsp;text/JSON log formatting<br/>"
     "|&nbsp;&nbsp;+-- api/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ingest, detections, incidents, attack, enrich,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rate_limit<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rate_limit, stats<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, coverage, enrichment,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;search, report, profile, pipeline, sigma_import,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise, metrics<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise, metrics, stats<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
     "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;127 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
-    "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html, static/{css,js}<br/>"
+    "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html,<br/>"
+    "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dashboard.html, static/{css,js}<br/>"
     "+-- migrations/&nbsp;&nbsp;&nbsp;&nbsp;Alembic<br/>"
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;598 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;614 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

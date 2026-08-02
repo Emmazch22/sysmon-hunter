@@ -325,6 +325,47 @@ async def count_detections() -> int:
         return len(result.scalars().all())
 
 
+async def stats_incident_rows() -> list[tuple[str, str, int, datetime]]:
+    """(severity, status, actionable, first_seen) for every incident on record.
+
+    Feeds `engine/stats.py`'s aggregation. Deliberately the four columns that
+    aggregation needs and nothing else -- SQLite has no server-side "group by
+    day" over a timezone-aware timestamp worth relying on, so the day-bucket
+    and severity/status tallies are done in Python over this narrow row set
+    rather than pulling every full IncidentRow (process_tree and all) just to
+    read four fields.
+    """
+    async with Session() as session:
+        result = await session.execute(
+            select(
+                IncidentRow.severity,
+                IncidentRow.status,
+                IncidentRow.actionable,
+                IncidentRow.first_seen,
+            )
+        )
+        return list(result.all())
+
+
+async def stats_detection_rows() -> list[tuple[str, str, list[str], datetime]]:
+    """(rule_id, title, attack, matched_at) for every detection on record.
+
+    Same narrow-columns reasoning as `stats_incident_rows` -- top-rules and
+    top-technique tallies only ever need these four fields, never the raw
+    event or evidence blob.
+    """
+    async with Session() as session:
+        result = await session.execute(
+            select(
+                DetectionRow.rule_id,
+                DetectionRow.title,
+                DetectionRow.attack,
+                DetectionRow.matched_at,
+            )
+        )
+        return list(result.all())
+
+
 async def reset_database() -> None:
     """Delete every detection and incident.
 

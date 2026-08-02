@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <script>
+        // Applied before first paint, so opening the dashboard never flashes
+        // the wrong theme while console.css is still loading.
+        (function () {
+            try {
+                if (localStorage.getItem("hunter-theme") === "light") {
+                    document.documentElement.setAttribute("data-theme", "light");
+                }
+            } catch (e) { }
+        })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard — Sysmon Hunter</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%23050A12%22/%3E%3Cpath%20d%3D%22M16%204l9%203.5v7c0%205.8-3.9%209.6-9%2011.5-5.1-1.9-9-5.7-9-11.5v-7L16%204z%22%20fill%3D%22none%22%20stroke%3D%22%2300D26A%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2215%22%20r%3D%222.5%22%20fill%3D%22%2300D26A%22/%3E%3Cpath%20d%3D%22M16%2017.5v4%22%20stroke%3D%22%2300D26A%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/console.css">
+    <style>
+        /* Dashboard-specific layout only. Reuses console.css's design tokens
+           (--surface, --border, --sev-*, .panel, .stats/.stat, .filters/.filter)
+           rather than redefining them -- this page is meant to feel like a
+           fourth view of the same console, not a separately-styled app. */
+
+        .db-head {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .db-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-mute);
+            text-decoration: none;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .db-back:hover {
+            color: var(--struct);
+        }
+
+        .db-title {
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .db-main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 18px 22px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .db-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        @media (max-width: 900px) {
+            .db-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .db-body {
+            padding: 16px;
+        }
+
+        .db-empty {
+            color: var(--text-mute);
+            font-size: 11px;
+            text-align: center;
+            padding: 30px 12px;
+        }
+
+        /* Incidents-per-day: plain flex/div bars, no SVG or charting library --
+           consistent with this project's zero-frontend-dependency approach.
+           Height is set inline per-bar as a percentage of the day range's max. */
+        .db-timechart {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 150px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2px;
+        }
+
+        .db-time-col {
+            flex: 1;
+            min-width: 3px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .db-time-bar {
+            width: 100%;
+            background: var(--struct);
+            min-height: 2px;
+            transition: opacity .12s;
+        }
+
+        .db-time-bar:hover {
+            opacity: .7;
+        }
+
+        .db-time-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 9px;
+            color: var(--text-mute);
+            font-family: var(--mono);
+        }
+
+        /* Horizontal bar rows: severity distribution, top rules, top techniques. */
+        .db-hrow {
+            display: grid;
+            grid-template-columns: 130px 1fr 40px;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 11px;
+        }
+
+        .db-hrow-label {
+            color: var(--text-dim);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .db-hrow-label a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .db-hrow-label a:hover {
+            color: var(--struct);
+            text-decoration: underline;
+        }
+
+        .db-hrow-track {
+            background: var(--surface-2);
+            height: 12px;
+            position: relative;
+        }
+
+        .db-hrow-bar {
+            height: 100%;
+            background: var(--struct);
+            min-width: 2px;
+        }
+
+        .db-hrow-count {
+            text-align: right;
+            font-family: var(--mono);
+            color: var(--text-mute);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .db-rule-title {
+            display: block;
+            font-size: 9px;
+            color: var(--text-mute);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-top: 1px;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-back" viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6" />
+        </symbol>
+    </svg>
+
+    <header class="db-head">
+        <a class="db-back" href="/"><svg class="ico"><use href="#i-back" /></svg> Console</a>
+        <div class="db-title">Dashboard</div>
+    </header>
+
+    <main class="db-main">
+
+        <section class="stats" id="db-totals">
+            <div class="stat">
+                <div class="stat-label">Incidents</div>
+                <div class="stat-value" id="t-incidents">&mdash;</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Detections</div>
+                <div class="stat-value" id="t-detections">&mdash;</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Needs triage</div>
+                <div class="stat-value" id="t-actionable">&mdash;</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Closed</div>
+                <div class="stat-value" id="t-closed">&mdash;</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">False positive</div>
+                <div class="stat-value" id="t-fp">&mdash;</div>
+            </div>
+        </section>
+
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-title">Incidents per day</div>
+                <div class="filters" id="range-filters" role="group" aria-label="Day range">
+                    <button class="filter" data-days="7">7d</button>
+                    <button class="filter" data-days="14" aria-pressed="true">14d</button>
+                    <button class="filter" data-days="30">30d</button>
+                    <button class="filter" data-days="90">90d</button>
+                </div>
+            </div>
+            <div class="db-body" id="time-chart">
+                <div class="db-empty">Loading&hellip;</div>
+            </div>
+        </div>
+
+        <div class="db-grid">
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Severity distribution</div>
+                    <div class="panel-note">all incidents</div>
+                </div>
+                <div class="db-body" id="severity-chart">
+                    <div class="db-empty">Loading&hellip;</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Triage status</div>
+                    <div class="panel-note">all incidents</div>
+                </div>
+                <div class="db-body" id="status-chart">
+                    <div class="db-empty">Loading&hellip;</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Top rules</div>
+                    <div class="panel-note">by detection count</div>
+                </div>
+                <div class="db-body" id="rules-chart">
+                    <div class="db-empty">Loading&hellip;</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">Top ATT&amp;CK techniques</div>
+                    <div class="panel-note">by detection count</div>
+                </div>
+                <div class="db-body" id="technique-chart">
+                    <div class="db-empty">Loading&hellip;</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="/static/common.js"></script>
+    <script src="/static/dashboard.js"></script>
+</body>
+
+</html>

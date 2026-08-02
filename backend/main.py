@@ -33,6 +33,7 @@ from backend.api import (
     profile,
     report,
     search,
+    stats,
     status,
     ws,
 )
@@ -136,6 +137,7 @@ app.include_router(profile.router, dependencies=_api_key_gate)
 app.include_router(notes.router, dependencies=_api_key_gate)
 app.include_router(status.router, dependencies=_api_key_gate)
 app.include_router(admin.router, dependencies=_api_key_gate)
+app.include_router(stats.router, dependencies=_api_key_gate)
 
 # Serve the console's CSS and JS. Split out of the HTML so each is cached and
 # edited on its own, rather than shipping one monolithic file.
@@ -191,6 +193,17 @@ _FAVICON = (
 async def favicon() -> Response:
     """Serve the shield favicon as SVG, so browsers stop 404-ing on /favicon.ico."""
     return Response(content=_FAVICON, media_type="image/svg+xml")
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_page() -> FileResponse:
+    """Serve the stats dashboard. Named distinctly from the `/stats` JSON API
+    (see api/stats.py) rather than reusing the same path under a different
+    method -- both are GETs, so a literal path collision would mean whichever
+    router registers first always wins and the other becomes unreachable, the
+    same reason `/incident/{id}` (page) and `/incidents` (API) stay distinct
+    rather than colliding on a singular/plural of the same word."""
+    return FileResponse(FRONTEND / "dashboard.html")
 
 
 @app.get("/incident/{incident_id}", include_in_schema=False)
