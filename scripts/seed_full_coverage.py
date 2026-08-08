@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 127 rules
+job: it is a regression fixture and a coverage demo, built to fire all 143 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
 19, 21) added purely so the incident's raw event stream and process tree show
@@ -101,6 +101,14 @@ machine. The phases, roughly in kill-chain order:
       │   wmic Win32_Process remote-exec command line, mmc.exe spawning a
       │   shell (MMC20.Application DCOM lateral movement), and a
       │   `docker run --privileged` invocation (SYS-169 through SYS-174)
+      ├─ coverage-expansion pass 10: an overwritten sticky-keys binary,
+      │   Winlogon/SSP/Active Setup registry persistence, a domain account
+      │   creation, a Safe Mode boot, a disabled event-log channel, an ISO
+      │   mounted via PowerShell, Mimikatz dumping LSA secrets and forging
+      │   a golden ticket, a double-extension file, an autologon password
+      │   query, GPP cpassword harvesting, SSH lateral movement with a
+      │   private key, Tor, and a fileless .NET-compression archive
+      │   (SYS-175 through SYS-190)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -146,7 +154,9 @@ EXPECTED_RULES = {
     "SYS-153", "SYS-154", "SYS-155", "SYS-156", "SYS-157", "SYS-158", "SYS-159",
     "SYS-160", "SYS-161", "SYS-162", "SYS-163", "SYS-164", "SYS-165", "SYS-166",
     "SYS-167", "SYS-168", "SYS-169", "SYS-170", "SYS-171", "SYS-172", "SYS-173",
-    "SYS-174",
+    "SYS-174", "SYS-175", "SYS-176", "SYS-177", "SYS-178", "SYS-179", "SYS-180",
+    "SYS-181", "SYS-182", "SYS-183", "SYS-184", "SYS-185", "SYS-186", "SYS-187",
+    "SYS-188", "SYS-189", "SYS-190",
 }
 
 
@@ -301,6 +311,21 @@ G = {
     "wmi_remote_exec": "{rng-wmi-remote-exec}",
     "dcom_mmc": "{rng-dcom-mmc}",
     "docker_privileged": "{rng-docker-privileged}",
+    # Coverage-expansion pass 10 (SYS-175..190).
+    "accessibility_replace": "{rng-accessibility-replace}",
+    "active_setup": "{rng-active-setup}",
+    "domain_account": "{rng-domain-account}",
+    "safe_mode": "{rng-safe-mode}",
+    "eventlog_disable": "{rng-eventlog-disable}",
+    "iso_mount": "{rng-iso-mount}",
+    "mimikatz_lsasecrets": "{rng-mimikatz-lsasecrets}",
+    "mimikatz_golden": "{rng-mimikatz-golden}",
+    "double_ext": "{rng-double-ext}",
+    "autologon_query": "{rng-autologon-query}",
+    "gpp_cpassword": "{rng-gpp-cpassword}",
+    "ssh_lateral": "{rng-ssh-lateral}",
+    "tor_proxy": "{rng-tor-proxy}",
+    "fileless_archive": "{rng-fileless-archive}",
 }
 
 
@@ -1021,6 +1046,110 @@ def events() -> list[dict]:
                     r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
                     "docker.exe run --rm --privileged alpine sh",
                     pid=5780, ppid=4510))
+
+    # === Coverage-expansion pass 10: persistence, defense-evasion, credential-
+    # access, and lateral-movement gaps, off "ops" (SYS-175..190) ===
+    # A script interpreter overwrites the sticky-keys accessibility binary
+    # (SYS-175).
+    ev.append(proc(step(1), G["accessibility_replace"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "Copy-Item payload.exe C:\Windows\System32\sethc.exe -Force"',
+                    pid=5790, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["accessibility_replace"],
+                         TargetFilename=r"C:\Windows\System32\sethc.exe"))
+
+    # Winlogon helper DLL and Security Support Provider persistence, both
+    # written directly by lsass.exe (SYS-176, SYS-177) -- reuses the same
+    # lsass process node the SAM-manipulation event below uses, since a real
+    # lsass.exe would be the one process making all of these writes.
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\lsass.exe", ProcessGuid=G["lsass"],
+                         ParentProcessGuid=G["root"],
+                         TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell",
+                         Details=r"explorer.exe, C:\Windows\Temp\helper.dll"))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\lsass.exe", ProcessGuid=G["lsass"],
+                         ParentProcessGuid=G["root"],
+                         TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Security Packages",
+                         Details=r"C:\Windows\System32\evilssp.dll"))
+
+    # Active Setup StubPath persistence (SYS-178).
+    ev.append(proc(step(1), G["active_setup"], G["ops"], r"C:\Windows\System32\reg.exe",
+                    r'reg.exe add "HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\{1CC1C-GUID}" '
+                    r'/v StubPath /d "C:\Windows\Temp\a.exe"',
+                    pid=5800, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", ProcessGuid=G["active_setup"],
+                         TargetObject=r"HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\{1CC1C-GUID}\StubPath",
+                         Details=r"C:\Windows\Temp\a.exe"))
+
+    # A domain account created directly, not local (SYS-179).
+    ev.append(proc(step(1), G["domain_account"], G["ops"], r"C:\Windows\System32\net.exe",
+                    'net.exe user svc_backup "P@ssw0rd123!" /add /domain',
+                    pid=5810, ppid=4510))
+
+    # Boot configured into Safe Mode ahead of an encryptor run (SYS-180).
+    ev.append(proc(step(1), G["safe_mode"], G["ops"], r"C:\Windows\System32\bcdedit.exe",
+                    "bcdedit.exe /set {default} safeboot minimal",
+                    pid=5820, ppid=4510))
+
+    # Windows Event Log channel disabled (SYS-181).
+    ev.append(proc(step(1), G["eventlog_disable"], G["ops"], r"C:\Windows\System32\wevtutil.exe",
+                    "wevtutil.exe sl Security /e:false",
+                    pid=5830, ppid=4510))
+
+    # ISO mounted via PowerShell -- MOTW-bypass delivery (SYS-182).
+    ev.append(proc(step(1), G["iso_mount"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "Mount-DiskImage -ImagePath C:\Users\redteam.ops\Downloads\invoice.iso"',
+                    pid=5840, ppid=4510))
+
+    # Mimikatz dumping LSA secrets / cached domain credentials (SYS-183).
+    ev.append(proc(step(1), G["mimikatz_lsasecrets"], G["ops"], r"C:\Users\redteam.ops\Downloads\mimikatz.exe",
+                    r'mimikatz.exe "lsadump::secrets" exit',
+                    pid=5850, ppid=4510))
+
+    # Mimikatz forging a Kerberos golden ticket (SYS-184).
+    ev.append(proc(step(1), G["mimikatz_golden"], G["ops"], r"C:\Users\redteam.ops\Downloads\mimikatz.exe",
+                    r'mimikatz.exe "kerberos::golden /user:admin /domain:corp.local '
+                    r'/sid:S-1-5-21 /krbtgt:aabbccdd /ptt" exit',
+                    pid=5860, ppid=4510))
+
+    # A double-extension file masking an executable (SYS-185).
+    ev.append(proc(step(1), G["double_ext"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "Move-Item a.tmp C:\Users\redteam.ops\Downloads\invoice.pdf.exe"',
+                    pid=5870, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["double_ext"],
+                         TargetFilename=r"C:\Users\redteam.ops\Downloads\invoice.pdf.exe"))
+
+    # Registry queried for an autologon password (SYS-186).
+    ev.append(proc(step(1), G["autologon_query"], G["ops"], r"C:\Windows\System32\reg.exe",
+                    r'reg.exe query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" '
+                    r"/v DefaultPassword",
+                    pid=5880, ppid=4510))
+
+    # Group Policy Preferences cpassword harvested (SYS-187).
+    ev.append(proc(step(1), G["gpp_cpassword"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    "powershell -nop -c Get-GPPPassword.ps1",
+                    pid=5890, ppid=4510))
+
+    # SSH client used with a private key, lateral movement (SYS-188).
+    ev.append(proc(step(1), G["ssh_lateral"], G["ops"], r"C:\Windows\System32\OpenSSH\ssh.exe",
+                    r"ssh.exe -i C:\Users\redteam.ops\AppData\Local\Temp\id_rsa administrator@10.10.10.20",
+                    pid=5900, ppid=4510))
+
+    # Tor launched for anonymized C2 (SYS-189).
+    ev.append(proc(step(1), G["tor_proxy"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\tor.exe", "tor.exe",
+                    pid=5910, ppid=4510))
+
+    # Fileless archive staged via .NET compression, no 7z/rar on disk (SYS-190).
+    ev.append(proc(step(1), G["fileless_archive"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell -nop -c "[System.IO.Compression.ZipFile]::CreateFromDirectory('
+                    r"'C:\Users\redteam.ops\Documents','C:\Users\redteam.ops\AppData\Local\Temp\d.zip')\"",
+                    pid=5920, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

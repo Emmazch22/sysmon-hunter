@@ -1,0 +1,16 @@
+id: SYS-185
+title: File written with a double extension masking an executable
+event_id: 11
+severity: high
+attack: [T1036.007]
+description: >
+  A file was written with a document/media extension immediately followed
+  by an executable one -- invoice.pdf.exe, report.docx.scr, photo.jpg.vbs.
+  Windows Explorer hides known extensions by default, so a user with that
+  setting untouched sees only "invoice.pdf" and double-clicks expecting a
+  PDF reader; what actually runs is whatever the trailing extension
+  associates with. This is the file-naming half of the same social
+  engineering SYS-151..154's ClickFix rules catch on the execution side.
+detection:
+  TargetFilename|re: '\.(pdf|docx?|xlsx?|pptx?|txt|jpg|jpeg|png|zip)\.(exe|scr|cmd|bat|com|pif|js|vbs|jar|lnk)$'
+condition: all

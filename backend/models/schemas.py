@@ -321,6 +321,24 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1518.001": "discovery",
     "T1048": "exfiltration",
     "T1558.004": "credential-access",
+    # SYS-175..190.
+    "T1546.008": "persistence",
+    "T1547.004": "persistence",
+    "T1547.005": "persistence",
+    "T1547.014": "persistence",
+    "T1136.002": "persistence",
+    "T1562.002": "defense-evasion",
+    "T1562.009": "defense-evasion",
+    "T1036.007": "masquerading",
+    "T1204.003": "execution",
+    "T1003.004": "credential-access",
+    "T1003.005": "credential-access",
+    "T1558.001": "credential-access",
+    "T1552.002": "credential-access",
+    "T1552.006": "credential-access",
+    "T1021.004": "lateral-movement",
+    "T1090.003": "command-and-control",
+    "T1560.002": "collection",
 }
 
 

@@ -1,0 +1,20 @@
+id: SYS-181
+title: Windows Event Log service or channel disabled
+event_id: 1
+severity: high
+attack: [T1562.002]
+description: >
+  Either the EventLog service was stopped or set to disabled via sc.exe,
+  or a specific channel was turned off via wevtutil sl <channel>
+  /e:false. Both leave the host generating no record of what happens
+  next -- distinct from T1070.001 (clearing what has already been
+  logged): this is refusing to log at all, so there is nothing later to
+  clear or for this engine's own /ingest pipeline to ever receive.
+detection:
+  image|endswith:
+    - '\sc.exe'
+    - '\wevtutil.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+  command_line|re: '(?=.*\beventlog\b)(?=.*\b(stop|disabled)\b)|(?=.*\bsl\b)(?=.*/e:false)'
+condition: all

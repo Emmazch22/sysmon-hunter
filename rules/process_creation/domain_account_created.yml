@@ -1,0 +1,21 @@
+id: SYS-179
+title: Domain account created
+event_id: 1
+severity: high
+attack: [T1136.002]
+description: >
+  net user /add /domain, its net1.exe equivalent, or PowerShell's
+  New-ADUser created an account directly against the domain rather than
+  the local SAM -- SYS-091's SAM-hive backstop and the local-account rule
+  behind T1136.001 both only see local accounts, so a domain-side account
+  an attacker creates for standing access needs its own signal. A domain
+  account survives a single-host cleanup and works from anywhere on the
+  network that trusts the domain.
+detection:
+  image|endswith:
+    - '\net.exe'
+    - '\net1.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+  command_line|re: '(?=.*\buser\b)(?=.*/add\b)(?=.*/domain\b)|new-aduser'
+condition: all

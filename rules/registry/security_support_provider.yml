@@ -1,0 +1,14 @@
+id: SYS-177
+title: Security Support Provider registered
+event_id: 13
+severity: high
+attack: [T1547.005]
+description: >
+  A DLL was added to the Security Packages value LSA loads at boot under
+  HKLM\...\Control\Lsa (or its OSConfig mirror). A malicious SSP DLL sees
+  every plaintext credential that passes through LSA at logon, and
+  persists across reboots since LSA reloads its package list every start
+  -- no scheduled task or Run key needed.
+detection:
+  TargetObject|re: '\\control\\lsa\\(osconfig\\)?security packages\b'
+condition: all

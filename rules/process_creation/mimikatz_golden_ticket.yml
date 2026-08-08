@@ -1,0 +1,15 @@
+id: SYS-184
+title: Mimikatz used to forge a Kerberos golden ticket
+event_id: 1
+severity: critical
+attack: [T1558.001]
+description: >
+  kerberos::golden named directly on the command line -- Mimikatz forging
+  a Kerberos TGT from a stolen krbtgt hash. A golden ticket authenticates
+  as any account, including Domain Admin, for as long as the forger
+  chooses, and (unlike Kerberoasting/AS-REP roasting, which SYS-118/
+  SYS-150 already catch as offline hash-cracking prerequisites) needs no
+  further interaction with a domain controller to be used once forged.
+detection:
+  command_line|contains: 'kerberos::golden'
+condition: all

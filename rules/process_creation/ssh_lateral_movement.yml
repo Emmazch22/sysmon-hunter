@@ -1,0 +1,16 @@
+id: SYS-188
+title: SSH client used with a private key for lateral movement
+event_id: 1
+severity: high
+attack: [T1021.004]
+description: >
+  Windows 10/11 ships an OpenSSH client, and an attacker with a staged
+  private key (SYS-171 catches the staging step) can use it exactly like
+  any other admin tool -- ssh.exe -i <key> user@host. Non-interactive,
+  key-based SSH out of a Windows box is a legitimate DevOps/IT pattern
+  too, so this is a lead to weigh against the source process and
+  destination, not an automatic verdict.
+detection:
+  image|endswith: '\ssh.exe'
+  command_line|re: '(^|\s)-i(\s|$)'
+condition: all

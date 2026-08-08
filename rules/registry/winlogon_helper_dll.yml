@@ -1,0 +1,14 @@
+id: SYS-176
+title: Winlogon helper DLL persistence key set
+event_id: 13
+severity: high
+attack: [T1547.004]
+description: >
+  A value was written to Notify, Userinit, or Shell under
+  HKLM\...\Winlogon -- three keys Windows reads at every interactive logon
+  to decide what to load alongside (Userinit/Shell) or notify (Notify) the
+  session. Anything named here runs with the logging-in user's session
+  every single time, no scheduled task or service required.
+detection:
+  TargetObject|re: '\\winlogon\\(notify|userinit|shell)\b'
+condition: all

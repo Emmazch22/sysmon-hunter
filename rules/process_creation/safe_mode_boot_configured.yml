@@ -1,0 +1,17 @@
+id: SYS-180
+title: Boot configured into Safe Mode
+event_id: 1
+severity: critical
+attack: [T1562.009]
+description: >
+  bcdedit set the safeboot boot option. Most endpoint security products do
+  not start their protective drivers in Safe Mode (or start in a reduced
+  "Safe Mode with Networking" configuration), which is exactly why
+  ransomware families from SamSam onward reboot the target into Safe Mode
+  before running their encryptor -- the antivirus that would have stopped
+  it never loads. A legitimate Safe Mode boot is an administrator
+  troubleshooting a problem, not something that happens unattended.
+detection:
+  image|endswith: '\bcdedit.exe'
+  command_line|contains: 'safeboot'
+condition: all

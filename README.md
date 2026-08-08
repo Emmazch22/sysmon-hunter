@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 127 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 143 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
   creation, network, DNS query, registry, image load, process access, remote
   thread, file create, file delete, file creation-time change, alternate data
@@ -131,6 +131,33 @@ about it.
   the privilege-escalation tactic (added for the GPO-abuse rules) resolved
   correctly but was silently dropped from both the incident title fallback
   and the kill-chain narrative, since neither had a slot for it yet.
+- **Persistence, credential-access, and lateral-movement detections** —
+  16 more rules (SYS-175 through SYS-190) from a fresh gap survey against
+  the live rule corpus: a script interpreter overwriting the sticky-keys
+  accessibility binary directly (SYS-032 already catches the IFEO-registry
+  variant of the same technique, this catches the file-replacement one);
+  Winlogon Helper DLL, Security Support Provider, and Active Setup
+  registry persistence; a domain account created directly rather than
+  local; a Safe Mode boot (`bcdedit /set safeboot`) staged ahead of a
+  ransomware run, the same trick that lets an encryptor start before
+  security tooling that does not load in Safe Mode does; the Windows
+  Event Log service or a specific channel disabled; an ISO/IMG mounted
+  via `Mount-DiskImage` — the dominant phishing delivery pattern since
+  Windows stopped propagating Mark-of-the-Web into a mounted image's
+  contents; Mimikatz dumping LSA secrets or cached domain credentials and
+  forging a Kerberos golden ticket; a file written with a double
+  extension masking an executable; a plaintext autologon password
+  queried from the registry; Group Policy Preferences `cpassword`
+  harvested via the still-unpatched MS14-025 weakness; SSH lateral
+  movement with a staged private key (SYS-171's staging step given a
+  companion usage-side rule); Tor or another multi-hop anonymizing
+  proxy; and a fileless archive staged through PowerShell's
+  `System.IO.Compression` with no 7-Zip/WinRAR ever touching disk. Fixing
+  these rules up also corrected a real narrative bug: the kill-chain
+  summary's credential-access phrase was hard-coded to always claim
+  "accessed credential material from LSASS memory," which would have
+  misdescribed every one of the new registry-, GPP-, and ticket-based
+  findings above — it now branches on which technique actually fired.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -441,7 +468,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 127 end to end as a single correlated incident and confirms its
+fires all 143 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -586,7 +613,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 614 tests
+python -m pytest        # 646 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -625,7 +652,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   127 YAML detection rules, by EventID, plus
+├── rules/                   143 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            dashboard.html, static/{css,js}
@@ -633,7 +660,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   614 tests
+└── tests/                   646 tests
 ```
 
 ---

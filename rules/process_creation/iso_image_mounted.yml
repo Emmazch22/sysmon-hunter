@@ -1,0 +1,22 @@
+id: SYS-182
+title: Disk image mounted via PowerShell
+event_id: 1
+severity: high
+attack: [T1204.003]
+description: >
+  Mount-DiskImage mounted an ISO, IMG, or VHD as a new drive letter. Since
+  Windows started tagging downloaded files with the Mark-of-the-Web
+  (MOTW) and Office/SmartScreen began warning on macros and executables
+  that carry it, phishing kits shifted to shipping the payload inside an
+  ISO instead: the ISO itself carries the MOTW, but the LNK, script, or
+  executable extracted after mounting it does not, because Windows does
+  not propagate MOTW into a mounted image's contents. Qakbot, IcedID, and
+  Emotet all moved to this delivery pattern for exactly that reason; a
+  user double-clicking an ISO to run this cmdlet is not typical desktop
+  behavior outside IT imaging work.
+detection:
+  image|endswith:
+    - '\powershell.exe'
+    - '\pwsh.exe'
+  command_line|contains: 'mount-diskimage'
+condition: all

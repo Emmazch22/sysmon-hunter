@@ -1,0 +1,17 @@
+id: SYS-189
+title: Tor or a multi-hop proxy tool launched
+event_id: 1
+severity: high
+attack: [T1090.003]
+description: >
+  tor.exe (or a wrapper like torsocks/torify) ran, or a command line
+  referenced a .onion address directly. Multi-hop anonymizing proxies
+  strip attribution from wherever the traffic actually goes next --
+  distinct from SYS-085's netsh portproxy rule, which catches a single
+  host:port relay chained through a compromised box, this is the
+  attacker's own multi-hop anonymization layer rather than a one-hop
+  tunnel.
+detection:
+  image|endswith: '\tor.exe'
+  command_line|contains: ['.onion', 'torsocks', 'torify']
+condition: any

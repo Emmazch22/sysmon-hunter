@@ -1,0 +1,35 @@
+id: SYS-175
+title: Accessibility binary replaced on disk
+event_id: 11
+severity: critical
+attack: [T1546.008]
+description: >
+  sethc.exe, utilman.exe, osk.exe, magnify.exe, narrator.exe,
+  displayswitch.exe, and atbroker.exe are all reachable from the Windows
+  logon screen before any credential is entered -- Windows launches
+  whichever one the user invokes with SYSTEM privileges and no session at
+  all. Overwriting one of them (the classic "sticky keys" backdoor) turns
+  that logon-screen shortcut into a SYSTEM shell with zero authentication.
+  This targets the file being staged, not opened, the same "staged, not
+  opened" signal SYS-135/136/171 use elsewhere: a script interpreter or
+  LOLBin writing a file with one of these exact names. SYS-032 already
+  catches the IFEO-debugger variant of this same technique (redirecting
+  execution via a registry key rather than touching the binary itself);
+  this is the direct-replacement variant IFEO cannot see.
+detection:
+  TargetFilename|endswith:
+    - '\sethc.exe'
+    - '\utilman.exe'
+    - '\osk.exe'
+    - '\magnify.exe'
+    - '\narrator.exe'
+    - '\displayswitch.exe'
+    - '\atbroker.exe'
+  image|endswith:
+    - '\powershell.exe'
+    - '\cmd.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\rundll32.exe'
+    - '\certutil.exe'
+condition: all

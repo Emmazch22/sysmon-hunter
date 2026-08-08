@@ -1,0 +1,17 @@
+id: SYS-190
+title: PowerShell archived data using .NET compression, no archive tool on disk
+event_id: 1
+severity: high
+attack: [T1560.002]
+description: >
+  A command line referenced System.IO.Compression -- PowerShell's built-in
+  ZipFile/DeflateStream classes staging or archiving data without ever
+  invoking 7z.exe, rar.exe, or any of the archive utilities SYS-161
+  already watches. Collection ahead of exfiltration does not need a
+  downloaded tool at all when the .NET framework already ships one.
+detection:
+  image|endswith:
+    - '\powershell.exe'
+    - '\pwsh.exe'
+  command_line|contains: 'system.io.compression'
+condition: all

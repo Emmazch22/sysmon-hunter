@@ -1,0 +1,15 @@
+id: SYS-178
+title: Active Setup StubPath persistence key set
+event_id: 13
+severity: high
+attack: [T1547.014]
+description: >
+  A StubPath value was written under Active Setup\Installed Components.
+  Windows runs every StubPath command once per user the first time that
+  user logs on after the key is created -- a low-profile, per-user
+  persistence mechanism with no scheduled task, service, or Run key
+  involved, and no UI (Task Scheduler, msconfig, Autoruns' default view)
+  most administrators check first.
+detection:
+  TargetObject|re: '\\active setup\\installed components\\.*\\stubpath\b'
+condition: all

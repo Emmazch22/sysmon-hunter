@@ -336,6 +336,22 @@ RULES = [
     ("SYS-172", "1", "High", "WMI used to create a process via Win32_Process", "T1047"),
     ("SYS-173", "1", "High", "mmc.exe spawned a shell consistent with MMC20.Application DCOM abuse", "T1021.003"),
     ("SYS-174", "1", "High", "Docker container launched with --privileged", "T1611"),
+    ("SYS-175", "11", "Critical", "Accessibility binary replaced on disk", "T1546.008"),
+    ("SYS-176", "13", "High", "Winlogon helper DLL persistence key set", "T1547.004"),
+    ("SYS-177", "13", "High", "Security Support Provider registered", "T1547.005"),
+    ("SYS-178", "13", "High", "Active Setup StubPath persistence key set", "T1547.014"),
+    ("SYS-179", "1", "High", "Domain account created", "T1136.002"),
+    ("SYS-180", "1", "Critical", "Boot configured into Safe Mode", "T1562.009"),
+    ("SYS-181", "1", "High", "Windows Event Log service or channel disabled", "T1562.002"),
+    ("SYS-182", "1", "High", "Disk image mounted via PowerShell", "T1204.003"),
+    ("SYS-183", "1", "Critical", "Mimikatz used to dump LSA secrets or cached domain credentials", "T1003.004/.005"),
+    ("SYS-184", "1", "Critical", "Mimikatz used to forge a Kerberos golden ticket", "T1558.001"),
+    ("SYS-185", "11", "High", "File written with a double extension masking an executable", "T1036.007"),
+    ("SYS-186", "1", "High", "Registry queried for an autologon or default password", "T1552.002"),
+    ("SYS-187", "1", "Critical", "Group Policy Preferences cpassword harvested", "T1552.006"),
+    ("SYS-188", "1", "High", "SSH client used with a private key for lateral movement", "T1021.004"),
+    ("SYS-189", "1", "High", "Tor or a multi-hop proxy tool launched", "T1090.003"),
+    ("SYS-190", "1", "High", "PowerShell archived data via .NET compression", "T1560.002"),
 ]
 
 EVENT_ID_NAMES = {
@@ -551,7 +567,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "127 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "143 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -1141,7 +1157,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 614 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 646 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1220,7 +1236,7 @@ layout_text = (
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;127 YAML detection rules, by Event ID, plus<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;143 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dashboard.html, static/{css,js}<br/>"
@@ -1228,7 +1244,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;614 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;646 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

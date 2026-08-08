@@ -129,6 +129,24 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1518.001": "discovery",
     "T1048": "exfiltration",
     "T1558.004": "credential-access",
+    # SYS-175..190.
+    "T1546.008": "persistence",
+    "T1547.004": "persistence",
+    "T1547.005": "persistence",
+    "T1547.014": "persistence",
+    "T1136.002": "persistence",
+    "T1562.002": "defense-evasion",
+    "T1562.009": "defense-evasion",
+    "T1036.007": "defense-evasion",
+    "T1204.003": "execution",
+    "T1003.004": "credential-access",
+    "T1003.005": "credential-access",
+    "T1558.001": "credential-access",
+    "T1552.002": "credential-access",
+    "T1552.006": "credential-access",
+    "T1021.004": "lateral-movement",
+    "T1090.003": "command-and-control",
+    "T1560.002": "collection",
 }
 
 # The order tactics fall in an intrusion. The narrative follows this, not the
@@ -198,6 +216,8 @@ def _phrase_for_tactic(
             return "executed an obfuscated PowerShell payload in memory"
         if "SYS-035" in rule_ids:
             return "executed an encoded script via the Windows Script Host"
+        if "T1204.003" in techniques:
+            return "executed a payload mounted from a downloaded ISO or IMG disk image"
         return "executed a suspicious payload"
 
     if tactic == "privilege-escalation":
@@ -223,6 +243,12 @@ def _phrase_for_tactic(
             details.append("used rundll32 to launch a script host")
         if "SYS-037" in rule_ids:
             details.append("executed a payload via rundll32 url.dll handlers")
+        if "T1562.009" in techniques:
+            details.append("rebooted into Safe Mode to bypass security tooling")
+        if "T1562.002" in techniques:
+            details.append("disabled Windows event logging")
+        if "T1036.007" in techniques:
+            details.append("masqueraded a payload behind a double file extension")
         return (
             "evaded defenses (" + ", ".join(details) + ")"
             if details
@@ -242,6 +268,14 @@ def _phrase_for_tactic(
     if tactic == "credential-access":
         if "SYS-038" in rule_ids:
             return "harvested IIS application-pool credentials via appcmd"
+        if "T1558.001" in techniques:
+            return "forged a Kerberos golden ticket to impersonate a privileged account"
+        if {"T1003.004", "T1003.005"} & techniques:
+            return "dumped LSA secrets or cached domain credentials from memory"
+        if "T1552.006" in techniques:
+            return "harvested cleartext credentials from Group Policy Preferences"
+        if "T1552.002" in techniques:
+            return "recovered a plaintext autologon password from the registry"
         return "accessed credential material from LSASS memory"
 
     if tactic == "persistence":
@@ -255,11 +289,19 @@ def _phrase_for_tactic(
             return "established persistence via a new Windows service"
         if {"T1546.003", "T1546.015"} & techniques:
             return "established persistence via an event-triggered execution hook"
+        if "T1546.008" in techniques:
+            return "backdoored a Windows accessibility feature for SYSTEM access at logon"
+        if {"T1547.004", "T1547.005", "T1547.014"} & techniques:
+            return "established persistence via a Winlogon, LSA, or Active Setup registry hook"
+        if "T1136.002" in techniques:
+            return "created a new domain account for standing access"
         return "established persistence"
 
     if tactic == "lateral-movement":
         if "T1563.002" in techniques:
             return "hijacked an existing RDP session to move laterally"
+        if "T1021.004" in techniques:
+            return "moved laterally over SSH using a private key"
         return "moved laterally to another host on the network"
 
     if tactic == "collection":
@@ -276,6 +318,8 @@ def _phrase_for_tactic(
                 )
         if "SYS-060" in rule_ids:
             return "established C2 over a named pipe matching a known framework default"
+        if "T1090.003" in techniques:
+            return "routed C2 traffic through Tor or a multi-hop anonymizing proxy"
         return "communicated with a remote command-and-control host"
 
     if tactic == "exfiltration":

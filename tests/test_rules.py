@@ -2180,6 +2180,278 @@ CASES = [
             command_line="docker.exe run --rm alpine sh",
         ),
     ),
+    # --- Accessibility binary replaced on disk (SYS-175) ---
+    (
+        "SYS-175",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Windows\System32\sethc.exe",
+        ),
+    ),
+    (
+        "SYS-175",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\servicing\TrustedInstaller.exe",
+            TargetFilename=r"C:\Windows\System32\notepad.exe",
+        ),
+    ),
+    # --- Winlogon helper DLL persistence key set (SYS-176) ---
+    (
+        "SYS-176",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\System32\lsass.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell",
+        ),
+    ),
+    (
+        "SYS-176",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\System32\lsass.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\LegalNoticeText",
+        ),
+    ),
+    # --- Security Support Provider registered (SYS-177) ---
+    (
+        "SYS-177",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\System32\lsass.exe",
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Security Packages",
+        ),
+    ),
+    (
+        "SYS-177",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\System32\lsass.exe",
+            TargetObject=r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Auditing",
+        ),
+    ),
+    # --- Active Setup StubPath persistence key set (SYS-178) ---
+    (
+        "SYS-178",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\System32\reg.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\{GUID}\StubPath",
+        ),
+    ),
+    (
+        "SYS-178",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\System32\reg.exe",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\Updater",
+        ),
+    ),
+    # --- Domain account created (SYS-179) ---
+    (
+        "SYS-179",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\net.exe",
+            command_line="net user hacker P@ss12345! /add /domain",
+        ),
+    ),
+    (
+        "SYS-179",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\net.exe",
+            command_line="net user hacker P@ss12345! /add",
+        ),
+    ),
+    # --- Boot configured into Safe Mode (SYS-180) ---
+    (
+        "SYS-180",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\bcdedit.exe",
+            command_line="bcdedit /set {default} safeboot minimal",
+        ),
+    ),
+    (
+        "SYS-180",
+        False,
+        event(1, image=r"C:\Windows\System32\bcdedit.exe", command_line="bcdedit /enum"),
+    ),
+    # --- Windows Event Log service or channel disabled (SYS-181) ---
+    (
+        "SYS-181",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\wevtutil.exe",
+            command_line="wevtutil.exe sl Security /e:false",
+        ),
+    ),
+    (
+        "SYS-181",
+        False,
+        event(1, image=r"C:\Windows\System32\sc.exe", command_line="sc query eventlog"),
+    ),
+    # --- Disk image mounted via PowerShell (SYS-182) ---
+    (
+        "SYS-182",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line=r"Mount-DiskImage -ImagePath C:\Users\bob\Downloads\invoice.iso",
+        ),
+    ),
+    (
+        "SYS-182",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="Get-Volume",
+        ),
+    ),
+    # --- Mimikatz used to dump LSA secrets or cached domain credentials (SYS-183) ---
+    (
+        "SYS-183",
+        True,
+        event(1, image=r"C:\tools\mimikatz.exe", command_line='mimikatz.exe "lsadump::cache" exit'),
+    ),
+    (
+        "SYS-183",
+        False,
+        event(
+            1,
+            image=r"C:\tools\mimikatz.exe",
+            command_line='mimikatz.exe "sekurlsa::logonpasswords" exit',
+        ),
+    ),
+    # --- Mimikatz used to forge a Kerberos golden ticket (SYS-184) ---
+    (
+        "SYS-184",
+        True,
+        event(
+            1,
+            image=r"C:\tools\mimikatz.exe",
+            command_line='mimikatz.exe "kerberos::golden /user:admin /domain:corp.local /sid:S-1 /krbtgt:aabb /ptt" exit',
+        ),
+    ),
+    (
+        "SYS-184",
+        False,
+        event(1, image=r"C:\tools\mimikatz.exe", command_line='mimikatz.exe "kerberos::ptt ticket.kirbi" exit'),
+    ),
+    # --- File written with a double extension masking an executable (SYS-185) ---
+    (
+        "SYS-185",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\Downloads\invoice.pdf.exe",
+        ),
+    ),
+    (
+        "SYS-185",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\Downloads\invoice.pdf",
+        ),
+    ),
+    # --- Registry queried for an autologon or default password (SYS-186) ---
+    (
+        "SYS-186",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\reg.exe",
+            command_line=r'reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword',
+        ),
+    ),
+    (
+        "SYS-186",
+        False,
+        event(1, image=r"C:\Windows\System32\reg.exe", command_line=r'reg query "HKLM\SOFTWARE\Classes"'),
+    ),
+    # --- Group Policy Preferences cpassword harvested (SYS-187) ---
+    (
+        "SYS-187",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="Get-GPPPassword.ps1",
+        ),
+    ),
+    (
+        "SYS-187",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="Get-ADUser -Filter *",
+        ),
+    ),
+    # --- SSH client used with a private key for lateral movement (SYS-188) ---
+    (
+        "SYS-188",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\OpenSSH\ssh.exe",
+            command_line=r"ssh -i C:\keys\id_rsa admin@10.0.0.5",
+        ),
+    ),
+    (
+        "SYS-188",
+        False,
+        event(1, image=r"C:\Windows\System32\OpenSSH\ssh.exe", command_line="ssh admin@10.0.0.5"),
+    ),
+    # --- Tor or a multi-hop proxy tool launched (SYS-189) ---
+    (
+        "SYS-189",
+        True,
+        event(1, image=r"C:\Users\bob\AppData\Local\Temp\tor.exe", command_line="tor.exe"),
+    ),
+    (
+        "SYS-189",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe", command_line="notepad.exe report.txt"),
+    ),
+    # --- PowerShell archived data via .NET compression, no archive tool on disk (SYS-190) ---
+    (
+        "SYS-190",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="[System.IO.Compression.ZipFile]::CreateFromDirectory($src,$dst)",
+        ),
+    ),
+    (
+        "SYS-190",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            command_line="Get-Process",
+        ),
+    ),
 ]
 
 
