@@ -244,6 +244,7 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1018": "discovery",
     "T1057": "discovery",
     "T1049": "discovery",
+    "T1046": "discovery",  # SCN-001 network scan detector
     "T1071": "command-and-control",
     "T1071.001": "command-and-control",
     "T1573": "command-and-control",
@@ -379,6 +380,7 @@ _SIGNATURE_RULES: dict[str, str] = {
     "SYS-151": "ClickFix social engineering",  # decoy-lure paste from Explorer
     "BCN-001": "C2 beacon",
     "DSC-001": "Host reconnaissance",
+    "SCN-001": "Network scan",
 }
 
 # Tactic combinations that tell a familiar multi-stage story. Ordered most

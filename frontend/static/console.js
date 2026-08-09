@@ -130,6 +130,7 @@ function detectionIcon(ruleId) {
     const id = String(ruleId || "");
     if (id.startsWith("BCN")) return "i-beacon";
     if (id.startsWith("DSC")) return "i-recon";
+    if (id.startsWith("SCN")) return "i-scan";
     return "i-process";
 }
 

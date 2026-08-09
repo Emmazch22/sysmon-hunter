@@ -409,6 +409,9 @@ CONFIG_SETTINGS = [
     ("HUNTER_BEACON_MAX_INTERVAL_SECONDS", "3600.0", "Slowest interval still distinguishable from a scheduled task."),
     ("HUNTER_DISCOVERY_ENABLED", "true", "Enable/disable reconnaissance-burst detection."),
     ("HUNTER_DISCOVERY_MIN_DISTINCT", "4", "Distinct recon techniques required to flag a burst."),
+    ("HUNTER_SCAN_ENABLED", "true", "Enable/disable statistical network-scan detection."),
+    ("HUNTER_SCAN_MIN_DISTINCT_IPS", "10", "Distinct destination IPs from one process required to flag a host sweep."),
+    ("HUNTER_SCAN_MIN_DISTINCT_PORTS", "15", "Distinct destination ports from one process required to flag a port scan."),
     ("HUNTER_NOISE_SIMILARITY_THRESHOLD", "0.6", "Similarity score (0-1) an open incident needs to be flagged as probable noise."),
     ("HUNTER_ABUSEIPDB_API_KEY", "(unset)", "Optional key for IP reputation enrichment."),
     ("HUNTER_VIRUSTOTAL_API_KEY", "(unset)", "Optional key for hash/IP/domain reputation enrichment."),
@@ -545,7 +548,7 @@ pipeline_rows = [
     ["1", "Ingest", "POST /ingest receives one normalized event and hands it to the pipeline. Holds no logic of its own."],
     ["2", "Normalize", "Winlogbeat/Sysmon JSON is converted into a uniform internal Event, so downstream code never branches on source format."],
     ["3", "Observe", "Every event feeds the in-memory process tree, not just the ones that match a rule -- a malicious process's ancestors are usually benign and must still be recorded."],
-    ["4", "Detect", "The event is run against three parallel detectors: the YAML rule engine, the statistical beacon detector, and the reconnaissance-burst detector."],
+    ["4", "Detect", "The event is run against four parallel detectors: the YAML rule engine, the statistical beacon detector, the reconnaissance-burst detector, and the network-scan detector."],
     ["5", "Correlate", "New detections are grouped with existing ones that share a process-tree root within the correlation window, forming or extending an incident."],
     ["6", "Persist &amp; Broadcast", "The detection and incident are written to SQLite and pushed to every connected console over the WebSocket feed."],
 ]
@@ -627,7 +630,25 @@ story.append(P(
     "in quick succession is variety, and is flagged as a reconnaissance burst."
 ))
 
-story.append(H2("3.5&nbsp;&nbsp;Ransomware Detection"))
+story.append(H2("3.5&nbsp;&nbsp;Statistical Network-Scan Detection"))
+story.append(P(
+    "Beaconing looks at rhythm to one destination; the discovery burst looks "
+    "at command variety. Neither sees a scanner, because a scanner is "
+    "neither periodic nor does it run recon commands -- it simply opens many "
+    "connections to many different places, fast. The scan detector watches "
+    "outbound connections (Sysmon Event ID 3) per process and tracks the "
+    "growing set of distinct destinations it has touched within a window, "
+    "flagging breadth rather than timing. Two shapes are covered, either "
+    "sufficient on its own: many distinct ports against a small number of "
+    "hosts (a port scan, the textbook vertical case) and many distinct hosts "
+    "on a small number of ports (a host sweep, the horizontal case, e.g. an "
+    "SMB or RDP sweep across a subnet). Severity escalates when a later "
+    "alert's accumulated breadth passes double the configured threshold, and "
+    "ATT&amp;CK tagging reflects whichever shape -- or both -- was actually "
+    "observed."
+))
+
+story.append(H2("3.6&nbsp;&nbsp;Ransomware Detection"))
 story.append(P(
     "Two rules target the file-write behavior that precedes and accompanies a "
     "ransomware encryption event, in addition to the shadow-copy-deletion and "
@@ -645,7 +666,7 @@ story.append(P(
     "the full-screen tree viewer."
 ))
 
-story.append(H2("3.6&nbsp;&nbsp;Behavior Profiling &amp; Derived Titles"))
+story.append(H2("3.7&nbsp;&nbsp;Behavior Profiling &amp; Derived Titles"))
 story.append(P(
     "Rather than leaving an analyst to read a flat list of N detections, the "
     "profiling engine turns an incident's detections into a plain-language, "
@@ -658,7 +679,7 @@ story.append(P(
     "#4821.”"
 ))
 
-story.append(H2("3.7&nbsp;&nbsp;Incident Scoring"))
+story.append(H2("3.8&nbsp;&nbsp;Incident Scoring"))
 story.append(P(
     "Incident severity scoring is non-linear by design: one critical LSASS "
     "access outweighs three medium-severity suspicious-path executions, and "
@@ -669,7 +690,7 @@ story.append(P(
     "score crosses a configurable threshold (12, by default)."
 ))
 
-story.append(H2("3.8&nbsp;&nbsp;Correlation Chains &amp; Classification"))
+story.append(H2("3.9&nbsp;&nbsp;Correlation Chains &amp; Classification"))
 story.append(P(
     "Beyond the tactic-based titles in Section 3.6, three named, rule-ID-"
     "level patterns recognise a specific multi-stage story and outrank the "
@@ -690,7 +711,7 @@ story.append(P(
     "described in Section 3.7 before it is ever classified."
 ))
 
-story.append(H2("3.9&nbsp;&nbsp;Sigma Rule Import"))
+story.append(H2("3.10&nbsp;&nbsp;Sigma Rule Import"))
 story.append(P(
     "The hand-written rule catalog in Section 4 can be extended at runtime "
     "by uploading Sigma YAML files (from the public SigmaHQ corpus or "
@@ -728,7 +749,7 @@ story.append(P(
     "skipped, never silently wrong and never fatal to the batch."
 ))
 
-story.append(H2("3.10&nbsp;&nbsp;STIX 2.1 Export"))
+story.append(H2("3.11&nbsp;&nbsp;STIX 2.1 Export"))
 story.append(P(
     "The counterpart to Sigma import: any incident can be downloaded as a "
     "STIX 2.1 bundle from <font face=\"Courier\">GET /incidents/{id}/stix"
@@ -763,7 +784,7 @@ story.append(P(
     "have."
 ))
 
-story.append(H2("3.11&nbsp;&nbsp;ATT&amp;CK Coverage Report &amp; Navigator Export"))
+story.append(H2("3.12&nbsp;&nbsp;ATT&amp;CK Coverage Report &amp; Navigator Export"))
 story.append(P(
     "Every other view in this manual answers what the engine has detected; "
     "this one answers what it never could. "
@@ -797,7 +818,7 @@ story.append(P(
     "works."
 ))
 
-story.append(H2("3.12&nbsp;&nbsp;False-Positive Similarity"))
+story.append(H2("3.13&nbsp;&nbsp;False-Positive Similarity"))
 story.append(P(
     "Every incident an analyst marks a false positive is a labeled example "
     "of noise -- <font face=\"Courier\">backend/engine/noise.py</font> is "
@@ -1163,7 +1184,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 674 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 690 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1236,7 +1257,7 @@ layout_text = (
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report, search, notes, admin, ws, serializers,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rate_limit, stats<br/>"
     "|&nbsp;&nbsp;+-- engine/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalizer, rule_loader, matcher, correlator,<br/>"
-    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, attack, coverage, enrichment,<br/>"
+    "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beacon, discovery, scan, attack, coverage, enrichment,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;search, report, profile, pipeline, sigma_import,<br/>"
     "|&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stix_export, noise, metrics, stats<br/>"
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
@@ -1250,7 +1271,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;674 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;690 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

@@ -55,6 +55,7 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1018": "discovery",
     "T1057": "discovery",
     "T1049": "discovery",
+    "T1046": "discovery",  # SCN-001 network scan detector
     "T1071": "command-and-control",
     "T1071.001": "command-and-control",
     "T1573": "command-and-control",

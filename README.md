@@ -185,6 +185,13 @@ about it.
   rule can see, robust to the jitter every modern C2 applies.
 - **Reconnaissance-burst detection** — flags clusters of *distinct* ATT&CK
   discovery techniques in one process tree.
+- **Statistical network-scan detection** — flags one process fanning out to many
+  distinct destinations in a short window (`backend/engine/scan.py`, T1046):
+  many ports on one host (a port scan) or many hosts on one port (a sweep,
+  T1018), either sufficient on its own. Neither beaconing (rhythm to one
+  destination) nor discovery (command variety) sees this shape, since a
+  scanner is neither periodic nor does it run recon commands — the signal is
+  pure breadth across Sysmon EventID 3.
 - **Behavior profiling** — turns an incident's detections into a kill-chain
   narrative: "gained initial access through a phishing document, executed an
   obfuscated PowerShell payload, harvested credentials from LSASS, beaconed to
@@ -263,7 +270,7 @@ about it.
   shaped noise, not signal.
 - **ATT&CK coverage report and Navigator export** — a settings-menu download
   (`GET /attack/coverage/navigator`) that renders every ATT&CK technique this
-  project can detect — the rule corpus plus the two statistical detectors —
+  project can detect — the rule corpus plus the three statistical detectors —
   as a MITRE ATT&CK Navigator layer, colored red (no coverage) through green
   (several rules), so opening it at
   [mitre-attack.github.io/attack-navigator](https://mitre-attack.github.io/attack-navigator/)
@@ -386,11 +393,11 @@ Every event, whatever produced it, takes one path:
   ProcessTree.observe()  every event feeds the    |
          |               tree, not just suspicious |
          v                                        |
-   +-----+-----+--------------+                    |
-   v           v              v                    |
- rules   beacon detector  discovery detector       |
-   |           |              |                    |
-   +-----+-----+--------------+                    |
+   +-----+-------+----------+----------+              |
+   v           v            v            v              |
+ rules   beacon det.   discovery det.   scan det.        |
+   |           |            |            |              |
+   +-----+-------+----------+----------+              |
          v                                         |
   IncidentEngine.correlate()  group by tree root   |
          |                     within a time window |
@@ -651,7 +658,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 674 tests
+python -m pytest        # 690 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -684,7 +691,7 @@ sysmon-hunter/
 │   │                        report, search, notes, admin, ws, serializers,
 │   │                        rate_limit, stats
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
-│   │                        beacon, discovery, attack, coverage,
+│   │                        beacon, discovery, scan, attack, coverage,
 │   │                        enrichment, search, report, profile, pipeline,
 │   │                        sigma_import, redos_guard, stix_export, noise,
 │   │                        metrics, stats
@@ -699,7 +706,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   674 tests
+└── tests/                   690 tests
 ```
 
 ---

@@ -107,6 +107,40 @@ class Settings(BaseSettings):
     discovery_window_minutes: int = 5
     discovery_cooldown_minutes: int = 15
 
+    # --- Network scan ---
+    # Breadth detection over Sysmon EventID 3. See engine/scan.py. Catches one
+    # process fanning out to many distinct destinations -- the shape beaconing
+    # and discovery both miss, since a scanner is neither periodic nor does it
+    # run recon commands.
+    scan_enabled: bool = True
+
+    # Distinct destination IPs from one process within the window that
+    # constitute a host sweep. Ten is well beyond what a normal client
+    # touches in five minutes.
+    scan_min_distinct_ips: int = 10
+
+    # Distinct destination ports from one process within the window that
+    # constitute a port scan. Higher than scan_min_distinct_ips: a legitimate
+    # multi-service handshake against one host is more common than a client
+    # legitimately touching ten hosts, so this axis needs a wider margin.
+    scan_min_distinct_ports: int = 15
+
+    scan_window_minutes: int = 5
+    scan_cooldown_minutes: int = 15
+
+    # Processes whose fan-out is expected -- proxies, update services, and the
+    # like. Keep this list short: every entry is a place a real scanner can
+    # hide by naming itself correctly.
+    scan_excluded_images: list[str] = [
+        "chrome.exe",
+        "msedge.exe",
+        "firefox.exe",
+        "svchost.exe",
+        "onedrive.exe",
+        "teams.exe",
+        "slack.exe",
+    ]
+
     # --- Noise heuristic ---
     # How similar (0.0-1.0, weighted Jaccard across rule IDs, ATT&CK
     # techniques, root process, and process chain) an open incident must be

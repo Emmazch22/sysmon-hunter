@@ -23,6 +23,7 @@ from backend.engine.matcher import evaluate
 from backend.engine import metrics
 from backend.engine.normalizer import normalize
 from backend.engine.rule_loader import rule_store
+from backend.engine.scan import ScanDetector
 from backend.models import db
 from backend.models.schemas import Detection, Event, Incident
 
@@ -69,6 +70,13 @@ class Pipeline:
             window=timedelta(minutes=settings.discovery_window_minutes),
             cooldown=timedelta(minutes=settings.discovery_cooldown_minutes),
         )
+        self.scans = ScanDetector(
+            min_distinct_ips=settings.scan_min_distinct_ips,
+            min_distinct_ports=settings.scan_min_distinct_ports,
+            window=timedelta(minutes=settings.scan_window_minutes),
+            cooldown=timedelta(minutes=settings.scan_cooldown_minutes),
+            excluded_images=settings.scan_excluded_images,
+        )
         self._events_seen = 0
 
     async def process(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -106,6 +114,15 @@ class Pipeline:
             burst = self.discovery.observe(event)
             if burst is not None:
                 detections.append(burst)
+
+        # Scan detection runs on network connections too, alongside beaconing
+        # -- the two look at the same event stream from opposite angles (rhythm
+        # to one destination vs. breadth across many) and both can fire off the
+        # same connection.
+        if settings.scan_enabled:
+            scan = self.scans.observe(event)
+            if scan is not None:
+                detections.append(scan)
 
         raised: list[Incident] = []
         for detection in detections:
@@ -179,6 +196,7 @@ class Pipeline:
         pruned = self.tree.prune()
         pruned += self.beacons.prune()
         pruned += self.discovery.prune()
+        pruned += self.scans.prune()
         if closed:
             log.info("Swept %d idle incident(s)", len(closed))
         return pruned
@@ -193,6 +211,7 @@ class Pipeline:
             "incidents_open": self.incidents.open_count,
             "channels_watched": self.beacons.tracked_channels,
             "recon_trees_watched": self.discovery.tracked_bursts,
+            "scans_watched": self.scans.tracked_scans,
         }
 
 
