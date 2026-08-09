@@ -73,6 +73,48 @@ class TestIngestEndpoint:
                 r = await c.post("/ingest", content=b"not json", headers={"Content-Type": "application/json"})
                 assert r.status_code in (400, 422)
 
+    async def test_ingest_rejects_a_body_over_the_size_cap(self, tmp_db, monkeypatch) -> None:
+        """A single Sysmon event never legitimately approaches the cap -- this
+        exists for the hostile or malfunctioning sender POSTing an unbounded
+        body at the one endpoint built to accept external input at volume."""
+        from backend.api import ingest as ingest_module
+        from backend.main import app
+
+        monkeypatch.setattr(ingest_module, "MAX_EVENT_BYTES", 100)
+        pipeline.reset()
+
+        async with app.router.lifespan_context(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://t"
+            ) as c:
+                oversized = {
+                    "EventID": 1,
+                    "Computer": "LAB-WIN11",
+                    "Image": r"C:\Windows\System32\notepad.exe",
+                    "CommandLine": "x" * 500,
+                }
+                r = await c.post("/ingest", json=oversized)
+                assert r.status_code == 413
+
+    async def test_ingest_still_accepts_a_normal_event_under_the_cap(
+        self, tmp_db, monkeypatch
+    ) -> None:
+        from backend.api import ingest as ingest_module
+        from backend.main import app
+
+        monkeypatch.setattr(ingest_module, "MAX_EVENT_BYTES", 100)
+        pipeline.reset()
+
+        async with app.router.lifespan_context(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://t"
+            ) as c:
+                r = await c.post(
+                    "/ingest",
+                    json={"EventID": 1, "Computer": "LAB-WIN11", "Image": r"C:\a.exe"},
+                )
+                assert r.status_code == 202
+
     async def test_ingest_fires_a_matching_rule(self, tmp_db) -> None:
         """An event shaped like a real detection actually raises one --
         end-to-end through normalize -> match -> correlate -> persist."""

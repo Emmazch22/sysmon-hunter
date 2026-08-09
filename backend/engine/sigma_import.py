@@ -52,6 +52,7 @@ from typing import Any
 
 import yaml
 
+from backend.engine.redos_guard import is_safe_regex
 from backend.models.schemas import Rule, Severity
 
 # Sigma logsource category -> Sysmon EventID. Only categories with one clear,
@@ -417,6 +418,18 @@ def _convert_field(spec: str, expected: Any) -> tuple[str, Any]:
 
     if operator_mods:
         operator, converted_expected = _MODIFIER_TO_OPERATOR[operator_mods[0]], expected
+        if operator == "re":
+            # Unlike a bare-value glob (always translated into a regex this
+            # module generates itself from escaped literals -- safe by
+            # construction), an explicit `|re` modifier hands the matcher a
+            # regex the Sigma author wrote verbatim. That regex then runs
+            # against every future ingested event for as long as the rule
+            # stays enabled, so it is validated here rather than trusted.
+            patterns = converted_expected if isinstance(converted_expected, list) else [converted_expected]
+            for candidate in patterns:
+                safe, reason = is_safe_regex(str(candidate))
+                if not safe:
+                    raise SigmaImportError(f"field {field_name!r}: unsafe regex ({reason})")
     else:
         operator, converted_expected = _convert_bare_value(expected)
 

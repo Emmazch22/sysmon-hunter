@@ -90,6 +90,11 @@ function humanGap(ms) {
         }
     }
 
+    // Exposed for connect() in console.js: the /ws handshake cannot carry a
+    // custom header the way fetch() can (see backend/api/ws.py), so it needs
+    // the same stored key to build its own `?key=` query parameter.
+    window.hunterStoredApiKey = storedKey;
+
     window.fetch = async function (input, init) {
         init = init || {};
         const headers = new Headers(init.headers || {});

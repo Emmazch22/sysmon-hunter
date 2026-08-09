@@ -47,6 +47,42 @@ class TestTokenBucket:
         assert used == 2
 
 
+class TestBucketEviction:
+    """_buckets exists specifically for the scenario where /ingest is reached
+    from a network the operator does not fully trust -- in exactly that
+    scenario, a client rotating source IPs must not be able to grow this dict
+    without bound (see rate_limit.py's docstring on _MAX_TRACKED_CLIENTS)."""
+
+    def test_stays_capped_as_new_clients_arrive(self, monkeypatch) -> None:
+        monkeypatch.setattr(rl, "_MAX_TRACKED_CLIENTS", 5)
+        monkeypatch.setattr(settings, "ingest_rate_limit_per_second", 10)
+        monkeypatch.setattr(settings, "ingest_rate_limit_burst", 10)
+        rl._buckets.clear()
+
+        for i in range(20):
+            rl._bucket_for(f"10.0.0.{i}")
+
+        assert len(rl._buckets) == 5
+        # The most recently seen clients survive; the earliest are evicted.
+        assert "10.0.0.19" in rl._buckets
+        assert "10.0.0.0" not in rl._buckets
+
+    def test_reusing_an_existing_client_counts_as_recently_used(self, monkeypatch) -> None:
+        monkeypatch.setattr(rl, "_MAX_TRACKED_CLIENTS", 3)
+        monkeypatch.setattr(settings, "ingest_rate_limit_per_second", 10)
+        monkeypatch.setattr(settings, "ingest_rate_limit_burst", 10)
+        rl._buckets.clear()
+
+        rl._bucket_for("a")
+        rl._bucket_for("b")
+        rl._bucket_for("c")
+        rl._bucket_for("a")  # touch "a" again -- it should not be the next evicted
+        rl._bucket_for("d")  # forces one eviction
+
+        assert "a" in rl._buckets
+        assert "b" not in rl._buckets
+
+
 class TestEnforceIngestRateLimit:
     async def test_disabled_by_default_never_limits(self, tmp_db, monkeypatch) -> None:
         monkeypatch.setattr(settings, "ingest_rate_limit_per_second", 0)

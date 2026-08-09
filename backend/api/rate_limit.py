@@ -11,7 +11,7 @@ HUNTER_INGEST_RATE_LIMIT_PER_SECOND.
 from __future__ import annotations
 
 import time
-from collections import defaultdict
+from collections import OrderedDict
 
 from fastapi import HTTPException, Request, status
 
@@ -46,11 +46,16 @@ class TokenBucket:
         return False
 
 
-# One bucket per source IP, created lazily on first request. Never evicted:
-# a long-running server accumulates one small object per distinct client IP
-# it has ever seen, which for this project's single-collector deployment
-# model is a handful of entries, not a leak worth guarding against.
-_buckets: dict[str, TokenBucket] = {}
+# One bucket per source IP, created lazily on first request, capped at
+# _MAX_TRACKED_CLIENTS via simple LRU eviction (oldest-used entry dropped
+# first). This limiter exists specifically for the scenario where /ingest is
+# reachable from a network the operator does not fully trust -- in exactly
+# that scenario, an attacker rotating source IPs would otherwise grow this
+# dict without bound, trading one DoS (an unthrottled flood of events) for
+# another (unbounded memory spent tracking the flood). A single-collector
+# deployment never comes close to the cap and never evicts anything.
+_MAX_TRACKED_CLIENTS = 10_000
+_buckets: "OrderedDict[str, TokenBucket]" = OrderedDict()
 
 
 def _bucket_for(client_key: str) -> TokenBucket:
@@ -63,7 +68,10 @@ def _bucket_for(client_key: str) -> TokenBucket:
         bucket = TokenBucket(
             settings.ingest_rate_limit_per_second, settings.ingest_rate_limit_burst
         )
-        _buckets[client_key] = bucket
+    _buckets[client_key] = bucket
+    _buckets.move_to_end(client_key)
+    if len(_buckets) > _MAX_TRACKED_CLIENTS:
+        _buckets.popitem(last=False)
     return bucket
 
 

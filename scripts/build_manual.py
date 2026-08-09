@@ -1157,7 +1157,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 646 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 661 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1244,7 +1244,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;646 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;661 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

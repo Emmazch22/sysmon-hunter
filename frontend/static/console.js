@@ -982,7 +982,14 @@ async function bootstrap() {
  *  on a wall display for days and a transient blip must not require a reload. */
 function connect() {
     const scheme = location.protocol === "https:" ? "wss" : "ws";
-    const socket = new WebSocket(`${scheme}://${location.host}/ws`);
+    // A WebSocket handshake cannot carry the X-API-Key header fetch() uses
+    // (see common.js), so the same stored key -- if the server prompted for
+    // one -- rides along as a query parameter instead. A no-op query string
+    // when no key has been set, matching the server's own "unset means open"
+    // default for /ws (see backend/api/ws.py).
+    const key = window.hunterStoredApiKey ? window.hunterStoredApiKey() : "";
+    const url = `${scheme}://${location.host}/ws${key ? `?key=${encodeURIComponent(key)}` : ""}`;
+    const socket = new WebSocket(url);
 
     socket.onopen = () => {
         $("led").className = "led on";
@@ -1459,8 +1466,15 @@ async function enrichIndicator(indicator, slot) {
     const verdictColor = VERDICT_COLOR[data.worst_verdict] || VERDICT_COLOR.unknown;
     const rows = data.providers.map((p) => {
         const dot = p.available ? VERDICT_COLOR[p.verdict] : "var(--text-mute)";
+        // p.link is built server-side from whatever indicator string the
+        // caller sent to /enrich (see backend/engine/enrichment.py) -- today
+        // the only two callers of enrichIndicator() pass a bare IP or a hex
+        // hash, but nothing stops a future indicator source (a DNS query
+        // name, say) from being attacker-controlled text, so this is escaped
+        // like every other server-derived value on this page rather than
+        // trusted because it "looks like" a URL.
         const link = p.link
-            ? `<a href="${p.link}" target="_blank" rel="noopener">view</a>`
+            ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener">view</a>`
             : "";
         return `
       <div class="enrich-provider">

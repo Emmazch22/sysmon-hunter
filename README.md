@@ -283,6 +283,24 @@ about it.
   no clean way to express. Rendered as plain HTML/CSS bar charts — no
   charting library, the same zero-new-dependency approach as everything
   else in the frontend.
+- **Security hardening** — five fixes from a self-audit, closing gaps a
+  network- or upload-reachable attacker (not just a rule author) could
+  otherwise use: `/ws` now requires the same shared secret as every JSON
+  router when `HUNTER_API_KEY` is set, carried as a `?key=` query parameter
+  since a WebSocket handshake cannot send a custom header; a Sigma-imported
+  rule's `|re` field is validated by `backend/engine/redos_guard.py` (a
+  length cap, a nested-quantifier heuristic, and an empirical timing probe
+  run in a throwaway subprocess) before it can reach the matcher's hot path,
+  since a catastrophic-backtracking pattern accepted there would run against
+  every event ingested from then on; the IOC-enrichment popup escapes the
+  provider link before inserting it into an `href` attribute, closing a
+  latent XSS path for any future indicator source that is not as
+  structurally constrained as today's IP/hash pair; the `/ingest` rate
+  limiter's per-IP bucket dict is now LRU-capped so an attacker rotating
+  source IPs cannot grow it without bound — the exact scenario the limiter
+  exists for; and `/ingest` enforces a byte cap while streaming the request
+  body, rather than buffering an unbounded POST into memory before rejecting
+  it.
 
 ---
 
@@ -613,7 +631,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 646 tests
+python -m pytest        # 661 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -648,7 +666,8 @@ sysmon-hunter/
 │   ├── engine/              normalizer, rule_loader, matcher, correlator,
 │   │                        beacon, discovery, attack, coverage,
 │   │                        enrichment, search, report, profile, pipeline,
-│   │                        sigma_import, stix_export, noise, metrics, stats
+│   │                        sigma_import, redos_guard, stix_export, noise,
+│   │                        metrics, stats
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
@@ -660,7 +679,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   646 tests
+└── tests/                   661 tests
 ```
 
 ---

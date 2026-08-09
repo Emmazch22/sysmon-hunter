@@ -583,6 +583,39 @@ class TestFieldRejections:
         with pytest.raises(SigmaImportError, match="null value"):
             convert_sigma_rule(_only_doc(doc))
 
+    def test_re_modifier_accepts_a_safe_pattern_and_round_trips(self) -> None:
+        """An explicit |re modifier hands the matcher a regex the Sigma
+        author wrote verbatim (unlike a bare-value glob, which this module
+        generates itself and is safe by construction), so it goes through
+        backend/engine/redos_guard.py -- an ordinary pattern must still come
+        out the other side and actually fire, not just be accepted."""
+        doc = sigma(r"""
+            title: t
+            logsource: {category: process_creation, product: windows}
+            detection:
+              selection:
+                CommandLine|re: '.*-enc(odedcommand)?\s'
+              condition: selection
+        """)
+        rule = convert_sigma_rule(_only_doc(doc))
+        assert rule.detection == {"CommandLine|re": r".*-enc(odedcommand)?\s"}
+        assert matches(event_from(EventID=1, CommandLine="powershell.exe -enc AB=="), rule)
+
+    def test_re_modifier_rejects_a_catastrophic_backtracking_pattern(self) -> None:
+        """A regex an attacker crafts to hang the matcher's hot path must be
+        rejected at import time, before it ever reaches a live rule -- see
+        tests/test_redos_guard.py for the check itself."""
+        doc = sigma(r"""
+            title: t
+            logsource: {category: process_creation, product: windows}
+            detection:
+              selection:
+                CommandLine|re: '(a+)+$'
+              condition: selection
+        """)
+        with pytest.raises(SigmaImportError, match="unsafe regex"):
+            convert_sigma_rule(_only_doc(doc))
+
 
 # ---------------------------------------------------------------------------
 # Batch import: file-level parsing, multi-document, partial success
