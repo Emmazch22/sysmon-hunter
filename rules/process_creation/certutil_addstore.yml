@@ -1,0 +1,18 @@
+id: SYS-198
+title: Certutil used to install a certificate into a trust store
+event_id: 1
+severity: high
+attack: [T1553.004]
+description: >
+  certutil -addstore (or the -f/-user/-enterprise variants) installs a
+  certificate into a Windows certificate store. Pointed at the Root or CA
+  store, this is how an attacker gets a self-signed certificate trusted
+  system-wide -- to sign malware so it passes signature checks, or to plant
+  a rogue CA capable of issuing certificates for TLS interception. Distinct
+  from SYS-003 and SYS-075, which watch certutil's download and codec
+  misuse: this is the trust-store-tampering half of the tool's abuse
+  surface.
+detection:
+  image|endswith: '\certutil.exe'
+  command_line|re: '-addstore\b'
+condition: all

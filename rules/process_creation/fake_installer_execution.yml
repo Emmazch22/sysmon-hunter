@@ -1,0 +1,19 @@
+id: SYS-199
+title: Executable disguised as an installer package was run
+event_id: 1
+severity: high
+attack: [T1036.007, T1204.002]
+description: >
+  A process ran from a path whose filename carries an installer-package
+  extension (.msi, .msix, .appx, .pkg, .dmg, .apk) immediately followed by
+  a real executable extension -- setup.msi.exe, update.appx.exe. Windows
+  hides known extensions by default, so a user sees "setup.msi" and
+  expects an installer prompt; what actually runs is whatever the trailing
+  extension associates with. This is the execution-time counterpart to
+  SYS-185, which watches the file being written with the same masquerade:
+  a download that arrives by a path Sysmon's FileCreate event never saw
+  (already present on disk, unpacked from an archive, copied over SMB)
+  still gets caught here, at the moment it runs.
+detection:
+  image|re: '\.(msi|msix|appx|pkg|dmg|apk)\.(exe|scr|cmd|bat|com|pif|js|vbs|jar|lnk)$'
+condition: all

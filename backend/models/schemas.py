@@ -344,6 +344,10 @@ _TECHNIQUE_TACTIC: dict[str, str] = {
     "T1562.006": "defense-evasion",
     "T1112": "defense-evasion",
     "T1564.001": "defense-evasion",
+    # SYS-197..199.
+    "T1574.001": "defense-evasion",
+    "T1574.002": "defense-evasion",
+    "T1553.004": "defense-evasion",
 }
 
 

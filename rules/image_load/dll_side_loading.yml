@@ -1,0 +1,21 @@
+id: SYS-197
+title: Unsigned DLL loaded from a user-writable path by a trusted-location process
+event_id: 7
+severity: high
+attack: [T1574.001, T1574.002]
+description: >
+  A process running from a trusted system location (System32, SysWOW64,
+  Program Files) loaded a DLL from a user-writable directory that is also
+  unsigned. Legitimate binaries in those trusted directories load their
+  dependencies from alongside themselves or from the system's own DLL
+  search path -- never from Temp, AppData, Downloads, ProgramData, or
+  Public. A trusted-looking process pulling in an unsigned DLL from one of
+  those locations is the signature of DLL search-order hijacking or
+  side-loading: an attacker plants a malicious DLL with the name Windows
+  or a legitimate application is expecting, and the trusted process loads
+  it unknowingly, inheriting that process's reputation.
+detection:
+  Image|re: '\\(system32|syswow64|program files)\\'
+  ImageLoaded|re: '\\(temp|appdata|downloads|programdata|users\\public)\\'
+  Signed|equals: 'false'
+condition: all

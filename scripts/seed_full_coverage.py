@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 149 rules
+job: it is a regression fixture and a coverage demo, built to fire all 152 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25) -- while staying ONE
 incident: everything hangs off a single process-tree root, and no gap between
@@ -112,6 +112,10 @@ machine. The phases, roughly in kill-chain order:
       │   capture, and a registry key rename (SYS-191, SYS-195, SYS-196) --
       │   the WMI filter/binding and pipe-connected rules (SYS-192 through
       │   SYS-194) fire off events already seeded earlier for other rules
+      ├─ coverage-expansion pass 12: an unsigned DLL side-loaded into "ops"
+      │   from Temp, certutil installing a certificate into the Root store,
+      │   and a renamed PE run from Downloads disguised as an MSI installer
+      │   (SYS-197 through SYS-199)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -136,7 +140,7 @@ HOST = "WKSTN-RANGE-01"
 USER = "CORP\\redteam.ops"
 BASE = datetime.now(timezone.utc) - timedelta(minutes=15)
 
-# All 88 rule IDs the corpus ships today, so main() can report exactly what
+# Every rule ID the corpus ships today, so main() can report exactly what
 # (if anything) did not fire.
 EXPECTED_RULES = {
     "SYS-001", "SYS-002", "SYS-003", "SYS-004", "SYS-005", "SYS-006", "SYS-007",
@@ -160,7 +164,7 @@ EXPECTED_RULES = {
     "SYS-174", "SYS-175", "SYS-176", "SYS-177", "SYS-178", "SYS-179", "SYS-180",
     "SYS-181", "SYS-182", "SYS-183", "SYS-184", "SYS-185", "SYS-186", "SYS-187",
     "SYS-188", "SYS-189", "SYS-190", "SYS-191", "SYS-192", "SYS-193", "SYS-194",
-    "SYS-195", "SYS-196",
+    "SYS-195", "SYS-196", "SYS-197", "SYS-198", "SYS-199",
 }
 
 
@@ -339,6 +343,12 @@ G = {
     # until the rules themselves existed. SYS-191 (Sysmon config change) has
     # no process actor by design (see raw_event's docstring on ProcessGuid).
     "reg_rename": "{rng-reg-rename}",
+    # Coverage-expansion pass 12 (SYS-197..199). SYS-197 (DLL side-loading)
+    # reuses "ops" as the trusted-location loader rather than adding a new
+    # actor -- the ImageLoad event just needs a ProcessGuid whose Image is
+    # already under System32, which "ops" (cmd.exe) already is.
+    "certutil_addstore": "{rng-certutil-addstore}",
+    "fake_installer": "{rng-fake-installer}",
 }
 
 
@@ -1189,6 +1199,26 @@ def events() -> list[dict]:
                          ProcessGuid=G["reg_rename"], EventType="RenameKey",
                          TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
                          NewName=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run_bak"))
+
+    # === Coverage-expansion pass 12: DLL side-loading, a rogue-CA install,
+    # and a fake-installer double extension (SYS-197..199) ===
+    # "ops" (cmd.exe, already under System32) loads an unsigned DLL staged
+    # in Temp -- search-order hijacking / side-loading (SYS-197).
+    ev.append(raw_event(7, step(1), Image=r"C:\Windows\System32\cmd.exe",
+                         ProcessGuid=G["ops"],
+                         ImageLoaded=r"C:\Windows\Temp\version.dll", Signed="false"))
+
+    # certutil installs a certificate into the Root store -- a rogue CA
+    # trusted system-wide (SYS-198).
+    ev.append(proc(step(1), G["certutil_addstore"], G["ops"], r"C:\Windows\System32\certutil.exe",
+                    r"certutil.exe -addstore Root C:\Users\redteam.ops\AppData\Local\Temp\evil.cer",
+                    pid=5940, ppid=4510))
+
+    # A renamed PE run from Downloads, disguised as an MSI installer
+    # (SYS-199).
+    ev.append(proc(step(1), G["fake_installer"], G["ops"],
+                    r"C:\Users\redteam.ops\Downloads\setup.msi.exe",
+                    r"setup.msi.exe /silent", pid=5950, ppid=4510))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

