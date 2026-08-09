@@ -147,6 +147,10 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1021.004": "lateral-movement",
     "T1090.003": "command-and-control",
     "T1560.002": "collection",
+    # SYS-191..196.
+    "T1562.006": "defense-evasion",
+    "T1112": "defense-evasion",
+    "T1564.001": "defense-evasion",
 }
 
 # The order tactics fall in an intrusion. The narrative follows this, not the

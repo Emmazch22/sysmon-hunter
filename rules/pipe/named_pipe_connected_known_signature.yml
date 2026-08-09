@@ -1,0 +1,26 @@
+id: SYS-194
+title: Connection to a named pipe matching a known C2 or lateral-movement signature
+event_id: 18
+severity: high
+attack: [T1071, T1055, T1021.002, T1569.002]
+description: >
+  A named pipe was connected whose name matches the same Cobalt
+  Strike/Meterpreter (SYS-060) or PsExec-style (SYS-072) defaults those two
+  rules already catch at creation time (event 17). PipeConnected is a
+  distinct event from PipeCreated: Sysmon on the connecting side of a remote
+  named pipe (the common shape for PsExec-style lateral movement, where the
+  service pipe is created on the target and the operator's tooling connects
+  to it) can see the connection without ever having seen a local create, so a
+  detection keyed only on event 17 misses that half of the picture. Reuses
+  both rules' pipe-name patterns rather than inventing new ones -- the
+  signature is the same, only the event that observes it differs.
+detection:
+  PipeName|re:
+    - '\\msagent_[0-9a-f]{2}\b'
+    - '\\status_[0-9a-f]{2}\b'
+    - '\\postex_[0-9a-f]{4}\b'
+    - '\\msf-pipe\b'
+    - '\\(interprocess|windows\.update)_[0-9a-f]+'
+    - '\\psexesvc'
+    - '\\remcom_communicat'
+condition: all

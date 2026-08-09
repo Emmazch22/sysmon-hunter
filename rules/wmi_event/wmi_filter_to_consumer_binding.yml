@@ -1,0 +1,18 @@
+id: SYS-193
+title: WMI filter bound to a consumer
+event_id: 21
+severity: high
+attack: [T1546.003]
+description: >
+  A WmiEventFilter was bound to a WmiEventConsumer -- the step that actually
+  wires a trigger condition (SYS-192, event 19) to an action (SYS-071, event
+  20) and turns two independently unremarkable WMI objects into a live,
+  reboot-surviving subscription. This is the single most specific of the
+  three WMI-persistence events Sysmon emits: a filter or a consumer can exist
+  without ever being bound to anything, but a binding only appears once the
+  subscription is actually wired to fire. Matches broadly on Consumer (always
+  present), same reasoning as SYS-191/SYS-192 -- rare, no steady-state noise,
+  a lead rather than a verdict on its own.
+detection:
+  Consumer|re: '.+'
+condition: all

@@ -58,12 +58,15 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 143 YAML rules with Sigma-compatible matching
-  semantics, mapped to MITRE ATT&CK, across 16 Sysmon event types (process
-  creation, network, DNS query, registry, image load, process access, remote
-  thread, file create, file delete, file creation-time change, alternate data
-  streams, named pipes, driver load, raw disk access, process tampering, WMI
-  event). Indexed by EventID so only relevant rules run per event.
+- **Rule-based detection** — 149 YAML rules with Sigma-compatible matching
+  semantics, mapped to MITRE ATT&CK, across all 23 Sysmon event types the
+  engine understands (process creation, network, DNS query, registry create/
+  delete/set/rename, image load, process access, remote thread, file create,
+  file delete, file creation-time change, alternate data streams, named pipe
+  created/connected, driver load, raw disk access, process tampering, Sysmon
+  configuration change, clipboard capture, and all three WMI persistence
+  events -- filter registration, consumer registration, and the binding
+  between them). Indexed by EventID so only relevant rules run per event.
 - **Ransomware detection** — a dropped ransom note (matched against the
   near-universal "how to decrypt / restore your files" naming convention) and
   mass file writes with a known ransomware encryption extension (`.locked`,
@@ -158,6 +161,23 @@ about it.
   "accessed credential material from LSASS memory," which would have
   misdescribed every one of the new registry-, GPP-, and ticket-based
   findings above — it now branches on which technique actually fired.
+- **Full Sysmon EventID coverage** — 6 more rules (SYS-191 through SYS-196)
+  closing the last EventIDs the engine understood but had zero rules on: a
+  Sysmon configuration reload (`sysmon -c`), the strongest single signal that
+  someone is trying to blind the sensor itself, since this event has no
+  legitimate steady-state traffic to tune around; a WMI event filter
+  registered and a filter-to-consumer binding created, completing the WMI
+  persistence chain alongside the existing consumer-registration rule
+  (SYS-071); a named-pipe *connection* matching the same Cobalt Strike/
+  PsExec signatures already caught at pipe *creation* (SYS-060, SYS-072) —
+  distinct because a machine on the receiving end of remote lateral movement
+  can see the connection without ever having seen a local create; clipboard
+  access from a scripting engine or LOLBIN rather than the foreground app,
+  catching what the corpus's two command-line-based clipboard rules
+  (SYS-154, SYS-157) cannot: a compiled crypto-clipper calling the Win32
+  clipboard API directly, no PowerShell involved; and a persistence-relevant
+  registry key renamed rather than created, set, or deleted, dodging every
+  detection keyed only on those three operations.
 - **Process-tree correlation** — reconstructs ancestry from Sysmon's
   `ProcessGuid`, so detections that share a root become one incident with the
   full branching tree.
@@ -486,7 +506,7 @@ campaign, and an Office-to-PowerShell infection chain — and surface it as a
 `classification` field and a chain-specific incident title, ranked above the
 existing tactic-based narratives. Every rule across all four passes ships
 with a true-positive and a true-negative case; `scripts/seed_full_coverage.py`
-fires all 143 end to end as a single correlated incident and confirms its
+fires all 149 end to end as a single correlated incident and confirms its
 classification.
 
 ---
@@ -631,7 +651,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 661 tests
+python -m pytest        # 674 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -671,7 +691,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   143 YAML detection rules, by EventID, plus
+├── rules/                   149 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            dashboard.html, static/{css,js}
@@ -679,7 +699,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   661 tests
+└── tests/                   674 tests
 ```
 
 ---

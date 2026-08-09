@@ -2,13 +2,12 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 143 rules
+job: it is a regression fixture and a coverage demo, built to fire all 149 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
-12, 13, 15, 17, 20, 22, 23, 25) plus a handful of EventIDs no rule keys on (18,
-19, 21) added purely so the incident's raw event stream and process tree show
-the full breadth of what Sysmon reports -- while staying ONE incident:
-everything hangs off a single process-tree root, and no gap between events
-exceeds the correlation window, so the correlator never splits it in two.
+12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25) -- while staying ONE
+incident: everything hangs off a single process-tree root, and no gap between
+events exceeds the correlation window, so the correlator never splits it in
+two.
 
 That means trading realism for coverage. No real intrusion touches IIS, SQL
 Server, PsExec, WMI/DCOM, CMSTP, and a phishing macro in the same twenty
@@ -109,6 +108,10 @@ machine. The phases, roughly in kill-chain order:
       │   query, GPP cpassword harvesting, SSH lateral movement with a
       │   private key, Tor, and a fileless .NET-compression archive
       │   (SYS-175 through SYS-190)
+      ├─ coverage-expansion pass 11: a Sysmon config reload, a clipboard
+      │   capture, and a registry key rename (SYS-191, SYS-195, SYS-196) --
+      │   the WMI filter/binding and pipe-connected rules (SYS-192 through
+      │   SYS-194) fire off events already seeded earlier for other rules
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -156,7 +159,8 @@ EXPECTED_RULES = {
     "SYS-167", "SYS-168", "SYS-169", "SYS-170", "SYS-171", "SYS-172", "SYS-173",
     "SYS-174", "SYS-175", "SYS-176", "SYS-177", "SYS-178", "SYS-179", "SYS-180",
     "SYS-181", "SYS-182", "SYS-183", "SYS-184", "SYS-185", "SYS-186", "SYS-187",
-    "SYS-188", "SYS-189", "SYS-190",
+    "SYS-188", "SYS-189", "SYS-190", "SYS-191", "SYS-192", "SYS-193", "SYS-194",
+    "SYS-195", "SYS-196",
 }
 
 
@@ -326,6 +330,15 @@ G = {
     "ssh_lateral": "{rng-ssh-lateral}",
     "tor_proxy": "{rng-tor-proxy}",
     "fileless_archive": "{rng-fileless-archive}",
+    # Coverage-expansion pass 11 (SYS-191..196). Only one new actor:
+    # SYS-192/SYS-193 (WMI filter registered / bound) already fire off the
+    # existing raw_event(19, ...)/raw_event(21, ...) pair below the WMI
+    # consumer block, and SYS-194 (pipe connected) already fires off the
+    # existing raw_event(18, ...) pairs next to rundll_bare and psexec's
+    # PipeCreated events -- none of those needed a new rule ID added here
+    # until the rules themselves existed. SYS-191 (Sysmon config change) has
+    # no process actor by design (see raw_event's docstring on ProcessGuid).
+    "reg_rename": "{rng-reg-rename}",
 }
 
 
@@ -1150,6 +1163,32 @@ def events() -> list[dict]:
                     r'powershell -nop -c "[System.IO.Compression.ZipFile]::CreateFromDirectory('
                     r"'C:\Users\redteam.ops\Documents','C:\Users\redteam.ops\AppData\Local\Temp\d.zip')\"",
                     pid=5920, ppid=4510))
+
+    # === Coverage-expansion pass 11: the last handful of Sysmon EventIDs with
+    # zero rule coverage -- config tampering, WMI persistence's other two
+    # events, a pipe connection with no local create, clipboard capture, and
+    # a registry rename (SYS-191..196) ===
+    # Sysmon's own logging configuration reloaded -- no process actor, this
+    # is the driver itself re-reading its config (SYS-191).
+    ev.append(raw_event(16, step(1), ConfigurationFileHash="SHA1=9F86D081884C7D659A2FEAA0C55AD015A3BF4F1"))
+
+    # The already-encoded PowerShell process also reads the clipboard --
+    # reuses G["ps_enc"] rather than adding a new actor, since one process
+    # doing both is exactly the realistic shape a clipboard-hijacking script
+    # takes (SYS-195).
+    ev.append(raw_event(24, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["ps_enc"]))
+
+    # A persistence-relevant registry key renamed rather than set or deleted
+    # (SYS-196).
+    ev.append(proc(step(1), G["reg_rename"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r"powershell -nop -c \"Rename-Item 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' 'Run_bak'\"",
+                    pid=5930, ppid=4510))
+    ev.append(raw_event(14, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["reg_rename"], EventType="RenameKey",
+                         TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                         NewName=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run_bak"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

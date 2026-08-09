@@ -1,0 +1,21 @@
+id: SYS-191
+title: Sysmon configuration reloaded
+event_id: 16
+severity: critical
+attack: [T1562.001, T1562.006]
+description: >
+  Sysmon's own logging configuration was reloaded (`sysmon -c <file>`, or the
+  driver otherwise re-reading its config). This event only fires on a genuine
+  configuration change -- there is no legitimate steady-state traffic to
+  filter out, unlike almost every other rule in this corpus. An operator
+  tuning detection coverage causes it too, which is exactly why it belongs in
+  the console rather than only in a change-management log: on an endpoint
+  where nobody scheduled a config push, this is the first and clearest signal
+  that a hands-on-keyboard attacker is trying to blind, narrow, or otherwise
+  tamper with the sensor before doing anything else. Matches on
+  ConfigurationFileHash rather than Configuration's free-text body, since the
+  hash is a short, fixed-shape field guaranteed present on every occurrence,
+  where the body's format has varied across Sysmon versions.
+detection:
+  ConfigurationFileHash|re: '.+'
+condition: all

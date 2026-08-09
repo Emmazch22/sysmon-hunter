@@ -2452,6 +2452,55 @@ CASES = [
             command_line="Get-Process",
         ),
     ),
+    # --- Sysmon configuration reloaded (SYS-191) ---
+    ("SYS-191", True, event(16, ConfigurationFileHash="SHA1=1A2B3C4D5E")),
+    ("SYS-191", False, event(16, ConfigurationFileHash="")),
+    # --- WMI event filter registered (SYS-192) ---
+    (
+        "SYS-192",
+        True,
+        event(19, Name="EvilFilter", Query="SELECT * FROM __InstanceCreationEvent"),
+    ),
+    ("SYS-192", False, event(19, Name="")),
+    # --- WMI filter bound to a consumer (SYS-193) ---
+    (
+        "SYS-193",
+        True,
+        event(21, Consumer='CommandLineEventConsumer="Evil"', Filter="EvilFilter"),
+    ),
+    ("SYS-193", False, event(21, Consumer="")),
+    # --- Named pipe connected matching a known C2/lateral-movement signature
+    # (SYS-194) -- same pipe-name patterns as SYS-060/SYS-072, on the Connected
+    # event rather than Created. ---
+    ("SYS-194", True, event(18, PipeName=r"\msagent_4f")),
+    ("SYS-194", True, event(18, PipeName=r"\PSEXESVC")),
+    ("SYS-194", False, event(18, PipeName=r"\lsass")),
+    # --- Clipboard accessed by a scripting engine or LOLBIN (SYS-195) ---
+    (
+        "SYS-195",
+        True,
+        event(24, image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"),
+    ),
+    ("SYS-195", False, event(24, image=r"C:\Windows\explorer.exe")),
+    # --- Persistence-relevant registry key renamed (SYS-196) ---
+    (
+        "SYS-196",
+        True,
+        event(
+            14,
+            EventType="RenameKey",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\evil",
+        ),
+    ),
+    (
+        "SYS-196",
+        False,
+        event(
+            14,
+            EventType="RenameKey",
+            TargetObject=r"HKCU\SOFTWARE\SomeApp\Settings\Theme",
+        ),
+    ),
 ]
 
 

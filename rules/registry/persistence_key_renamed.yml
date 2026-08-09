@@ -1,0 +1,21 @@
+id: SYS-196
+title: Persistence-relevant registry key renamed
+event_id: 14
+severity: high
+attack: [T1112, T1564.001]
+description: >
+  A registry key under a well-known persistence or security-configuration
+  path was renamed rather than created, set, or deleted -- the three
+  operations every other registry rule in this corpus already watches for
+  (SYS-087 and others via events 12/13). A rename achieves the same practical
+  effect a delete-then-recreate would (the original value stops taking
+  effect, or a new hidden copy starts existing under an unexpected name)
+  while dodging any detection keyed only on CreateKey/SetValue/DeleteValue,
+  and renaming a key to something benign-looking is also a plain hiding
+  technique on its own. Sysmon only emits event 14 for an actual rename, so
+  there is no steady-state "keys get renamed constantly" noise to tune
+  around the way there is for ordinary value writes.
+detection:
+  EventType|equals: RenameKey
+  TargetObject|re: '\\run\b|\\runonce\b|\\image file execution options\b|\\winlogon\b|\\control\\lsa\b|\\active setup\\installed components\b'
+condition: all

@@ -1,0 +1,29 @@
+id: SYS-195
+title: Clipboard accessed by a scripting engine or LOLBIN
+event_id: 24
+severity: medium
+attack: [T1115]
+description: >
+  A ClipboardChange event was attributed to a scripting host or a LOLBIN
+  rather than to the foreground application a user actually copied from.
+  This corpus already has two T1115 rules (SYS-154, SYS-157) that catch
+  PowerShell's Get-Clipboard/Set-Clipboard cmdlets by command line -- a real
+  but narrow surface, since it only sees the technique when the clipboard is
+  read through those specific cmdlets. Sysmon's ClipboardChange event instead
+  fires on the underlying Win32 clipboard API itself, so it catches what the
+  command-line rules cannot: a compiled crypto-clipper or infostealer binary
+  that calls SetClipboardData/GetClipboardData directly, with no PowerShell
+  and no command-line signature to match against at all. A normal copy/paste
+  is attributed to the app the user was using (explorer.exe, a browser, an
+  editor), never to cmd.exe or rundll32.exe -- which is the whole signal
+  here.
+detection:
+  image|endswith:
+    - \powershell.exe
+    - \pwsh.exe
+    - \cmd.exe
+    - \wscript.exe
+    - \cscript.exe
+    - \mshta.exe
+    - \rundll32.exe
+condition: all

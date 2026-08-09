@@ -1,0 +1,20 @@
+id: SYS-192
+title: WMI event filter registered
+event_id: 19
+severity: high
+attack: [T1546.003]
+description: >
+  A WmiEventFilter was registered -- the trigger-condition half of a WMI
+  event subscription, evaluated separately from SYS-071's consumer check
+  (event 20, the action-to-run half) and from the binding that connects the
+  two (SYS-193, event 21). Sysmon only emits this event when a filter is
+  actually created; there is no polling or steady-state noise to tune around,
+  and legitimate software rarely registers a new WQL filter outside specific
+  management/monitoring tooling. Matches broadly on Name (always present) for
+  the same reason SYS-191 matches broadly on event 16: a rare event with no
+  clean, hash-free way to separate malicious from benign at the filter-syntax
+  level alone, so this is a lead to correlate against what gets bound to it,
+  not an automatic verdict.
+detection:
+  Name|re: '.+'
+condition: all
