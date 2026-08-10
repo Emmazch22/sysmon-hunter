@@ -1,0 +1,22 @@
+id: SYS-207
+title: Crash handler launched for a security-critical Windows service
+event_id: 1
+severity: high
+attack: [T1562.002]
+description: >
+  WerFault.exe (Windows Error Reporting's crash handler) started, and the
+  service hosting process it is reporting on identifies itself by its `-s
+  <ServiceName>` argument as EventLog, NTDS, Spooler, or Netlogon -- services
+  whose sudden, unscheduled death has an outsized defense-evasion payoff.
+  Remotely crashing the Event Log service (the LogCrusher/EventLogCrasher
+  family of RPC-based crashes) blinds Windows Event Forwarding and any
+  Sysmon-adjacent logging pipeline for as long as the service takes to
+  restart; crashing NTDS or Netlogon on a domain controller disrupts
+  authentication; crashing the Spooler is the softer cousin of the
+  PrintNightmare exploit chain. A single crash is not proof of an attack --
+  services do crash on their own -- but it is a high-value signal to
+  correlate against whatever else was touching the host at the same moment.
+detection:
+  Image|endswith: '\WerFault.exe'
+  ParentCommandLine|re: '-s\s+(eventlog|ntds|spooler|netlogon)\b'
+condition: all

@@ -58,7 +58,7 @@ about it.
 
 ## What it does
 
-- **Rule-based detection** — 157 YAML rules with Sigma-compatible matching
+- **Rule-based detection** — 173 YAML rules with Sigma-compatible matching
   semantics, mapped to MITRE ATT&CK, across all 23 Sysmon event types the
   engine understands (process creation, network, DNS query, registry create/
   delete/set/rename, image load, process access, remote thread, file create,
@@ -658,7 +658,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 708 tests
+python -m pytest        # 742 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -698,7 +698,7 @@ sysmon-hunter/
 │   ├── models/              schemas, db
 │   └── data/                attack_data.json (ATT&CK technique lookup),
 │                            attack_index.json (full catalog, coverage gaps)
-├── rules/                   157 YAML detection rules, by EventID, plus
+├── rules/                   173 YAML detection rules, by EventID, plus
 │                            imported_sigma/ for rules imported at runtime
 ├── frontend/                console.html, incident.html, tree.html,
 │                            dashboard.html, static/{css,js}
@@ -706,7 +706,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   708 tests
+└── tests/                   742 tests
 ```
 
 ---

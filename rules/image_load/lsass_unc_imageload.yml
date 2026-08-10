@@ -1,0 +1,19 @@
+id: SYS-215
+title: lsass.exe loaded an image from a network path
+event_id: 7
+severity: critical
+attack: [T1003.001, T1021.002]
+description: >
+  lsass.exe loaded a DLL whose path is a UNC network share rather than a
+  local disk path. There is no legitimate reason for the process holding
+  Windows' credential material in memory to load code over SMB from another
+  host -- every module lsass legitimately loads ships locally under
+  System32. Getting lsass to load a remote DLL (via a registry value that
+  names a UNC path, a planted provider DLL, or similar) is a way to run
+  code inside lsass's address space -- and therefore with direct access to
+  the credentials it holds -- from a remote share the attacker controls,
+  without ever writing the payload to the target's own disk.
+detection:
+  image|endswith: '\lsass.exe'
+  ImageLoaded|startswith: '\\'
+condition: all

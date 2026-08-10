@@ -1,0 +1,17 @@
+id: SYS-209
+title: attrib.exe used to hide a file
+event_id: 1
+severity: medium
+attack: [T1564.001]
+description: >
+  attrib.exe was run with the +h flag, which sets the hidden attribute on a
+  file or directory. File Explorer honors it by default, so a tool dropped
+  next to legitimate files and then hidden this way survives casual
+  browsing. Medium severity rather than high because +h also shows up in
+  ordinary install scripts hiding a config file or log directory -- what
+  makes it worth a look is which file gets hidden and by what parent
+  process, not the command alone.
+detection:
+  image|endswith: '\attrib.exe'
+  command_line|re: '(^|\s)\+h(\s|$)'
+condition: all

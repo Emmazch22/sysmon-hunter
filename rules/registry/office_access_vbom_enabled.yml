@@ -1,0 +1,19 @@
+id: SYS-211
+title: Office VBA object model access (AccessVBOM) enabled via registry
+event_id: 13
+severity: high
+attack: [T1059.005]
+description: >
+  AccessVBOM under an Office application's ...\Security key controls whether
+  code (a macro, an add-in, an automation client) is allowed to programmatically
+  read and write the VBA project of a document -- normally locked down because
+  it lets one piece of code generate and inject more VBA at runtime. Malware
+  droppers flip it on via the registry before dropping a document, so the
+  document's own macro can self-modify or spawn further malicious VBA without
+  ever tripping a static macro-content scanner that only inspected the
+  original file.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\Security\AccessVBOM'
+  Details|equals: 'DWORD (0x00000001)'
+condition: all

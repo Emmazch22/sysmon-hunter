@@ -1,0 +1,19 @@
+id: SYS-216
+title: NTDS DirectoryServiceExtPt registry value points at a network path
+event_id: 13
+severity: critical
+attack: [T1003.003, T1021.002]
+description: >
+  HKLM\...\Services\NTDS\DirectoryServiceExtPt names a DLL the Active
+  Directory service (lsass, on a domain controller) loads as an extension
+  at startup. Pointing it at a UNC path is a documented technique
+  (popularized as the "AdamXpn" trick) for getting a domain controller to
+  load and execute a DLL of the attacker's choosing straight off a remote
+  share -- with the same SYSTEM-level, NTDS.dit-and-credentials-adjacent
+  privileges any other legitimate NTDS extension gets, and without ever
+  needing to write the payload to the DC's own disk.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\NTDS\DirectoryServiceExtPt'
+  Details|startswith: '\\'
+condition: all

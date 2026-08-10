@@ -1,0 +1,22 @@
+id: SYS-210
+title: PowerShell execution policy forced to Unrestricted or Bypass via registry
+event_id: 13
+severity: high
+attack: [T1562.001]
+description: >
+  The machine-wide PowerShell execution policy
+  (...\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell\ExecutionPolicy)
+  was set directly via the registry rather than through Set-ExecutionPolicy,
+  to Unrestricted or Bypass -- the two settings that let an unsigned script
+  run with no prompt at all. Writing this value straight into the registry
+  (instead of calling the cmdlet, which is what -ExecutionPolicy Bypass on
+  an individual invocation already does without touching persistent state)
+  is a machine-wide, durable downgrade of the one control PowerShell offers
+  against drive-by script execution.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\Microsoft.PowerShell\ExecutionPolicy'
+  Details:
+    - Unrestricted
+    - Bypass
+condition: all

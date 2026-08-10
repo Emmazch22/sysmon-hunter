@@ -366,6 +366,22 @@ RULES = [
     ("SYS-202", "7", "Critical", "UAC auto-elevate binary loaded an unsigned DLL", "T1548.002/T1574.001/.002"),
     ("SYS-203", "13", "Critical", "UAC disabled via the EnableLUA registry value", "T1548.002/T1562.001"),
     ("SYS-204", "1", "Critical", "Shell spawned by DllHost.exe at High integrity", "T1548.002/T1134.001"),
+    ("SYS-205", "10", "High", "Process opened with suspend/resume-only access rights", "T1055.012"),
+    ("SYS-206", "10", "High", "Process access call stack has no ntdll.dll frame", "T1055"),
+    ("SYS-207", "1", "High", "Crash handler launched for a security-critical Windows service", "T1562.002"),
+    ("SYS-208", "17", "High", "Named pipe follows PsExec's stdin/stdout/stderr relay naming convention", "T1569.002"),
+    ("SYS-209", "1", "Medium", "attrib.exe used to hide a file", "T1564.001"),
+    ("SYS-210", "13", "High", "PowerShell execution policy forced to Unrestricted or Bypass via registry", "T1562.001"),
+    ("SYS-211", "13", "High", "Office VBA object model access (AccessVBOM) enabled via registry", "T1059.005"),
+    ("SYS-212", "7", "High", "Loaded image's PE metadata claims a trusted binary, but it runs from a staging path", "T1036.005"),
+    ("SYS-213", "1", "High", "Process executed from a redirected RDP client drive, or SharpRDP tooling ran", "T1021.001"),
+    ("SYS-214", "1", "Critical", "WMI-spawned command redirects its output to a hidden administrative share", "T1047/T1021.002"),
+    ("SYS-215", "7", "Critical", "lsass.exe loaded an image from a network path", "T1003.001/T1021.002"),
+    ("SYS-216", "13", "Critical", "NTDS DirectoryServiceExtPt registry value points at a network path", "T1003.003/T1021.002"),
+    ("SYS-217", "13", "High", "New SMB share added directly through the registry", "T1021.002"),
+    ("SYS-218", "13", "High", "NullSessionPipes registry value modified", "T1021.002/T1562.001"),
+    ("SYS-219", "17", "High", "Named pipe named as a bare hex string, consistent with a framework-generated backdoor", "T1071"),
+    ("SYS-220", "18", "High", "Connection to a named pipe named as a bare hex string", "T1071"),
 ]
 
 EVENT_ID_NAMES = {
@@ -584,7 +600,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "157 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "173 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -1192,7 +1208,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 708 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 742 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1271,7 +1287,7 @@ layout_text = (
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;157 YAML detection rules, by Event ID, plus<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;173 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dashboard.html, static/{css,js}<br/>"
@@ -1279,7 +1295,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;708 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;742 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

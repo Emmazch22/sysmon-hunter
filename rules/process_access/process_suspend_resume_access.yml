@@ -1,0 +1,18 @@
+id: SYS-205
+title: Process opened with suspend/resume-only access rights
+event_id: 10
+severity: high
+attack: [T1055.012]
+description: >
+  A process opened a handle to another process requesting exactly
+  PROCESS_SUSPEND_RESUME (0x800) and nothing else. Debuggers and legitimate
+  tooling that touch another process almost always ask for a broader access
+  mask (0x1fffff, or one of the narrower-but-still-composite debug/query
+  combinations); asking for suspend/resume alone and nothing else is the
+  access pattern of process-hollowing tooling that freezes a freshly spawned
+  process before it executes its own entrypoint so it can be reimaged with
+  a malicious payload (Mimikatz's own process-suspend helper is one example
+  observed in the wild with this exact mask).
+detection:
+  GrantedAccess|equals: '0x800'
+condition: all

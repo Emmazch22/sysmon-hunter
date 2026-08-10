@@ -1,0 +1,19 @@
+id: SYS-206
+title: Process access call stack has no ntdll.dll frame
+event_id: 10
+severity: high
+attack: [T1055]
+description: >
+  Every legitimate call into a process-access API on Windows passes through
+  ntdll.dll -- it is the lowest-level, always-loaded gateway to the syscall,
+  and Sysmon's CallTrace should show it as a frame regardless of which
+  higher-level API (OpenProcess, NtOpenProcess, DuplicateHandle, ...) the
+  caller actually used. A CallTrace with no ntdll.dll frame at all means the
+  call originated from a memory region Sysmon could not resolve to any
+  loaded module -- the signature of a thread executing directly out of
+  unbacked/shellcode memory rather than the process's own mapped code,
+  commonly seen once a reflective loader or injected payload starts probing
+  or manipulating other processes.
+detection:
+  CallTrace|contains|not: 'ntdll.dll'
+condition: all

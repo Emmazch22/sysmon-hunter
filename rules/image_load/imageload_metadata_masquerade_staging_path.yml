@@ -1,0 +1,40 @@
+id: SYS-212
+title: Loaded image's PE metadata claims a trusted binary, but it runs from a staging path
+event_id: 7
+severity: high
+attack: [T1036.005]
+description: >
+  SYS-092 catches this same metadata lie (OriginalFileName naming a
+  well-known Windows or Office binary while the file itself sits in a
+  user-writable location) at process-creation time; this is the ImageLoad
+  counterpart, needed because Process Herpaderping and similar
+  content-swap-after-mapping techniques leave a process-creation event
+  whose OriginalFileName is still blank (the loader has not yet mapped the
+  final PE headers when Sysmon captures event 1) but a subsequent ImageLoad
+  event that does carry the spoofed metadata once the swapped content is
+  mapped in. Downloads and Desktop are included alongside SYS-092's
+  Temp/AppData/ProgramData/Public list because both are equally
+  user-writable and are where a browser or archive-extraction naturally
+  drops a file a victim then double-clicks.
+detection:
+  OriginalFileName:
+    - CALC.EXE
+    - NOTEPAD.EXE
+    - CMD.EXE
+    - EXPLORER.EXE
+    - MSPAINT.EXE
+    - WERFAULT.EXE
+    - SVCHOST.EXE
+    - IEXPLORE.EXE
+    - WINWORD.EXE
+    - EXCEL.EXE
+    - CHROME.EXE
+    - CONHOST.EXE
+  image|re:
+    - '\\users\\[^\\]+\\appdata\\local\\temp\\'
+    - '\\users\\[^\\]+\\downloads\\'
+    - '\\users\\[^\\]+\\desktop\\'
+    - '\\users\\public\\'
+    - '\\windows\\temp\\[^\\]+\.exe'
+    - '\\programdata\\[^\\]+\.exe'
+condition: all

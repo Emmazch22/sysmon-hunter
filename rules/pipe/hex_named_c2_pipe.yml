@@ -1,0 +1,18 @@
+id: SYS-219
+title: Named pipe named as a bare hex string, consistent with a framework-generated backdoor
+event_id: 17
+severity: high
+attack: [T1071]
+description: >
+  A named pipe was created whose entire name is a run of 16 to 40 lowercase
+  hex characters and nothing else -- no readable prefix, no vendor name, no
+  word at all. Every legitimate Windows-native named pipe Sysmon normally
+  sees (lsass, wkssvc, browser, eventlog, srvsvc, ...) has a human-readable
+  name; a bare hex string of hash-like length is the fingerprint of a pipe
+  name generated programmatically at build or run time, a pattern seen in
+  named-pipe-based reverse shells and post-exploitation frameworks that
+  randomize the pipe identifier per build to dodge exactly the kind of
+  fixed-string signature SYS-060/SYS-072 rely on.
+detection:
+  PipeName|re: '^\\[0-9a-f]{16,40}$'
+condition: all

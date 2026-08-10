@@ -1,0 +1,19 @@
+id: SYS-208
+title: Named pipe follows PsExec's stdin/stdout/stderr relay naming convention
+event_id: 17
+severity: high
+attack: [T1569.002]
+description: >
+  SYS-072/SYS-073 catch PsExec-style lateral movement by the default
+  PSEXESVC filename and pipe name, both of which an operator can trivially
+  rename to dodge those two signatures. What survives a rename is the
+  *shape* of the three relay pipes the service side always creates to
+  stream the remote command's stdin/stdout/stderr back to the client --
+  they are always named `<servicename>-<hostname>-<pid>-std(in|out|err)`,
+  regardless of what the service binary itself is called. A pipe name
+  ending in exactly `-stdin`, `-stdout`, or `-stderr` is close to unique to
+  this relay mechanism; almost nothing else on a Windows host names a named
+  pipe that way.
+detection:
+  PipeName|re: '-(stdin|stdout|stderr)$'
+condition: all

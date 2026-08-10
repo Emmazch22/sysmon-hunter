@@ -1,0 +1,22 @@
+id: SYS-217
+title: New SMB share added directly through the registry
+event_id: 13
+severity: high
+attack: [T1021.002]
+description: >
+  A value was written directly under
+  HKLM\System\CurrentControlSet\Services\LanmanServer\Shares\<name> -- the
+  key the Server service reads its share table from -- rather than through
+  `net share`, PowerShell's New-SmbShare, or the Computer Management UI.
+  Every one of those normal paths still ends up writing this same key, so
+  the key itself is not unusual; what is unusual is a share appearing with
+  no corresponding `net share`/WMI/PowerShell command-line evidence,
+  because that means whatever created it wrote the registry value straight
+  through RegSetValueEx (commonly svchost.exe on behalf of a remote
+  RPC/registry call), a pattern that shows up when an attacker stages a new
+  file share for later data staging or lateral tool transfer without
+  leaving the usual command-line trail.
+detection:
+  EventType|equals: SetValue
+  TargetObject|re: '\\lanmanserver\\shares\\[^\\]+$'
+condition: all

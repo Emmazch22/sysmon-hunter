@@ -2679,6 +2679,298 @@ CASES = [
             IntegrityLevel="High",
         ),
     ),
+    # --- Process opened with suspend/resume-only access (SYS-205) ---
+    # GrantedAccess value taken from process_suspend_sysmon_10_ga_800.evtx.
+    (
+        "SYS-205",
+        True,
+        event(10, GrantedAccess="0x800"),
+    ),
+    (
+        "SYS-205",
+        False,
+        event(10, GrantedAccess="0x1fffff"),
+    ),
+    # --- Process access call stack has no ntdll.dll frame (SYS-206) ---
+    # Taken from Sysmon_10_Evasion_Suspicious_NtOpenProcess_CallTrace.evtx.
+    (
+        "SYS-206",
+        True,
+        event(10, CallTrace="UNKNOWN(000001F3C35A0014)"),
+    ),
+    (
+        "SYS-206",
+        False,
+        event(
+            10,
+            CallTrace=(
+                r"C:\Windows\SYSTEM32\ntdll.dll+4595c|"
+                r"C:\Windows\system32\KERNELBASE.dll+8185"
+            ),
+        ),
+    ),
+    # --- WerFault launched for a crashed security-critical service (SYS-207) ---
+    # Taken from DE_EventLog_Service_Crashed.evtx.
+    (
+        "SYS-207",
+        True,
+        event(
+            1,
+            Image=r"C:\Windows\System32\WerFault.exe",
+            ParentCommandLine=r"C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p -s EventLog",
+        ),
+    ),
+    (
+        "SYS-207",
+        False,
+        event(
+            1,
+            Image=r"C:\Windows\System32\WerFault.exe",
+            ParentCommandLine=r"C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted",
+        ),
+    ),
+    # --- Renamed PsExec relay pipe (SYS-208) ---
+    # Taken from DE_renamed_psexec_service_sysmon_17_18.evtx.
+    (
+        "SYS-208",
+        True,
+        event(17, PipeName=r"\svchost-MSEDGEWIN10-8116-stdout"),
+    ),
+    (
+        "SYS-208",
+        False,
+        event(17, PipeName=r"\lsass"),
+    ),
+    # --- attrib.exe used to hide a file (SYS-209) ---
+    (
+        "SYS-209",
+        True,
+        event(1, image=r"C:\Windows\System32\attrib.exe", command_line="attrib  +h nbtscan.exe"),
+    ),
+    (
+        "SYS-209",
+        False,
+        event(1, image=r"C:\Windows\System32\attrib.exe", command_line="attrib -r report.docx"),
+    ),
+    # --- PowerShell execution policy forced via registry (SYS-210) ---
+    (
+        "SYS-210",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell\ExecutionPolicy",
+            Details="Unrestricted",
+        ),
+    ),
+    (
+        "SYS-210",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell\ExecutionPolicy",
+            Details="RemoteSigned",
+        ),
+    ),
+    # --- Office AccessVBOM enabled via registry (SYS-211) ---
+    (
+        "SYS-211",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000\Software\Microsoft\Office\16.0\Excel\Security\AccessVBOM",
+            Details="DWORD (0x00000001)",
+        ),
+    ),
+    (
+        "SYS-211",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000\Software\Microsoft\Office\16.0\Excel\Security\AccessVBOM",
+            Details="DWORD (0x00000000)",
+        ),
+    ),
+    # --- ImageLoad metadata masquerade from a staging path (SYS-212) ---
+    # Taken from DE_ProcessHerpaderping_Sysmon_11_10_1_7.evtx.
+    (
+        "SYS-212",
+        True,
+        event(
+            7,
+            image=r"C:\Users\bouss\Downloads\samir.exe",
+            OriginalFileName="IEXPLORE.EXE",
+        ),
+    ),
+    (
+        "SYS-212",
+        False,
+        event(
+            7,
+            image=r"C:\Program Files\Internet Explorer\iexplore.exe",
+            OriginalFileName="IEXPLORE.EXE",
+        ),
+    ),
+    # --- RDP client drive execution / SharpRDP (SYS-213) ---
+    # Taken from LM_sysmon_1_12_13_3_tsclient_SharpRdp.evtx and
+    # sharprdp_sysmon_7_mstscax.dll.evtx.
+    (
+        "SYS-213",
+        True,
+        event(1, image=r"\\tsclient\c\temp\stack\a.exe"),
+    ),
+    (
+        "SYS-213",
+        True,
+        event(1, image=r"C:\ProgramData\USOShared\SharpRDP.exe"),
+    ),
+    (
+        "SYS-213",
+        False,
+        event(1, image=r"C:\Windows\System32\notepad.exe"),
+    ),
+    # --- WMI-spawned command redirected to a hidden admin share (SYS-214) ---
+    # Taken from LM_wmiexec_impacket_sysmon_whoami.evtx and
+    # smbmap_upload_exec_sysmon.evtx.
+    (
+        "SYS-214",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\wbem\WmiPrvSE.exe",
+            command_line=r"cmd.exe /Q /c whoami /all 1> \\127.0.0.1\ADMIN$\__1556656369.7 2>&1",
+        ),
+    ),
+    (
+        "SYS-214",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\wbem\WmiPrvSE.exe",
+            command_line=r"cmd.exe /Q /c cd \ 1> \\127.0.0.1\C$\WqEVwJZYOe 2>&1",
+        ),
+    ),
+    (
+        "SYS-214",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\wbem\WmiPrvSE.exe",
+            command_line="whoami /all",
+        ),
+    ),
+    # --- lsass.exe loaded an image from a network path (SYS-215) ---
+    # Taken from LM_ImageLoad_NFSH_Sysmon_7.evtx.
+    (
+        "SYS-215",
+        True,
+        event(
+            7,
+            image=r"C:\Windows\System32\lsass.exe",
+            ImageLoaded=r"\\172.16.66.254\shared\lsadb.dll",
+        ),
+    ),
+    (
+        "SYS-215",
+        False,
+        event(
+            7,
+            image=r"C:\Windows\System32\lsass.exe",
+            ImageLoaded=r"C:\Windows\System32\sspicli.dll",
+        ),
+    ),
+    # --- NTDS DirectoryServiceExtPt points at a UNC path (SYS-216) ---
+    # Taken from LM_regsvc_DirectoryServiceExtPt_Lsass_NTDS_AdamXpn.evtx.
+    (
+        "SYS-216",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\Services\NTDS\DirectoryServiceExtPt",
+            Details=r"\\172.16.66.254\shared\lsadb.dll",
+        ),
+    ),
+    (
+        "SYS-216",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\Services\NTDS\DirectoryServiceExtPt",
+            Details=r"C:\Windows\System32\ntdsetup.dll",
+        ),
+    ),
+    # --- New SMB share added via registry (SYS-217) ---
+    # Taken from LM_NewShare_Added_Sysmon_12_13.evtx.
+    (
+        "SYS-217",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\Services\LanmanServer\Shares\staging",
+            Details="Binary Data",
+        ),
+    ),
+    (
+        "SYS-217",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\Services\LanmanServer\Shares\Security\staging",
+            Details="Binary Data",
+        ),
+    ),
+    # --- NullSessionPipes registry value modified (SYS-218) ---
+    # Taken from LM_add_new_namedpipe_tp_nullsession_registry_turla_like_ttp.evtx.
+    (
+        "SYS-218",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\services\LanmanServer\Parameters\NullSessionPipes",
+            Details="Binary Data",
+        ),
+    ),
+    (
+        "SYS-218",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\System\CurrentControlSet\services\LanmanServer\Parameters\AutoShareServer",
+            Details="DWORD (0x00000000)",
+        ),
+    ),
+    # --- Named pipe with a bare hex-string name, create (SYS-219) ---
+    # Taken from lm_sysmon_18_remshell_over_namedpipe.evtx.
+    (
+        "SYS-219",
+        True,
+        event(17, PipeName=r"\46a676ab7f179e511e30dd2dc41bd388"),
+    ),
+    (
+        "SYS-219",
+        False,
+        event(17, PipeName=r"\wkssvc"),
+    ),
+    # --- Named pipe with a bare hex-string name, connect (SYS-220) ---
+    (
+        "SYS-220",
+        True,
+        event(18, PipeName=r"\46a676ab7f179e511e30dd2dc41bd388"),
+    ),
+    (
+        "SYS-220",
+        False,
+        event(18, PipeName=r"\browser"),
+    ),
 ]
 
 

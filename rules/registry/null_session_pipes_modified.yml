@@ -1,0 +1,17 @@
+id: SYS-218
+title: NullSessionPipes registry value modified
+event_id: 13
+severity: high
+attack: [T1021.002, T1562.001]
+description: >
+  HKLM\System\CurrentControlSet\services\LanmanServer\Parameters\NullSessionPipes
+  lists the named pipes an anonymous, unauthenticated SMB session is allowed
+  to connect to. Adding an entry here reopens a specific piece of anonymous
+  network access Windows disables by default -- a technique observed in
+  Turla-attributed tradecraft to let a backdoor's named-pipe listener accept
+  connections from a session that supplied no credentials at all, sidestepping
+  normal SMB authentication for whatever service sits behind that pipe.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\LanmanServer\Parameters\NullSessionPipes'
+condition: all

@@ -1,0 +1,19 @@
+id: SYS-220
+title: Connection to a named pipe named as a bare hex string
+event_id: 18
+severity: high
+attack: [T1071]
+description: >
+  SYS-219 catches the same bare-hex-string pipe-naming pattern at creation
+  time (event 17); this is the PipeConnected counterpart, needed for the
+  same reason SYS-194 exists alongside SYS-060/SYS-072: Sysmon on the
+  connecting side of a named pipe can observe the connection without ever
+  having seen the pipe's creation (the create happened in the listener's
+  own process, which may not be one Sysmon captured event 17 for, or the
+  create event simply fell outside the collection window), so a detection
+  keyed only on event 17 misses that half of the picture. Reuses the exact
+  same regex -- a run of 16 to 40 lowercase hex characters and nothing else
+  -- since the signature is identical, only the event differs.
+detection:
+  PipeName|re: '^\\[0-9a-f]{16,40}$'
+condition: all

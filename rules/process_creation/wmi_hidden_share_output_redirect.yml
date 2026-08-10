@@ -1,0 +1,20 @@
+id: SYS-214
+title: WMI-spawned command redirects its output to a hidden administrative share
+event_id: 1
+severity: critical
+attack: [T1047, T1021.002]
+description: >
+  A process spawned by WmiPrvSE.exe (i.e. created through Win32_Process, the
+  same fileless-execution primitive SYS-172 catches at the command-line
+  level) has its output redirected with `1>` to a UNC path ending in a
+  hidden share (`ADMIN$`, `C$`, or any other `<drive-letter>$`). This is the
+  exact mechanism Impacket's wmiexec.py and smbexec.py use to fake an
+  interactive shell over WMI: since Win32_Process has no way to return
+  stdout directly, the tool has the remote command write its output to a
+  temp file on the target's own hidden share, then reads that file back
+  over SMB moments later. Legitimate WMI-based remote administration
+  essentially never redirects output this way.
+detection:
+  parent_image|endswith: '\WmiPrvSE.exe'
+  command_line|re: '\\\\[^\\]+\\(admin|[a-z])\$\\'
+condition: all

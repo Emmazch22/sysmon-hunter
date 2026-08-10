@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 157 rules
+job: it is a regression fixture and a coverage demo, built to fire all 173 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25) -- while staying ONE
 incident: everything hangs off a single process-tree root, and no gap between
@@ -121,6 +121,16 @@ machine. The phases, roughly in kill-chain order:
       │   hijack, EnableLUA disabled via registry, and a COM
       │   elevation-moniker shell off DllHost.exe -- five real UACME/CMSTP
       │   shapes pulled from EVTX-ATTACK-SAMPLES (SYS-200 through SYS-204)
+      ├─ coverage-expansion pass 14: a suspended/hollowed notepad.exe and an
+      │   unbacked-memory process-access call, a WerFault crash tied to
+      │   EventLog, a renamed PsExec's relay pipes, attrib +h, a
+      │   registry-forced PowerShell execution policy and AccessVBOM, a
+      │   Downloads-staged metadata masquerade, SharpRDP, a wmiexec-style
+      │   ADMIN$ output redirect, lsass and NTDS loading off a remote share,
+      │   a registry-added SMB share and NullSessionPipes entry, and a
+      │   hex-named C2 pipe -- sixteen real shapes pulled from the
+      │   "defense evasion misc" and "lateral movement" EVTX-ATTACK-SAMPLES
+      │   gap buckets (SYS-205 through SYS-220)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -170,7 +180,9 @@ EXPECTED_RULES = {
     "SYS-181", "SYS-182", "SYS-183", "SYS-184", "SYS-185", "SYS-186", "SYS-187",
     "SYS-188", "SYS-189", "SYS-190", "SYS-191", "SYS-192", "SYS-193", "SYS-194",
     "SYS-195", "SYS-196", "SYS-197", "SYS-198", "SYS-199", "SYS-200", "SYS-201",
-    "SYS-202", "SYS-203", "SYS-204",
+    "SYS-202", "SYS-203", "SYS-204", "SYS-205", "SYS-206", "SYS-207", "SYS-208",
+    "SYS-209", "SYS-210", "SYS-211", "SYS-212", "SYS-213", "SYS-214", "SYS-215",
+    "SYS-216", "SYS-217", "SYS-218", "SYS-219", "SYS-220",
 }
 
 
@@ -361,6 +373,21 @@ G = {
     "uac_disable_lua": "{rng-uac-disable-lua}",
     "dllhost_com": "{rng-dllhost-com}",
     "dllhost_shell": "{rng-dllhost-shell}",
+    # Coverage-expansion pass 14 (SYS-205..220), field shapes taken from real
+    # EVTX-ATTACK-SAMPLES captures across the "defense evasion misc" and
+    # "lateral movement" gap buckets. The registry-only rules (SYS-210,
+    # SYS-211, SYS-216, SYS-217, SYS-218) have no process actor by design,
+    # same as SYS-191/SYS-201 above -- the pipe rules (SYS-208, SYS-219,
+    # SYS-220) and the UNC-imageload rule (SYS-215) reuse existing actors
+    # ("psexec", "ops", "lsass") rather than adding new ones, since the
+    # signature lives entirely in the field values, not in who the actor is.
+    "hollow_src": "{rng-hollow-src}",
+    "hollow_target": "{rng-hollow-target}",
+    "werfault_crash": "{rng-werfault-crash}",
+    "attrib_hide": "{rng-attrib-hide}",
+    "downloads_herpaderp": "{rng-downloads-herpaderp}",
+    "sharprdp_tool": "{rng-sharprdp-tool}",
+    "wmi_hidden_share": "{rng-wmi-hidden-share}",
 }
 
 
@@ -1272,6 +1299,108 @@ def events() -> list[dict]:
     ev.append(proc(step(1), G["dllhost_shell"], G["dllhost_com"], r"C:\Windows\System32\cmd.exe",
                     r"c:\windows\System32\cmd.exe", pid=5990, ppid=5980,
                     integrity="High"))
+
+    # === Coverage-expansion pass 14: defense-evasion-misc and lateral-movement
+    # gaps, field shapes taken from real EVTX-ATTACK-SAMPLES captures rather
+    # than synthesized (SYS-205..220) ===
+    # A downloaded loader suspends a freshly spawned notepad.exe by asking
+    # for PROCESS_SUSPEND_RESUME rights only (SYS-205), then a second access
+    # to the same target with a call trace that never resolves to ntdll.dll
+    # -- an unbacked-memory/shellcode-originated call (SYS-206).
+    ev.append(proc(step(1), G["hollow_src"], G["ops"], r"C:\Users\redteam.ops\Downloads\loader.exe",
+                    "loader.exe", pid=6000, ppid=4510))
+    ev.append(proc(step(1), G["hollow_target"], G["hollow_src"], r"C:\Windows\System32\notepad.exe",
+                    "notepad.exe", pid=6010, ppid=6000))
+    ev.append(raw_event(10, step(1), SourceImage=r"C:\Users\redteam.ops\Downloads\loader.exe",
+                         SourceProcessGUID=G["hollow_src"], TargetImage=r"C:\Windows\System32\notepad.exe",
+                         TargetProcessGUID=G["hollow_target"], GrantedAccess="0x800", User=USER))
+    ev.append(raw_event(10, step(1), SourceImage=r"C:\Users\redteam.ops\Downloads\loader.exe",
+                         SourceProcessGUID=G["hollow_src"], TargetImage=r"C:\Windows\System32\notepad.exe",
+                         TargetProcessGUID=G["hollow_target"], GrantedAccess="0x1fffff",
+                         CallTrace="UNKNOWN(000001F3C35A0014)", User=USER))
+
+    # WerFault reports a crash in the process hosting the Event Log service
+    # (SYS-207).
+    ev.append(proc(step(1), G["werfault_crash"], G["root"], r"C:\Windows\System32\WerFault.exe",
+                    r"C:\Windows\system32\WerFault.exe -u -p 1234 -s 5678", pid=6020, ppid=628,
+                    parent_image=r"C:\Windows\System32\svchost.exe",
+                    parent_cmdline=r"C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p -s EventLog"))
+
+    # PsExec's relay pipes survive a rename of the service binary itself --
+    # the pipe naming convention is the signature, not the filename (SYS-208).
+    ev.append(raw_event(17, step(1), Image=r"C:\Windows\PSEXESVC.exe",
+                         ProcessGuid=G["psexec"], PipeName=fr"\svchost-{HOST}-8116-stdout"))
+
+    # attrib +h hides a tool dropped next to legitimate files (SYS-209).
+    ev.append(proc(step(1), G["attrib_hide"], G["ops"], r"C:\Windows\System32\attrib.exe",
+                    "attrib.exe +h nbtscan.exe", pid=6030, ppid=4510))
+
+    # PowerShell's execution policy forced to Unrestricted straight through
+    # the registry, bypassing Set-ExecutionPolicy (SYS-210).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         EventType="SetValue",
+                         TargetObject=r"HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell\ExecutionPolicy",
+                         Details="Unrestricted"))
+
+    # Office's AccessVBOM flipped on via registry so a macro can generate
+    # more VBA at runtime (SYS-211).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\wbem\wmiprvse.exe",
+                         EventType="SetValue",
+                         TargetObject=r"HKU\S-1-5-21-1-2-3-1000\Software\Microsoft\Office\16.0\Excel\Security\AccessVBOM",
+                         Details="DWORD (0x00000001)"))
+
+    # A file dropped in Downloads carries PE metadata claiming to be
+    # IEXPLORE.EXE -- the ImageLoad-time counterpart of SYS-092, needed
+    # because Process Herpaderping-style content swaps leave the spoofed
+    # metadata on the module load rather than the process-creation event
+    # (SYS-212).
+    ev.append(proc(step(1), G["downloads_herpaderp"], G["ops"], r"C:\Users\redteam.ops\Downloads\report.exe",
+                    "report.exe", pid=6040, ppid=4510))
+    ev.append(raw_event(7, step(1), Image=r"C:\Users\redteam.ops\Downloads\report.exe",
+                         ProcessGuid=G["downloads_herpaderp"],
+                         ImageLoaded=r"C:\Users\redteam.ops\Downloads\report.exe",
+                         OriginalFileName="IEXPLORE.EXE", Signed="false"))
+
+    # SharpRDP executed directly, parented at root as an RDP-session arrival
+    # rather than a child of the phishing chain (SYS-213).
+    ev.append(proc(step(1), G["sharprdp_tool"], G["root"], r"C:\ProgramData\USOShared\SharpRDP.exe",
+                    r'SharpRDP.exe computername=192.168.56.1 command="C:\Temp\file.exe"',
+                    pid=6050, ppid=628))
+
+    # A WMI-spawned command redirects its output to the ADMIN$ hidden
+    # share -- the wmiexec.py/smbexec.py fake-interactive-shell mechanism
+    # (SYS-214).
+    ev.append(proc(step(1), G["wmi_hidden_share"], G["wmiprvse"], r"C:\Windows\System32\cmd.exe",
+                    r"cmd.exe /Q /c whoami /all 1> \\127.0.0.1\ADMIN$\__1556656369.7 2>&1",
+                    pid=6060, ppid=5900, parent_image=r"C:\Windows\System32\wbem\wmiprvse.exe"))
+
+    # lsass.exe loads a DLL straight off a remote SMB share (SYS-215).
+    ev.append(raw_event(7, step(1), Image=r"C:\Windows\System32\lsass.exe", ProcessGuid=G["lsass"],
+                         ImageLoaded=r"\\172.16.66.254\shared\lsadb.dll", Signed="false"))
+
+    # NTDS's DirectoryServiceExtPt is pointed at the same remote share --
+    # the "AdamXpn" DC-DLL-load trick (SYS-216).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\svchost.exe", EventType="SetValue",
+                         TargetObject=r"HKLM\System\CurrentControlSet\Services\NTDS\DirectoryServiceExtPt",
+                         Details=r"\\172.16.66.254\shared\lsadb.dll"))
+
+    # A new SMB share staged directly through the registry, bypassing `net
+    # share` (SYS-217).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\svchost.exe", EventType="SetValue",
+                         TargetObject=r"HKLM\System\CurrentControlSet\Services\LanmanServer\Shares\staging",
+                         Details="Binary Data"))
+
+    # NullSessionPipes reopened for anonymous access (SYS-218).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=r"HKLM\System\CurrentControlSet\services\LanmanServer\Parameters\NullSessionPipes",
+                         Details="Binary Data"))
+
+    # A named pipe whose name is a bare hex-hash string -- framework-
+    # generated backdoor pipe naming, create and connect (SYS-219, SYS-220).
+    ev.append(raw_event(17, step(1), Image=r"C:\Windows\System32\cmd.exe", ProcessGuid=G["ops"],
+                         PipeName=r"\46a676ab7f179e511e30dd2dc41bd388"))
+    ev.append(raw_event(18, step(1), Image=r"C:\Windows\System32\cmd.exe", ProcessGuid=G["ops"],
+                         PipeName=r"\46a676ab7f179e511e30dd2dc41bd388"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

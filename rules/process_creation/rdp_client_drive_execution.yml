@@ -1,0 +1,19 @@
+id: SYS-213
+title: Process executed from a redirected RDP client drive, or SharpRDP tooling ran
+event_id: 1
+severity: high
+attack: [T1021.001]
+description: >
+  Two related RDP-based lateral-movement patterns in one rule. First: a
+  binary launched directly from `\\tsclient\...` -- the share an RDP client
+  exposes back to the server session for its local drives -- meaning the
+  operator ran a payload straight off their own machine through the RDP
+  session without ever copying it onto the target's disk first, an
+  execution path most file-based defenses never see. Second: SharpRDP.exe
+  by name, the public tool that automates the same idea (drive-redirected
+  execution, or command execution over the RDP virtual channel without ever
+  opening an interactive desktop) end to end.
+detection:
+  image|startswith: '\\tsclient\'
+  image|endswith: '\SharpRDP.exe'
+condition: any
