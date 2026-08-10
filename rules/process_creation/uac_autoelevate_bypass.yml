@@ -1,0 +1,46 @@
+id: SYS-200
+title: UAC auto-elevate binary launched outside the normal Explorer prompt flow
+event_id: 1
+severity: high
+attack: [T1548.002]
+description: >
+  A Windows binary whose manifest requests auto-elevation (eventvwr.exe,
+  sysprep.exe, cliconfg.exe, mcx2prov.exe, wusa.exe, dcomcnfg.exe,
+  computerdefaults.exe, fodhelper.exe, sdclt.exe, winsat.exe, pkgmgr.exe,
+  dism.exe -- the fixed list Windows silently elevates to High integrity
+  with no consent.exe prompt, because their COM auto-approval manifest
+  entry says to) reached High integrity without being launched through
+  Explorer's "Run as administrator" flow. A user-initiated elevation of
+  one of these always shows explorer.exe as the parent; a script, an
+  interpreter, or a bespoke dropper launching one directly and landing at
+  High integrity is the auto-elevate mechanism itself being invoked
+  programmatically -- the first step of nearly every UACME-catalogued
+  bypass (registry hijack, DLL search-order hijack, or path mocking all
+  rely on getting one of these binaries to run elevated first). Reaching
+  High integrity here is not proof of a working bypass on its own -- see
+  SYS-201/SYS-202 for the hijack step itself -- but it is the
+  precondition every variant shares. slui.exe is deliberately left off
+  this list: the Software Protection Platform launches it elevated via
+  DCOM (svchost -k DcomLaunch) on a routine schedule, which would make it
+  a constant false positive with no attacker involved. svchost.exe is
+  excluded as a parent for the same reason -- background service
+  activity, not an interactive or scripted elevation attempt.
+detection:
+  Image|endswith:
+    - '\eventvwr.exe'
+    - '\sysprep.exe'
+    - '\cliconfg.exe'
+    - '\mcx2prov.exe'
+    - '\wusa.exe'
+    - '\dcomcnfg.exe'
+    - '\computerdefaults.exe'
+    - '\fodhelper.exe'
+    - '\sdclt.exe'
+    - '\winsat.exe'
+    - '\pkgmgr.exe'
+    - '\dism.exe'
+  IntegrityLevel|equals: High
+  ParentImage|endswith|not:
+    - '\explorer.exe'
+    - '\svchost.exe'
+condition: all

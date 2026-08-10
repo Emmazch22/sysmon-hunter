@@ -2562,6 +2562,123 @@ CASES = [
         False,
         event(1, image=r"C:\Users\bob\Downloads\setup.msi"),
     ),
+    # --- UAC auto-elevate binary launched outside Explorer (SYS-200) ---
+    # Field values below are taken directly from EVTX-ATTACK-SAMPLES'
+    # UACME captures (Sysmon_UACME_22/32/36), not synthesized.
+    (
+        "SYS-200",
+        True,
+        event(
+            1,
+            Image=r"C:\Windows\System32\eventvwr.exe",
+            ParentImage=r"C:\Users\IEUser\Desktop\UACME.exe",
+            IntegrityLevel="High",
+        ),
+    ),
+    (
+        "SYS-200",
+        False,
+        event(
+            1,
+            Image=r"C:\Windows\System32\eventvwr.exe",
+            ParentImage=r"C:\Windows\explorer.exe",
+            IntegrityLevel="High",
+        ),
+    ),
+    (
+        "SYS-200",
+        False,
+        event(
+            1,
+            Image=r"C:\Windows\System32\slui.exe",
+            ParentImage=r"C:\Windows\System32\svchost.exe",
+            IntegrityLevel="High",
+        ),
+    ),
+    # --- %windir% environment value hijacked (SYS-201) ---
+    (
+        "SYS-201",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKU\S-1-5-21-3461203602-4096304019-2269080069-1000\Environment\windir",
+            Details=r'"C:\Windows\system32\cmd.exe"',
+        ),
+    ),
+    (
+        "SYS-201",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKU\S-1-5-21-3461203602-4096304019-2269080069-1000\Environment\TEMP",
+            Details=r"%USERPROFILE%\AppData\Local\Temp",
+        ),
+    ),
+    # --- UAC auto-elevate binary loaded an unsigned DLL (SYS-202) ---
+    (
+        "SYS-202",
+        True,
+        event(
+            7,
+            Image=r"C:\Windows\System32\sysprep\sysprep.exe",
+            ImageLoaded=r"C:\Windows\System32\sysprep\cryptbase.dll",
+            Signed="false",
+        ),
+    ),
+    (
+        "SYS-202",
+        False,
+        event(
+            7,
+            Image=r"C:\Windows\System32\sysprep\sysprep.exe",
+            ImageLoaded=r"C:\Windows\System32\ntdll.dll",
+            Signed="true",
+        ),
+    ),
+    # --- UAC disabled via EnableLUA (SYS-203) ---
+    (
+        "SYS-203",
+        True,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\policies\system\EnableLUA",
+            Details="DWORD (0x00000000)",
+        ),
+    ),
+    (
+        "SYS-203",
+        False,
+        event(
+            13,
+            EventType="SetValue",
+            TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\policies\system\EnableLUA",
+            Details="DWORD (0x00000001)",
+        ),
+    ),
+    # --- Shell spawned by DllHost.exe at High integrity (SYS-204) ---
+    (
+        "SYS-204",
+        True,
+        event(
+            1,
+            Image=r"C:\Windows\System32\cmd.exe",
+            ParentImage=r"C:\Windows\system32\DllHost.exe",
+            IntegrityLevel="High",
+        ),
+    ),
+    (
+        "SYS-204",
+        False,
+        event(
+            1,
+            Image=r"C:\Windows\System32\notepad.exe",
+            ParentImage=r"C:\Windows\system32\DllHost.exe",
+            IntegrityLevel="High",
+        ),
+    ),
 ]
 
 

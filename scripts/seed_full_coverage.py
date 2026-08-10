@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 152 rules
+job: it is a regression fixture and a coverage demo, built to fire all 157 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25) -- while staying ONE
 incident: everything hangs off a single process-tree root, and no gap between
@@ -116,6 +116,11 @@ machine. The phases, roughly in kill-chain order:
       │   from Temp, certutil installing a certificate into the Root store,
       │   and a renamed PE run from Downloads disguised as an MSI installer
       │   (SYS-197 through SYS-199)
+      ├─ coverage-expansion pass 13: eventvwr.exe auto-elevated outside
+      │   Explorer and loading an unsigned DLL, a %windir% environment
+      │   hijack, EnableLUA disabled via registry, and a COM
+      │   elevation-moniker shell off DllHost.exe -- five real UACME/CMSTP
+      │   shapes pulled from EVTX-ATTACK-SAMPLES (SYS-200 through SYS-204)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -164,7 +169,8 @@ EXPECTED_RULES = {
     "SYS-174", "SYS-175", "SYS-176", "SYS-177", "SYS-178", "SYS-179", "SYS-180",
     "SYS-181", "SYS-182", "SYS-183", "SYS-184", "SYS-185", "SYS-186", "SYS-187",
     "SYS-188", "SYS-189", "SYS-190", "SYS-191", "SYS-192", "SYS-193", "SYS-194",
-    "SYS-195", "SYS-196", "SYS-197", "SYS-198", "SYS-199",
+    "SYS-195", "SYS-196", "SYS-197", "SYS-198", "SYS-199", "SYS-200", "SYS-201",
+    "SYS-202", "SYS-203", "SYS-204",
 }
 
 
@@ -349,6 +355,12 @@ G = {
     # already under System32, which "ops" (cmd.exe) already is.
     "certutil_addstore": "{rng-certutil-addstore}",
     "fake_installer": "{rng-fake-installer}",
+    # Coverage-expansion pass 13 (SYS-200..204), field shapes taken from
+    # real UACME/CMSTP captures in EVTX-ATTACK-SAMPLES, not synthesized.
+    "uac_eventvwr": "{rng-uac-eventvwr}",
+    "uac_disable_lua": "{rng-uac-disable-lua}",
+    "dllhost_com": "{rng-dllhost-com}",
+    "dllhost_shell": "{rng-dllhost-shell}",
 }
 
 
@@ -1219,6 +1231,47 @@ def events() -> list[dict]:
     ev.append(proc(step(1), G["fake_installer"], G["ops"],
                     r"C:\Users\redteam.ops\Downloads\setup.msi.exe",
                     r"setup.msi.exe /silent", pid=5950, ppid=4510))
+
+    # === Coverage-expansion pass 13: UAC bypass, taken from real UACME and
+    # CMSTP EVTX captures rather than synthesized (SYS-200..204) ===
+    # eventvwr.exe launched directly by "ops" (not explorer.exe) and reaches
+    # High integrity -- the auto-elevate mechanism invoked programmatically
+    # (SYS-200), then loads an unsigned DLL staged alongside it (SYS-202).
+    ev.append(proc(step(1), G["uac_eventvwr"], G["ops"], r"C:\Windows\System32\eventvwr.exe",
+                    r'"C:\Windows\system32\eventvwr.exe" ', pid=5960, ppid=4510,
+                    integrity="High"))
+    ev.append(raw_event(7, step(1), Image=r"C:\Windows\System32\eventvwr.exe",
+                         ProcessGuid=G["uac_eventvwr"],
+                         ImageLoaded=r"C:\Windows\System32\dismcore.dll", Signed="false"))
+
+    # The per-user %windir% environment value is hijacked to point at a
+    # shell -- the SilentCleanup scheduled-task bypass (SYS-201). No process
+    # actor by design, same as SYS-191 above: Sysmon attributes this write to
+    # explorer.exe holding the user's registry hive, not a new dropper.
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\explorer.exe",
+                         EventType="SetValue",
+                         TargetObject=r"HKU\S-1-5-21-1-2-3-1000\Environment\windir",
+                         Details=r'"C:\Windows\system32\cmd.exe"'))
+
+    # UAC turned off system-wide via EnableLUA rather than bypassed for one
+    # process (SYS-203).
+    ev.append(proc(step(1), G["uac_disable_lua"], G["ops"], r"C:\Windows\System32\reg.exe",
+                    r"reg add hklm\software\microsoft\windows\currentversion\policies\system "
+                    r"/v EnableLUA /t REG_DWORD /d 0x0 /f",
+                    pid=5970, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\system32\reg.exe",
+                         ProcessGuid=G["uac_disable_lua"], EventType="SetValue",
+                         TargetObject=r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\policies\system\EnableLUA",
+                         Details="DWORD (0x00000000)"))
+
+    # A COM elevation-moniker surrogate (DllHost.exe) spawns a shell at High
+    # integrity -- the RottenPotato/EfsPotato/CMSTP-bypass shape (SYS-204).
+    ev.append(proc(step(1), G["dllhost_com"], G["root"], r"C:\Windows\System32\DllHost.exe",
+                    r"C:\Windows\system32\DllHost.exe /Processid:{3E5FC7F9-9A51-4367-9063-A120244FBEC7}",
+                    pid=5980, ppid=628, integrity="System"))
+    ev.append(proc(step(1), G["dllhost_shell"], G["dllhost_com"], r"C:\Windows\System32\cmd.exe",
+                    r"c:\windows\System32\cmd.exe", pid=5990, ppid=5980,
+                    integrity="High"))
 
     # === FTP LOLBAS execution, off "ops" ===
     ev.append(proc(step(2), G["ftp"], G["ops"], r"C:\Windows\System32\ftp.exe",

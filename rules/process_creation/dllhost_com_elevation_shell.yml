@@ -1,0 +1,26 @@
+id: SYS-204
+title: Shell spawned by DllHost.exe at High integrity
+event_id: 1
+severity: critical
+attack: [T1548.002, T1134.001]
+description: >
+  cmd.exe or PowerShell was launched with DllHost.exe as its parent,
+  running at High integrity. DllHost.exe hosts out-of-process COM
+  surrogates, and Windows ships a handful of COM objects (ICMLuaUtil,
+  IColorDataProxy, and others catalogued by the "COM elevation moniker"
+  family of UAC bypasses) that auto-elevate to High without a prompt when
+  instantiated the right way -- that is what DllHost is doing here, not
+  hosting an ordinary COM server. A legitimate elevated COM surrogate has
+  no reason to spawn an interactive shell; DllHost.exe as the parent of
+  cmd.exe or powershell.exe at High integrity is close to a smoking gun
+  for this technique family (RottenPotato/RoguePotato/EfsPotato and the
+  CMSTPLUA-based UACME variants all end with exactly this shape).
+detection:
+  Image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\powershell_ise.exe'
+    - '\pwsh.exe'
+  ParentImage|endswith: '\dllhost.exe'
+  IntegrityLevel|equals: High
+condition: all

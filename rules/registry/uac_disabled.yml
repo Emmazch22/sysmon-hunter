@@ -1,0 +1,19 @@
+id: SYS-203
+title: UAC disabled via the EnableLUA registry value
+event_id: 13
+severity: critical
+attack: [T1548.002, T1562.001]
+description: >
+  HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\EnableLUA
+  was set to 0, turning User Account Control off system-wide rather than
+  bypassing it for one process. Cruder than any single UACME technique --
+  it requires the elevated write it is trying to avoid needing again --
+  but it shows up in the wild as the second step once an attacker has
+  gained elevated access once: disable UAC entirely so every subsequent
+  action runs elevated with no further prompt or auto-elevate trickery
+  needed.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\Policies\System\EnableLUA'
+  Details|equals: 'DWORD (0x00000000)'
+condition: all

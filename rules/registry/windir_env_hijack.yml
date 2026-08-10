@@ -1,0 +1,20 @@
+id: SYS-201
+title: Per-user %windir% environment variable set via registry
+event_id: 13
+severity: critical
+attack: [T1548.002]
+description: >
+  The per-user Environment\windir registry value was written. Nothing
+  legitimate ever sets this -- %windir% is meant to resolve to
+  C:\Windows, and it is normally absent from the per-user Environment
+  key entirely, inherited from the system default instead. This is the
+  UACME "SilentCleanup" bypass: an auto-elevated scheduled task
+  (\Microsoft\Windows\DiskCleanup\SilentCleanup) expands
+  %windir%\system32\cleanmgr.exe with no quotes and no full path
+  validation, so pointing the user's own windir at an attacker-chosen
+  binary (cmd.exe, in the textbook case) gets it launched at the task's
+  elevated integrity level instead.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\Environment\windir'
+condition: all

@@ -361,6 +361,11 @@ RULES = [
     ("SYS-197", "7", "High", "Unsigned DLL loaded from a user-writable path by a trusted-location process", "T1574.001/.002"),
     ("SYS-198", "1", "High", "Certutil used to install a certificate into a trust store", "T1553.004"),
     ("SYS-199", "1", "High", "Executable disguised as an installer package was run", "T1036.007/T1204.002"),
+    ("SYS-200", "1", "High", "UAC auto-elevate binary launched outside the normal Explorer prompt flow", "T1548.002"),
+    ("SYS-201", "13", "Critical", "Per-user %windir% environment variable set via registry", "T1548.002"),
+    ("SYS-202", "7", "Critical", "UAC auto-elevate binary loaded an unsigned DLL", "T1548.002/T1574.001/.002"),
+    ("SYS-203", "13", "Critical", "UAC disabled via the EnableLUA registry value", "T1548.002/T1562.001"),
+    ("SYS-204", "1", "Critical", "Shell spawned by DllHost.exe at High integrity", "T1548.002/T1134.001"),
 ]
 
 EVENT_ID_NAMES = {
@@ -579,7 +584,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "152 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "157 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -1187,7 +1192,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 697 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 708 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1266,7 +1271,7 @@ layout_text = (
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;152 YAML detection rules, by Event ID, plus<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;157 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dashboard.html, static/{css,js}<br/>"
@@ -1274,7 +1279,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;697 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;708 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

@@ -1,0 +1,34 @@
+id: SYS-202
+title: UAC auto-elevate binary loaded an unsigned DLL
+event_id: 7
+severity: critical
+attack: [T1548.002, T1574.001, T1574.002]
+description: >
+  A binary from the fixed list of Windows auto-elevate executables
+  (consent.exe itself, or one of the binaries it silently elevates --
+  sysprep.exe, wusa.exe/WerFault.exe, cliconfg.exe, mcx2prov.exe,
+  winsat.exe, eventvwr.exe) loaded an unsigned DLL. This is the hijack
+  step every UACME DLL-search-order variant shares: the auto-elevate
+  mechanism itself is trustworthy, but it resolves a DLL by name rather
+  than by full trusted path, so a payload dropped or extracted (via
+  wusa's .msu/.cab extraction, or a mocked "C:\Windows \System32" path
+  with a trailing space) into the directory the binary searches first
+  gets loaded at whatever integrity level the binary just auto-elevated
+  to -- SYSTEM, in consent.exe's case, the process that arbitrates every
+  other UAC prompt on the box. Distinct from SYS-197, which watches the
+  general case of a trusted process loading an unsigned DLL from an
+  obviously user-writable path (Temp, AppData): these hijacks land the
+  payload inside System32/SysWOW64/ehome/sysprep itself, which SYS-197's
+  path check would not flag.
+detection:
+  Image|endswith:
+    - '\consent.exe'
+    - '\sysprep.exe'
+    - '\wusa.exe'
+    - '\WerFault.exe'
+    - '\cliconfg.exe'
+    - '\mcx2prov.exe'
+    - '\winsat.exe'
+    - '\eventvwr.exe'
+  Signed|equals: 'false'
+condition: all
