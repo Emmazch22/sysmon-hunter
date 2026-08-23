@@ -26,13 +26,13 @@ Why this is not just "are the intervals equal":
 
 from __future__ import annotations
 
-import ipaddress
 import logging
 import statistics
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from typing import Deque, Optional
 
+from backend.engine.net_scope import is_internal
 from backend.models.schemas import Detection, Event, Severity, utcnow
 
 log = logging.getLogger(__name__)
@@ -52,31 +52,6 @@ def _basename(path: Optional[str]) -> str:
     if not path:
         return "unknown"
     return path.replace("/", "\\").split("\\")[-1].lower()
-
-
-def _is_internal(destination_ip: str) -> bool:
-    """Is this destination private, loopback, or link-local rather than the
-    open internet?
-
-    A machine-like rhythm alone does not distinguish an implant calling home
-    from a log forwarder heartbeating its own indexer or a domain controller
-    talking LDAP to itself over loopback -- both look identical on regularity.
-    What differs is where the traffic goes: sustained periodic connections to
-    infrastructure inside the network are commonplace, while the same rhythm
-    aimed at an address outside it is the actually rare, actionable pattern.
-    This does not suppress internal beacons -- lateral C2 exists and internal
-    destinations still alert -- it only keeps their severity from crowding out
-    beacons leaving the network, which is where CRITICAL belongs.
-
-    An address that fails to parse (a hostname Sysmon occasionally logs
-    instead of an IP) is treated as external rather than silently downgraded,
-    since "unknown" should never read as "safe".
-    """
-    try:
-        addr = ipaddress.ip_address(destination_ip)
-    except ValueError:
-        return False
-    return addr.is_private or addr.is_loopback or addr.is_link_local
 
 
 def regularity(intervals: list[float]) -> float:
@@ -288,7 +263,7 @@ class BeaconDetector:
         should not be silenced outright.
         """
         _, image, destination_ip, destination_port = key
-        internal = _is_internal(str(destination_ip))
+        internal = is_internal(str(destination_ip))
 
         if internal:
             severity = Severity.HIGH if score >= 0.92 else Severity.MEDIUM

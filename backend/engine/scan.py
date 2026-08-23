@@ -36,6 +36,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+from backend.engine.net_scope import is_internal
 from backend.models.schemas import Detection, Event, Severity, utcnow
 
 log = logging.getLogger(__name__)
@@ -82,6 +83,13 @@ class _Scan:
             return 0.0
         stamps = list(self.destinations.values())
         return (max(stamps) - min(stamps)).total_seconds()
+
+    def all_internal(self) -> bool:
+        """Is every distinct destination IP touched so far private, loopback,
+        or link-local? A single destination reaching outside the network is
+        enough to call the whole scan external -- see _build_detection for
+        why that asymmetry is deliberate."""
+        return all(is_internal(ip) for ip, _port in self.destinations)
 
 
 class ScanDetector:
@@ -188,11 +196,28 @@ class ScanDetector:
 
         Severity rises when the breadth is far past the threshold -- a process
         that has already doubled the bar it needed to clear is not an edge
-        case, it is a scanner running to completion.
+        case, it is a scanner running to completion -- then is capped one
+        band lower when every destination touched is internal (private,
+        loopback, or link-local): an internal-only vulnerability scanner or
+        asset-inventory agent (Nessus, SCCM, and similar) produces the exact
+        same breadth pattern as a real lateral-movement sweep, since both are
+        "one process, many internal hosts, fast." This is a real trade-off,
+        not a clean win the way it is for beacon.py's internal/external split
+        -- an attacker's own internal host sweep is T1018/T1046 itself, the
+        core technique this detector exists to catch, so capping it below
+        CRITICAL does mean a genuine lateral-movement scan can land on HIGH
+        instead. It still alerts, and the evidence still says exactly which
+        destinations were touched; the trade is fewer CRITICAL pages from
+        routine internal scanning tools against a small chance of under
+        -stating a real one. A single destination reaching outside the
+        network is enough to call the whole scan external and skip the cap,
+        since no legitimate internal-only scanner mixes in random internet
+        addresses.
         """
         distinct_ips = scan.distinct_ips()
         distinct_ports = scan.distinct_ports()
         image = _basename(scan.image)
+        internal = scan.all_internal()
 
         techniques = list(SCAN_BASE_TECHNIQUES)
         if is_sweep:
@@ -205,14 +230,14 @@ class ScanDetector:
         else:
             shape = "port scan"
 
-        severity = (
-            Severity.CRITICAL
-            if (
-                distinct_ips >= self._min_distinct_ips * 2
-                or distinct_ports >= self._min_distinct_ports * 2
-            )
-            else Severity.HIGH
+        past_double = (
+            distinct_ips >= self._min_distinct_ips * 2
+            or distinct_ports >= self._min_distinct_ports * 2
         )
+        if internal:
+            severity = Severity.HIGH if past_double else Severity.MEDIUM
+        else:
+            severity = Severity.CRITICAL if past_double else Severity.HIGH
 
         sample = sorted(f"{ip}:{port}" for ip, port in scan.destinations)[:10]
 
@@ -248,6 +273,7 @@ class ScanDetector:
                 "span_seconds": round(scan.span()),
                 "sample_destinations": sample,
                 "image": image,
+                "destination_scope": "internal" if internal else "external",
             },
         )
 

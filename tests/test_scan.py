@@ -111,7 +111,10 @@ class TestHostSweep:
         assert "host sweep" in detection.title
         assert "T1046" in detection.attack
         assert "T1018" in detection.attack
-        assert detection.severity is Severity.HIGH
+        # All-internal destinations (10.0.0.x): capped one band below what
+        # the same breadth against external IPs would score. See
+        # TestDestinationScope for the external/mixed equivalents.
+        assert detection.severity is Severity.MEDIUM
 
 
 class TestCombinedScan:
@@ -169,7 +172,8 @@ class TestCombinedScan:
             ],
         )
         assert first is not None
-        assert first.severity is Severity.HIGH
+        # Internal destination, single threshold: MEDIUM, not HIGH.
+        assert first.severity is Severity.MEDIUM
 
         # 15 more distinct ports, all well within the 5-minute cooldown that
         # started at the first alert (offset ~14s) -- these accumulate breadth
@@ -190,7 +194,104 @@ class TestCombinedScan:
         )
         assert second is not None
         assert second.evidence["distinct_ports"] == 30
+        # Internal destination, doubled breadth: HIGH, not CRITICAL.
+        assert second.severity is Severity.HIGH
+
+
+class TestDestinationScope:
+    """A vulnerability scanner sweeping the internal network and an attacker
+    doing the exact same thing produce identical breadth -- that ambiguity is
+    real, unlike beacon.py's internal/external split. What is not ambiguous
+    is a fan-out that reaches outside the network at all: no legitimate
+    internal-only scanning tool mixes in random internet addresses, so a
+    single external destination is enough to skip the cap entirely."""
+
+    def test_all_internal_destinations_cap_below_high(
+        self, detector: ScanDetector
+    ) -> None:
+        """The textbook Nessus/SCCM shape: one process, ten-plus internal
+        hosts, single threshold crossed. Capped to MEDIUM rather than the
+        HIGH an external sweep of the same breadth would score."""
+        connections = [
+            connection(i * 2, destination_ip=f"10.0.0.{i}", destination_port="445")
+            for i in range(10)
+        ]
+        detection = feed(detector, connections)
+
+        assert detection is not None
+        assert detection.severity is Severity.MEDIUM
+        assert detection.evidence["destination_scope"] == "internal"
+
+    def test_all_external_destinations_reach_high(self, detector: ScanDetector) -> None:
+        """The regression case: the same breadth against external IPs must
+        still reach HIGH, not be muted by the internal cap. Real public IPs
+        (not the 203.0.113.0/24-style documentation ranges, which Python's
+        ipaddress module itself treats as private)."""
+        connections = [
+            connection(i * 2, destination_ip=f"45.76.12.{20 + i}", destination_port="445")
+            for i in range(10)
+        ]
+        detection = feed(detector, connections)
+
+        assert detection is not None
+        assert detection.severity is Severity.HIGH
+        assert detection.evidence["destination_scope"] == "external"
+
+    def test_a_single_external_destination_is_enough_to_drop_the_cap(
+        self, detector: ScanDetector
+    ) -> None:
+        """Nine internal hosts and one external one is not "mostly internal,
+        round down" -- no legitimate internal scanner reaches outside the
+        network at all, so the whole scan is treated as external."""
+        connections = [
+            connection(i * 2, destination_ip=f"10.0.0.{i}", destination_port="445")
+            for i in range(9)
+        ] + [connection(20, destination_ip="45.76.12.99", destination_port="445")]
+        detection = feed(detector, connections)
+
+        assert detection is not None
+        assert detection.evidence["destination_scope"] == "external"
+        assert detection.severity is Severity.HIGH
+
+    def test_doubled_breadth_against_external_hosts_reaches_critical(self) -> None:
+        """External destinations, breadth past double the threshold: still
+        CRITICAL, unaffected by the internal cap.
+
+        Mirrors test_severity_escalates_on_a_later_alert_with_doubled_breadth:
+        the first alert lands right at the threshold, a second batch
+        accumulates silently inside the cooldown, and a post-cooldown
+        reconnection (adding no new breadth of its own) triggers the second,
+        doubled-breadth verdict.
+        """
+        detector = ScanDetector(
+            min_distinct_ports=15, window=timedelta(minutes=30), cooldown=timedelta(minutes=5)
+        )
+        first = feed(
+            detector,
+            [
+                connection(i, destination_ip="198.51.101.5", destination_port=str(6000 + i))
+                for i in range(15)
+            ],
+        )
+        assert first is not None
+        assert first.severity is Severity.HIGH
+
+        silent = feed(
+            detector,
+            [
+                connection(20 + i, destination_ip="198.51.101.5", destination_port=str(7000 + i))
+                for i in range(15)
+            ],
+        )
+        assert silent is None
+
+        second = detector.observe(
+            connection(320, destination_ip="198.51.101.5", destination_port="7014")
+        )
+        assert second is not None
+        assert second.evidence["distinct_ports"] == 30
         assert second.severity is Severity.CRITICAL
+        assert second.evidence["destination_scope"] == "external"
 
 
 class TestEvidence:
