@@ -658,7 +658,7 @@ and latency histograms by route and detections raised by rule ID.
 
 ```bash
 pip install pytest pytest-asyncio
-python -m pytest        # 784 tests
+python -m pytest        # 788 tests
 ```
 
 The suite doubles as documentation: each design decision has a test named for
@@ -706,7 +706,7 @@ sysmon-hunter/
 ├── scripts/                 seed_apt, seed_demo, seed_rw, seed_full_coverage,
 │                            replay_evtx, fetch_attack
 ├── docs/                    screenshots
-└── tests/                   784 tests
+└── tests/                   788 tests
 ```
 
 ---
