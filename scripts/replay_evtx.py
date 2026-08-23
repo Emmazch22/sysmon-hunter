@@ -8,16 +8,24 @@ re-run against every future rule to catch regressions.
 
 Sources:
 
-* .evtx  -- a Windows event log, e.g. one exported from the lab VM, or a sample
-            from the EVTX-ATTACK-SAMPLES corpus (each file is one technique).
-* .jsonl -- one JSON event per line. What `--dump` writes, and what belongs in
-            `backend/tests/fixtures/` as a committed regression corpus.
+* .evtx        -- a Windows event log, e.g. one exported from the lab VM, or a
+                   sample from the EVTX-ATTACK-SAMPLES corpus (each file is one
+                   technique).
+* .jsonl        -- one JSON event per line. What `--dump` writes, and what
+                   belongs in `backend/tests/fixtures/` as a committed
+                   regression corpus.
+* .xml / .log  -- one `<Event>...</Event>` document per line, the plain-text
+                   dump `wevtutil qe <channel> /f:xml` (or a SIEM's raw export)
+                   produces. Not the same thing as .evtx, which is Windows' own
+                   binary log format -- this is XML text, one record per line,
+                   no binary framing at all.
 
 Usage:
     python scripts/replay_evtx.py --file samples/sysmon.evtx
     python scripts/replay_evtx.py --file samples/lateral_movement.evtx --speed 4
     python scripts/replay_evtx.py --file samples/sysmon.evtx --dump fixtures/lm.jsonl
     python scripts/replay_evtx.py --file fixtures/lm.jsonl --only 1,3,10
+    python scripts/replay_evtx.py --file samples/sysmon.log --dump fixtures/range.jsonl
 """
 
 from __future__ import annotations
@@ -26,6 +34,7 @@ import argparse
 import json
 import sys
 import time
+import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
@@ -102,6 +111,70 @@ def read_evtx(path: Path) -> Iterator[dict[str, Any]]:
         }
 
 
+_EVENT_XML_NS = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
+
+
+def _parse_xml_event(line: str) -> dict[str, Any] | None:
+    """Parse one `<Event>...</Event>` document into the same flat shape
+    `read_evtx` yields. Returns None on anything that does not parse as a
+    well-formed Event document -- a truncated line at EOF, for instance --
+    so the caller can skip it rather than crash the whole replay."""
+    try:
+        root = ET.fromstring(line)
+    except ET.ParseError:
+        return None
+
+    system = root.find("e:System", _EVENT_XML_NS)
+    if system is None:
+        return None
+
+    event_id_el = system.find("e:EventID", _EVENT_XML_NS)
+    channel_el = system.find("e:Channel", _EVENT_XML_NS)
+    computer_el = system.find("e:Computer", _EVENT_XML_NS)
+    time_el = system.find("e:TimeCreated", _EVENT_XML_NS)
+
+    event_data: dict[str, Any] = {}
+    data_node = root.find("e:EventData", _EVENT_XML_NS)
+    if data_node is not None:
+        for data in data_node.findall("e:Data", _EVENT_XML_NS):
+            name = data.get("Name")
+            if name:
+                event_data[name] = data.text or ""
+
+    try:
+        event_id = int(event_id_el.text) if event_id_el is not None and event_id_el.text else 0
+    except ValueError:
+        event_id = 0
+
+    return {
+        "channel": channel_el.text if channel_el is not None else "",
+        "winlog": {
+            "event_id": event_id,
+            "computer_name": computer_el.text if computer_el is not None else "unknown",
+            "event_data": event_data,
+        },
+        "@timestamp": time_el.get("SystemTime") if time_el is not None else None,
+    }
+
+
+def read_xml(path: Path) -> Iterator[dict[str, Any]]:
+    """Yield each record of a one-event-per-line Windows Event Log XML dump
+    (e.g. `wevtutil qe Microsoft-Windows-Sysmon/Operational /f:xml`) as a
+    flat Sysmon-style dict, matching `read_evtx`'s output shape exactly so
+    every flag below (--only, --dump, channel filtering) works unchanged
+    regardless of which parser produced the event."""
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            record = _parse_xml_event(line)
+            if record is None:
+                print(f"  ! line {line_number}: not a well-formed <Event> document", file=sys.stderr)
+                continue
+            yield record
+
+
 def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     """Yield each line of a .jsonl fixture as an event."""
     with path.open(encoding="utf-8") as handle:
@@ -121,7 +194,9 @@ def load(path: Path) -> Iterator[dict[str, Any]]:
         return read_evtx(path)
     if path.suffix.lower() in {".jsonl", ".ndjson"}:
         return read_jsonl(path)
-    sys.exit(f"Unsupported file type: {path.suffix}. Expected .evtx or .jsonl")
+    if path.suffix.lower() in {".xml", ".log"}:
+        return read_xml(path)
+    sys.exit(f"Unsupported file type: {path.suffix}. Expected .evtx, .jsonl, .xml, or .log")
 
 
 def main() -> int:
