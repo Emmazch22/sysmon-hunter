@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-VERSION = "0.3.4"
+VERSION = "0.3.5"
 DOC_TITLE = "Sysmon Hunter — User Manual"
 OUT_PATH = "Sysmon_Hunter_Manual.pdf"
 
@@ -382,6 +382,25 @@ RULES = [
     ("SYS-218", "13", "High", "NullSessionPipes registry value modified", "T1021.002/T1562.001"),
     ("SYS-219", "17", "High", "Named pipe named as a bare hex string, consistent with a framework-generated backdoor", "T1071"),
     ("SYS-220", "18", "High", "Connection to a named pipe named as a bare hex string", "T1071"),
+    ("SYS-221", "1", "High", "MSI custom action ran a temp binary staged in the Installer cache", "T1218.007"),
+    ("SYS-222", "1", "High", "Compiled HTML Help viewer spawned a shell or script host", "T1218.001"),
+    ("SYS-223", "1", "High", "msxsl.exe executed an XSL stylesheet", "T1220"),
+    ("SYS-224", "1", "High", "WMIC formatted output through a remotely-hosted XSL stylesheet (Squiblytwo)", "T1220/T1218"),
+    ("SYS-225", "1", "Medium", "MSBuild spawned a shell or script host", "T1127.001"),
+    ("SYS-226", "1", "High", "svchost's DcomLaunch service group spawned a shell", "T1055/T1021.003"),
+    ("SYS-227", "1", "High", "explorer.exe launched a target through the undocumented /root, switch", "T1218/T1548.002"),
+    ("SYS-228", "1", "High", "desktopimgdownldr.exe fetched a remote file", "T1105"),
+    ("SYS-229", "13", "High", "CLSID redirected to another class via TreatAs", "T1546.015"),
+    ("SYS-230", "13", "High", "Built-in Administrator or Guest RID manipulated directly in the SAM hive", "T1098/T1136.001"),
+    ("SYS-231", "1", "High", "Logon-screen accessibility tool spawned a child process", "T1546.008"),
+    ("SYS-232", "13", "High", "A fake pending Group Policy was queued in the registry", "T1484.001"),
+    ("SYS-233", "13", "High", "The Startup special folder was redirected via User Shell Folders", "T1547.001"),
+    ("SYS-234", "1", "Critical", "smss.exe spawned a shell instead of a boot-phase subsystem", "T1547.001"),
+    ("SYS-235", "11", "Critical", "lsass.exe wrote mimikatz's default memssp credential-capture log", "T1556.002"),
+    ("SYS-236", "8", "High", "Remote thread created inside KeePass", "T1555.005"),
+    ("SYS-237", "10", "High", "A process opened a handle into TeamViewer's memory", "T1555"),
+    ("SYS-238", "13", "Medium", "A value under LSA Secrets was written", "T1003.004"),
+    ("SYS-239", "13", "Medium", "DirectInput MostRecentApplication registry key written", "T1056.001"),
 ]
 
 EVENT_ID_NAMES = {
@@ -600,7 +619,7 @@ story.append(H1("3.&nbsp;&nbsp;Detection Engine"))
 
 story.append(H2("3.1&nbsp;&nbsp;Rule-Based Detection"))
 story.append(P(
-    "173 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
+    "192 YAML detection rules, each mapped to one or more MITRE ATT&amp;CK "
     "technique IDs, are indexed by Sysmon Event ID so that only relevant rules "
     "are evaluated per event. Rules use Sigma-compatible matching semantics: "
     "field/operator pairs (<font face=\"Courier\">equals</font>, "
@@ -1208,7 +1227,7 @@ story.append(P(
 story.append(H1("9.&nbsp;&nbsp;Testing"))
 story.append(Paragraph(
     "pip install pytest pytest-asyncio<br/>"
-    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 742 tests",
+    "python -m pytest&nbsp;&nbsp;&nbsp;&nbsp;# 784 tests",
     styles["Mono"]
 ))
 story.append(P(
@@ -1287,7 +1306,7 @@ layout_text = (
     "|&nbsp;&nbsp;+-- models/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schemas, db<br/>"
     "|&nbsp;&nbsp;`-- data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_data.json (ATT&amp;CK technique lookup),<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attack_index.json (full catalog, coverage gaps)<br/>"
-    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;173 YAML detection rules, by Event ID, plus<br/>"
+    "+-- rules/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;192 YAML detection rules, by Event ID, plus<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imported_sigma/ for runtime Sigma imports<br/>"
     "+-- frontend/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;console.html, incident.html, tree.html,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dashboard.html, static/{css,js}<br/>"
@@ -1295,7 +1314,7 @@ layout_text = (
     "+-- scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;seed_apt, seed_demo, seed_rw, seed_full_coverage,<br/>"
     "|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;replay_evtx, fetch_attack<br/>"
     "+-- docs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screenshots<br/>"
-    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;742 tests"
+    "`-- tests/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;784 tests"
 )
 story.append(Paragraph(layout_text, ParagraphStyle(
     "Layout", parent=styles["Mono"], fontSize=7.8, leading=11.5)))

@@ -1,0 +1,26 @@
+id: SYS-234
+title: smss.exe spawned a shell instead of a boot-phase subsystem
+event_id: 1
+severity: critical
+attack: [T1547.001]
+description: >
+  smss.exe -- the Session Manager Subsystem -- spawned cmd.exe or another
+  script host. smss runs once at boot, launches a fixed, small set of
+  known children (csrss.exe, wininit.exe, the first winlogon.exe), executes
+  whatever is registered under
+  HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\BootExecute and
+  SetupExecute, and then exits -- a live smss.exe forking a shell well
+  after boot, or forking one at all outside that fixed set, means either
+  those registry values were tampered with to run something extra before
+  most security tooling has initialized, or a process is masquerading as
+  smss to inherit its trusted-ancestor look. Validated against a real
+  capture: smss.exe spawning cmd.exe directly.
+detection:
+  parent_image|endswith: '\smss.exe'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+condition: all

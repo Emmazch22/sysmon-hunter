@@ -1,0 +1,29 @@
+id: SYS-231
+title: Logon-screen accessibility tool spawned a child process
+event_id: 1
+severity: high
+attack: [T1546.008]
+description: >
+  osk.exe, sethc.exe, magnify.exe, narrator.exe, displayswitch.exe, or
+  atbroker.exe spawned a child process. All six are reachable from the
+  Windows logon screen before any credential is entered, and unlike
+  utilman.exe -- which legitimately launches whichever of these the user
+  picks from the ease-of-access menu, so it is deliberately left out of
+  this parent list -- none of these six has any legitimate reason to fork
+  anything themselves: the on-screen keyboard does not launch other
+  programs, it draws a keyboard. SYS-175 catches the technique at the
+  moment the binary is replaced on disk and SYS-032 catches the
+  IFEO-debugger variant; this is the execution-time confirmation that
+  works regardless of how the redirect was planted, including a hooked or
+  trojanized binary that never touched disk as a separate file. Validated
+  against a real capture: osk.exe, launched by Utilman.exe at the lock
+  screen, itself running whoami.exe as SYSTEM.
+detection:
+  parent_image|endswith:
+    - '\osk.exe'
+    - '\sethc.exe'
+    - '\magnify.exe'
+    - '\narrator.exe'
+    - '\displayswitch.exe'
+    - '\atbroker.exe'
+condition: all

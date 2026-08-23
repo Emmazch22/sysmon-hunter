@@ -1,0 +1,17 @@
+id: SYS-223
+title: msxsl.exe executed an XSL stylesheet
+event_id: 1
+severity: high
+attack: [T1220]
+description: >
+  msxsl.exe ran at all. It is not a Windows component -- there is no
+  install of Windows that ships it -- so its presence on disk already means
+  someone dropped it there deliberately, almost always to run a
+  script-embedded .xsl through Microsoft.XMLDOM the way regsvr32/squiblytwo
+  abuse WMIC for the same trick. Seeing it execute is close to sufficient
+  signal on its own, the same reasoning SYS-079 applies to ftp.exe.
+  Validated against a real capture: msxsl.exe run from a mapped network
+  share against a same-named .dat/.xsl pair.
+detection:
+  image|endswith: '\msxsl.exe'
+condition: all

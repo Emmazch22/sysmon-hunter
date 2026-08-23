@@ -1,0 +1,16 @@
+id: SYS-237
+title: A process opened a handle into TeamViewer's memory
+event_id: 10
+severity: high
+attack: [T1555]
+description: >
+  A process other than TeamViewer's own components opened TeamViewer.exe
+  for memory access. TeamViewer has historically kept the session password
+  and connection ID reachable in its own process memory, which is exactly
+  what public "TeamViewer dumper" tooling reads out to recover an active
+  session's credentials without ever touching disk or the registry.
+  Validated against a real capture: a Frida-injected helper process
+  opening TeamViewer.exe with GrantedAccess 0x147a.
+detection:
+  TargetImage|endswith: '\TeamViewer.exe'
+condition: all

@@ -1,0 +1,20 @@
+id: SYS-232
+title: A fake pending Group Policy was queued in the registry
+event_id: 13
+severity: high
+attack: [T1484.001]
+description: >
+  A value was written under ...\Microsoft\IEAK\GroupPolicy\PendingGPOs,
+  the branch Windows checks at the next policy refresh to finish applying
+  an interrupted Group Policy install -- normally left behind only by IEAK
+  (the Internet Explorer Administration Kit) itself, mid-deployment. Hand
+  -crafting a PendingGPOs entry that names an attacker-controlled Path and
+  Section causes the next policy refresh (or the next logon) to run that
+  .inf as if it were a legitimate, already-approved Group Policy client
+  -side extension -- no actual domain GPO ever needs to be touched.
+  Validated against a real capture: regedit.exe writing Count, Section1,
+  and Path1 (pointing at c:\programdata\gpo.inf) under PendingGPOs in a
+  single burst.
+detection:
+  TargetObject|contains: 'GroupPolicy\PendingGPOs'
+condition: all

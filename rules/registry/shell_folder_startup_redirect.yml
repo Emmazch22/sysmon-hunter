@@ -1,0 +1,16 @@
+id: SYS-233
+title: The Startup special folder was redirected via User Shell Folders
+event_id: 13
+severity: high
+attack: [T1547.001]
+description: >
+  The registry value that tells Windows where the Startup (or Common
+  Startup) special folder physically lives was changed. Every shortcut and
+  script an attacker drops in whatever path this points to now runs at the
+  next logon, exactly like the real Startup folder -- except nothing that
+  audits "what's in the Startup folder" by its usual, well-known path will
+  ever look there. Validated against a real capture: reg.exe pointing
+  User Shell Folders\startup at c:\programdata\StartupNewHomeAddress.
+detection:
+  TargetObject|re: 'user shell folders\\(common )?startup$'
+condition: all

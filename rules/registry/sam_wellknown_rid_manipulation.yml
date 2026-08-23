@@ -1,0 +1,23 @@
+id: SYS-230
+title: Built-in Administrator or Guest RID manipulated directly in the SAM hive
+event_id: 13
+severity: high
+attack: [T1098, T1136.001]
+description: >
+  A value was written directly under the SAM hive entry for RID 500 or 501
+  -- the built-in Administrator and Guest accounts respectively, fixed and
+  well-known on every Windows install regardless of hostname or domain.
+  SYS-091 already watches lsass.exe writing the Names/Aliases branches that
+  normal account-management APIs touch; this is the other path in: a raw
+  write straight to \Users\000001F4\ (Administrator) or \Users\000001F5\
+  (Guest), often bypassing lsass entirely and often targeting the F value
+  or ForcePasswordReset flag that controls whether the account is enabled,
+  locked, or due for a forced credential change. Two independent real
+  captures land here: MSBuild.exe writing 000001F5\F directly (RID
+  hijacking -- silently re-enabling and re-privileging the Guest account),
+  and lsass.exe setting 000001F4\ForcePasswordReset on Administrator.
+detection:
+  TargetObject|contains:
+    - '\SAM\Domains\Account\Users\000001F4\'
+    - '\SAM\Domains\Account\Users\000001F5\'
+condition: any

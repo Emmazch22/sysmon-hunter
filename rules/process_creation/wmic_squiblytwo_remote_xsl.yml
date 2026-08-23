@@ -1,0 +1,18 @@
+id: SYS-224
+title: WMIC formatted output through a remotely-hosted XSL stylesheet
+event_id: 1
+severity: high
+attack: [T1220, T1218]
+description: >
+  wmic.exe's /format: switch normally names a local .xsl file shipped with
+  Windows (csv.xsl, htable.xsl, ...); here it names an http(s) URL instead.
+  WMIC will fetch that URL and run it as an XSL transform through
+  Microsoft.XMLDOM, which is enough to execute embedded script -- the
+  "Squiblytwo" technique, the WMIC-driven sibling of regsvr32's
+  squiblydoo. A signed Microsoft binary that most allow-lists trust becomes
+  a full download-and-execute primitive with no extra tooling. Validated
+  against a real capture: wmic process list /format:"https://.../test.xsl".
+detection:
+  image|endswith: '\wmic.exe'
+  command_line|re: 'format:\s*"?https?://'
+condition: all

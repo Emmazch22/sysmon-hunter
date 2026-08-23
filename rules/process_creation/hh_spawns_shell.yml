@@ -1,0 +1,28 @@
+id: SYS-222
+title: Compiled HTML Help viewer spawned a shell or script host
+event_id: 1
+severity: high
+attack: [T1218.001]
+description: >
+  hh.exe (the Microsoft HTML Help viewer) launched cmd.exe, powershell.exe,
+  or another script host. A .chm can embed a shortcut object that runs
+  arbitrary script the moment its topic is viewed, and the whole point of
+  routing through hh.exe is that the parent looks like a help file being
+  opened rather than a download being run. SYS-101 already catches this
+  same abuse when the .chm itself is staged under a writable path; this
+  rule is independent of where the .chm sits and instead keys on the
+  parent/child shape, which is what actually confirms the embedded script
+  fired. Validated against a real capture: hh.exe opening a .chm from the
+  desktop, immediately spawning cmd.exe with an embedded mshtml
+  RunHTMLApplication payload.
+detection:
+  parent_image|endswith: '\hh.exe'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+    - '\mshta.exe'
+    - '\rundll32.exe'
+condition: all

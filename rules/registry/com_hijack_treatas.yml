@@ -1,0 +1,19 @@
+id: SYS-229
+title: CLSID redirected to another class via TreatAs
+event_id: 13
+severity: high
+attack: [T1546.015]
+description: >
+  A value was written to a CLSID's TreatAs\(Default), which tells COM "when
+  something asks for this CLSID, instantiate this other one instead." It is
+  a second, less-watched lever for the same COM-hijack outcome SYS-122
+  already covers on InprocServer32: rather than pointing a CLSID straight
+  at a malicious DLL, TreatAs quietly reroutes it to a CLSID that already
+  has one registered, which is one hop removed from the obvious signal and
+  survives in a per-user hive the same way. Validated against a real
+  capture: a Turla-style Outlook backdoor registering a bogus CLSID's
+  InprocServer32 and then pointing a legitimate, commonly-instantiated
+  CLSID's TreatAs at it.
+detection:
+  TargetObject|re: '(\\classes\\|_classes\\)clsid\\.+\\treatas\\[({]default[)}]$'
+condition: all

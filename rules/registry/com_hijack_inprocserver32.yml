@@ -11,8 +11,14 @@ description: >
   context, whatever the system-wide HKLM registration would normally load.
   This is the mechanism behind most documented COM-hijack persistence: no
   admin rights needed to plant it, and it fires the next time anything
-  instantiates that CLSID.
+  instantiates that CLSID. Matches both ways Windows exposes a per-user
+  Classes hive -- HKCU\Software\Classes\CLSID\... and the loaded-hive form
+  HKU\<SID>_Classes\CLSID\..., which uses an underscore rather than a
+  backslash before "Classes" -- and both value-name spellings tools use for
+  the default value, (Default) and {Default}. Missing the HKU\<SID>_Classes
+  form and the {Default} spelling was a real gap: a live Turla-style
+  Outlook COM-hijack capture used exactly that combination and produced no
+  detection until this was widened.
 detection:
-  TargetObject|contains: '\Classes\CLSID\'
-  TargetObject|endswith: '\InprocServer32\(Default)'
+  TargetObject|re: '(\\classes\\|_classes\\)clsid\\.+\\inprocserver32\\[({]default[)}]$'
 condition: all

@@ -1,0 +1,17 @@
+id: SYS-235
+title: lsass.exe wrote mimikatz's default memssp credential-capture log
+event_id: 11
+severity: critical
+attack: [T1556.002]
+description: >
+  lsass.exe itself created C:\Windows\System32\mimilsa.log -- the exact,
+  unconfigurable default filename mimikatz's `misc::memssp` writes to.
+  memssp registers a rogue Security Support Provider inside lsass at
+  runtime; every plaintext credential that authenticates on the box from
+  that point on gets appended to this file. lsass.exe creating a file
+  named mimilsa.log is not a pattern that admits an innocent explanation --
+  it is close to a direct signature match.
+detection:
+  image|endswith: '\lsass.exe'
+  TargetFilename|endswith: '\mimilsa.log'
+condition: all

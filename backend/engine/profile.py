@@ -161,6 +161,12 @@ TECHNIQUE_TACTIC: dict[str, str] = {
     "T1055.012": "injection",
     "T1059.005": "execution",
     "T1003.003": "credential-access",
+    # SYS-221..239.
+    "T1218.007": "execution",
+    "T1220": "execution",
+    "T1556.002": "credential-access",
+    "T1056.001": "credential-access",
+    "T1558": "credential-access",
 }
 
 # The order tactics fall in an intrusion. The narrative follows this, not the

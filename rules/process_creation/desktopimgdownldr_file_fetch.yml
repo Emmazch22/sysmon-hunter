@@ -1,0 +1,20 @@
+id: SYS-228
+title: desktopimgdownldr.exe fetched a remote file
+event_id: 1
+severity: high
+attack: [T1105]
+description: >
+  desktopimgdownldr.exe is a signed Windows utility whose only documented
+  purpose is downloading a lock-screen image from a URL an administrator
+  supplies via MDM policy -- normal use never touches a command line at
+  all, let alone one a user or script runs directly. Its /lockscreenurl:
+  switch will fetch anything reachable over HTTP(S) to a local temp path
+  regardless of file type, which makes it a LOLBAS download primitive:
+  a signed Microsoft binary most controls never watch, doing the same job
+  as certutil or bitsadmin. Validated against a real capture:
+  desktopimgdownldr.exe /lockscreenurl:https://.../Bin.7z pulling an
+  archive down to the user's Temp\Personalization\LockScreenImage folder.
+detection:
+  image|endswith: '\desktopimgdownldr.exe'
+  command_line|contains: 'lockscreenurl'
+condition: all

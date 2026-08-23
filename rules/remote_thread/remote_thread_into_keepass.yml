@@ -1,0 +1,18 @@
+id: SYS-236
+title: Remote thread created inside KeePass
+event_id: 8
+severity: high
+attack: [T1555.005]
+description: >
+  A process created a thread running inside KeePass.exe. KeeThief and
+  similar tools extract the master key or the decrypted password database
+  straight from KeePass's process memory this way, which sidesteps the
+  master-password prompt and any key-file protection entirely -- the
+  secrets are already unlocked in memory whenever the database is open.
+  Mirrors SYS-095's reasoning for lsass: nothing legitimate injects a
+  thread into a password manager. Validated against a real capture:
+  powershell.exe (KeeThief's Get-KeePassDatabaseKey) creating two remote
+  threads in KeePass.exe.
+detection:
+  TargetImage|endswith: '\KeePass.exe'
+condition: all

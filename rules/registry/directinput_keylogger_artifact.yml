@@ -1,0 +1,20 @@
+id: SYS-239
+title: DirectInput MostRecentApplication registry key written
+event_id: 13
+severity: medium
+attack: [T1056.001]
+description: >
+  A value was written under ...\Microsoft\DirectInput\MostRecentApplication,
+  the branch Windows populates for the process most recently reading
+  keyboard/mouse state through the DirectInput API rather than the normal
+  Win32 message queue -- the same low-level input path a DirectX-based
+  keylogger uses specifically because it bypasses the hooks most anti
+  -keylogging tools watch. Medium rather than high because any legitimate
+  DirectInput game or peripheral-configuration tool touches this too, so
+  what makes it worth a look is which process wrote it -- something
+  running from a user-writable path with no business reading raw input.
+  Validated against a real capture: keylogger_directx.exe writing Version,
+  Name, Id, and MostRecentStart under this key.
+detection:
+  TargetObject|contains: '\Microsoft\DirectInput\MostRecentApplication\'
+condition: all

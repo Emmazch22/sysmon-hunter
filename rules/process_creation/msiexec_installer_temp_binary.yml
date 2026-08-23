@@ -1,0 +1,20 @@
+id: SYS-221
+title: MSI custom action ran a temp binary staged in the Installer cache
+event_id: 1
+severity: high
+attack: [T1218.007]
+description: >
+  msiexec.exe spawned a child process whose image sits directly under
+  C:\Windows\Installer, named the way the installer cache names its own
+  extracted payloads (MSI<hex>.tmp). A custom action embedded in an MSI
+  package runs at install time with whatever privilege the install itself
+  has, and the extracted binary never has to touch a normal, watched
+  location to run -- it lives for exactly as long as the install and is
+  gone after. Validated against a real Metasploit reverse-TCP MSI package:
+  msiexec.exe /V spawning C:\Windows\Installer\MSI4FFD.tmp, which in turn
+  ran cmd.exe and whoami.
+detection:
+  parent_image|endswith: '\msiexec.exe'
+  image|contains: '\Installer\'
+  image|endswith: '.tmp'
+condition: all

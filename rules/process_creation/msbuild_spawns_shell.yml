@@ -1,0 +1,27 @@
+id: SYS-225
+title: MSBuild spawned a shell or script host
+event_id: 1
+severity: medium
+attack: [T1127.001]
+description: >
+  msbuild.exe launched cmd.exe or powershell.exe as a direct child. A
+  Visual Studio project's pre-build or post-build event runs whatever
+  command line the .vcxproj/.csproj names through exactly this parent/child
+  shape, which makes it a legitimate developer workflow and a documented
+  Trusted Developer Utilities Proxy Execution technique at the same time --
+  MSBuild is signed, commonly allow-listed, and SYS-113 only catches the
+  variant where the project file itself is staged in a writable path.
+  This is the complementary signal: the payload lives in a build-event
+  property inside an otherwise ordinary-looking project, so it never
+  touches disk as a separate script. Medium rather than high because
+  developer machines legitimately trigger this via custom build steps;
+  what makes it worth a look is the shell appearing at all outside of a
+  known compiler/linker/tracker toolchain. Validated against a real
+  capture: devenv.exe -> MSBuild.exe -> cmd.exe -> powershell.exe -> notepad.exe.
+detection:
+  parent_image|endswith: '\msbuild.exe'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+condition: all

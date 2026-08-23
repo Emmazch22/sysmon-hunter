@@ -6,7 +6,11 @@ attack: [T1204.002, T1566]
 description: >
   A browser or email client spawned a shell or script interpreter. Users open
   attachments and links in these apps, so a scripting child is a strong signal
-  of a malicious document or drive-by download executing.
+  of a malicious document or drive-by download executing. iexplore.exe is
+  included alongside the modern browsers: legacy IE is still present on most
+  Windows images and remains a live drive-by target, validated against a real
+  capture of CVE-2018-15982 (a Flash exploit) spawning cmd.exe from
+  iexplore.exe with a matching ProcessAccess (EventID 10) into the new shell.
 detection:
   parent_image|endswith:
     - '\outlook.exe'
@@ -14,6 +18,7 @@ detection:
     - '\msedge.exe'
     - '\firefox.exe'
     - '\acrord32.exe'
+    - '\iexplore.exe'
   image|endswith:
     - '\powershell.exe'
     - '\pwsh.exe'

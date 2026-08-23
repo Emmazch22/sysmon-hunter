@@ -1,0 +1,19 @@
+id: SYS-227
+title: explorer.exe launched a target through the undocumented /root, switch
+event_id: 1
+severity: high
+attack: [T1218, T1548.002]
+description: >
+  explorer.exe's command line uses the undocumented `/root,"<target>"`
+  syntax to launch an arbitrary executable. Nothing about a normal user
+  double-click produces this command line -- it only appears when
+  something drives Explorer programmatically (a script, a shortcut with a
+  crafted target, or a living-off-the-land launcher) to run a target while
+  the visible parent is Explorer itself, which is what makes the technique
+  attractive for evading controls that trust Explorer as a benign process
+  ancestor. Validated against a real capture: explorer.exe
+  /root,"c:\windows\System32\calc.exe" launched from a cmd.exe session.
+detection:
+  image|endswith: '\explorer.exe'
+  command_line|contains: '/root,'
+condition: all

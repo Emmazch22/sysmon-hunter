@@ -1,0 +1,35 @@
+id: SYS-226
+title: svchost's DcomLaunch service group spawned a shell
+event_id: 1
+severity: high
+attack: [T1055, T1021.003]
+description: >
+  cmd.exe or another script host appeared as a direct child of svchost.exe
+  running the DcomLaunch service group -- the group that hosts the DCOM
+  Server Process Launcher and Plug and Play, neither of which has any
+  legitimate reason to fork a shell. This is the process-lineage signature
+  left behind by a DCOM-activated reverse shell or a payload injected into
+  one of DcomLaunch's hosted services: the malicious code runs under a
+  trusted system process's identity, and the only visible trace is the
+  parent/child pair, not a new binary on disk. Scoped to the DcomLaunch
+  group specifically, not svchost in general, because other groups
+  (Schedule, in particular) legitimately spawn cmd.exe for ordinary
+  scheduled tasks. rundll32.exe is deliberately left off the child list:
+  DcomLaunch spawning rundll32.exe through
+  shell32.dll,SHCreateLocalServerRunDll is the ordinary, constant
+  mechanism Windows uses to activate any out-of-process COM server, and
+  including it produced a real false positive against a benign capture of
+  that exact activation while validating this rule. Validated against two
+  real captures: svchost.exe -k DcomLaunch -p -s PlugPlay spawning
+  cmd.exe as SYSTEM (a reverse-shell sample), and a faxhell bind-shell
+  DLL-hijack sample where DcomLaunch spawns cmd.exe the same way.
+detection:
+  parent_image|endswith: '\svchost.exe'
+  parent_command_line|contains: 'DcomLaunch'
+  image|endswith:
+    - '\cmd.exe'
+    - '\powershell.exe'
+    - '\pwsh.exe'
+    - '\wscript.exe'
+    - '\cscript.exe'
+condition: all

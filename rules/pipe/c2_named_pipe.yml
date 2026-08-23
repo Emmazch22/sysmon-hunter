@@ -2,11 +2,15 @@ id: SYS-060
 title: Named pipe matching a known C2 default
 event_id: 17
 severity: high
-attack: [T1071, T1055]
+attack: [T1071, T1055, T1558]
 description: >
-  A named pipe was created whose name matches a default used by Cobalt Strike or
-  Meterpreter for inter-process C2. Operators frequently leave these defaults
-  unchanged, which makes the pipe name a high-confidence signature.
+  A named pipe was created whose name matches a default used by Cobalt Strike,
+  Meterpreter, or kekeo for inter-process C2 or credential relay. Operators
+  frequently leave these defaults unchanged, which makes the pipe name a
+  high-confidence signature. \kekeo_tsssp_endpoint is kekeo's default pipe
+  for its TSSSP (Terminal Services SSP) module, which registers a rogue
+  security-support provider to intercept RDP/console logon credentials in
+  the clear -- validated against a real capture of kekeo.exe creating it.
 detection:
   PipeName|re:
     - '\\msagent_[0-9a-f]{2}\b'
@@ -14,4 +18,5 @@ detection:
     - '\\postex_[0-9a-f]{4}\b'
     - '\\msf-pipe\b'
     - '\\(interprocess|windows\.update)_[0-9a-f]+'
+    - '\\kekeo_tsssp_endpoint\b'
 condition: all
