@@ -26,6 +26,7 @@ Why this is not just "are the intervals equal":
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import statistics
 from collections import defaultdict, deque
@@ -51,6 +52,31 @@ def _basename(path: Optional[str]) -> str:
     if not path:
         return "unknown"
     return path.replace("/", "\\").split("\\")[-1].lower()
+
+
+def _is_internal(destination_ip: str) -> bool:
+    """Is this destination private, loopback, or link-local rather than the
+    open internet?
+
+    A machine-like rhythm alone does not distinguish an implant calling home
+    from a log forwarder heartbeating its own indexer or a domain controller
+    talking LDAP to itself over loopback -- both look identical on regularity.
+    What differs is where the traffic goes: sustained periodic connections to
+    infrastructure inside the network are commonplace, while the same rhythm
+    aimed at an address outside it is the actually rare, actionable pattern.
+    This does not suppress internal beacons -- lateral C2 exists and internal
+    destinations still alert -- it only keeps their severity from crowding out
+    beacons leaving the network, which is where CRITICAL belongs.
+
+    An address that fails to parse (a hostname Sysmon occasionally logs
+    instead of an IP) is treated as external rather than silently downgraded,
+    since "unknown" should never read as "safe".
+    """
+    try:
+        addr = ipaddress.ip_address(destination_ip)
+    except ValueError:
+        return False
+    return addr.is_private or addr.is_loopback or addr.is_link_local
 
 
 def regularity(intervals: list[float]) -> float:
@@ -250,14 +276,24 @@ class BeaconDetector:
     ) -> Detection:
         """Package a confirmed beacon as a Detection.
 
-        Severity rises with how machine-like the rhythm is. A near-perfect
-        interval from a scripting host is about as close to a smoking gun as
-        network telemetry gets; a merely suspicious rhythm is worth a look but
-        not worth waking anyone.
+        Severity rises with how machine-like the rhythm is, then is capped
+        one band lower when the destination is internal (private, loopback,
+        or link-local): a heartbeat to infrastructure inside the network and
+        a callback leaving it can score identically on regularity alone, but
+        they are not the same finding, and CRITICAL should mean "this host is
+        very likely talking to an outside operator" rather than "a scheduled
+        job runs on time" -- both of which produce a perfect rhythm. Internal
+        destinations still alert, they just cannot reach CRITICAL on rhythm
+        alone, since lateral C2 to a compromised internal host is real and
+        should not be silenced outright.
         """
         _, image, destination_ip, destination_port = key
+        internal = _is_internal(str(destination_ip))
 
-        severity = Severity.CRITICAL if score >= 0.92 else Severity.HIGH
+        if internal:
+            severity = Severity.HIGH if score >= 0.92 else Severity.MEDIUM
+        else:
+            severity = Severity.CRITICAL if score >= 0.92 else Severity.HIGH
 
         log.info(
             "Beacon confirmed: %s -> %s:%s every ~%.0fs (regularity %.2f, %d connections)",
@@ -285,6 +321,7 @@ class BeaconDetector:
             # contact with a false positive.
             evidence={
                 "destination": f"{destination_ip}:{destination_port}",
+                "destination_scope": "internal" if internal else "external",
                 "connections": len(channel.timestamps),
                 "median_interval_seconds": round(median_interval, 1),
                 "jitter_seconds": round(

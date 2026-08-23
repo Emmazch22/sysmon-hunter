@@ -192,6 +192,94 @@ class TestFalsePositives:
         assert detector.tracked_channels == 2
 
 
+class TestDestinationScope:
+    """A perfect rhythm to infrastructure inside the network and one leaving
+    it are not the same finding, even though regularity alone cannot tell
+    them apart. CRITICAL is reserved for the destination that is actually
+    rare and actionable: traffic heading outside the network."""
+
+    def test_internal_destination_beacon_does_not_reach_critical(
+        self, detector: BeaconDetector
+    ) -> None:
+        """A perfectly periodic connection to a private address -- e.g. a log
+        forwarder heartbeating its own indexer -- scores 1.0 on regularity,
+        the same as live C2, but must not read as CRITICAL on that basis
+        alone."""
+        detection = feed(
+            detector, [i * 60 for i in range(8)], destination_ip="10.0.1.12"
+        )
+
+        assert detection is not None
+        assert detection.evidence["regularity"] == 1.0
+        assert detection.severity is Severity.HIGH
+        assert detection.evidence["destination_scope"] == "internal"
+
+    def test_loopback_destination_is_treated_as_internal(
+        self, detector: BeaconDetector
+    ) -> None:
+        """IPv6 loopback as Sysmon actually logs it (expanded, not `::1`) --
+        seen in practice on domain controllers talking LDAP to themselves."""
+        detection = feed(
+            detector,
+            [i * 60 for i in range(8)],
+            destination_ip="0:0:0:0:0:0:0:1",
+        )
+
+        assert detection is not None
+        assert detection.severity is Severity.HIGH
+        assert detection.evidence["destination_scope"] == "internal"
+
+    def test_external_destination_still_reaches_critical(
+        self, detector: BeaconDetector
+    ) -> None:
+        """The regression case: a beacon leaving the network on a
+        near-perfect rhythm must still be the loudest alert the detector
+        raises."""
+        detection = feed(
+            detector, [i * 60 for i in range(8)], destination_ip="185.234.72.19"
+        )
+
+        assert detection is not None
+        assert detection.severity is Severity.CRITICAL
+        assert detection.evidence["destination_scope"] == "external"
+
+    def test_internal_beacon_below_top_score_lands_on_medium(
+        self, detector: BeaconDetector
+    ) -> None:
+        """External traffic at this same regularity band would be HIGH
+        (score >= threshold but < 0.92); internal traffic drops one band
+        further, to MEDIUM, rather than mirroring the external scale.
+
+        Fixed intervals rather than random jitter, chosen so the regularity
+        score lands deliberately inside [0.75, 0.92) instead of drifting
+        there by chance: [69, 55, 48, 47, 57, 48, 56] has a median of 55 and
+        a MAD of 7, for a regularity of 1 - 7/55 ~= 0.873.
+        """
+        intervals = [69, 55, 48, 47, 57, 48, 56]
+        offsets = [0.0]
+        for step in intervals:
+            offsets.append(offsets[-1] + step)
+
+        detection = feed(detector, offsets, destination_ip="192.168.1.5")
+
+        assert detection is not None
+        assert 0.75 <= detection.evidence["regularity"] < 0.92
+        assert detection.severity is Severity.MEDIUM
+
+    def test_unparseable_destination_is_not_treated_as_internal(
+        self, detector: BeaconDetector
+    ) -> None:
+        """A hostname Sysmon occasionally logs instead of a resolved IP must
+        not be silently read as safe just because it fails to parse."""
+        detection = feed(
+            detector, [i * 60 for i in range(8)], destination_ip="c2.example.net"
+        )
+
+        assert detection is not None
+        assert detection.evidence["destination_scope"] == "external"
+        assert detection.severity is Severity.CRITICAL
+
+
 class TestStateManagement:
     def test_cooldown_suppresses_repeat_alerts_within_the_window(
         self, detector: BeaconDetector
