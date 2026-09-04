@@ -1,0 +1,18 @@
+id: SYS-242
+title: Netsh helper DLL registered
+event_id: 1
+severity: high
+attack: [T1546.007]
+description: >
+  netsh.exe ran with "add helper", registering a DLL that netsh loads into
+  its own process on every future invocation -- including the ones any
+  admin or script runs routinely for something as unrelated as checking an
+  IP config. Because the trigger is "netsh ran again" rather than logon or
+  boot, it persists quietly through normal daily use. Legitimate helper
+  DLLs exist (WFP and IPsec management extensions ship this way) but arrive
+  through their own MSI, not an ad hoc command line. Validated against a
+  real capture: netsh.exe add helper AllTheThings.dll.
+detection:
+  image|endswith: '\netsh.exe'
+  command_line|re: '\badd\s+helper\b'
+condition: all

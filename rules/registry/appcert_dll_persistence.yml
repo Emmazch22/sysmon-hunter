@@ -1,0 +1,17 @@
+id: SYS-243
+title: AppCert DLL registered for every CreateProcess call
+event_id: 13
+severity: high
+attack: [T1546.009]
+description: >
+  A value was added under Session Manager\AppCertDlls. Every DLL listed here
+  loads into every process created through the standard Win32 CreateProcess*
+  APIs on the host -- browsers, Office, admin tools, anything -- making it
+  both a persistence mechanism and a way to run code inside processes an
+  attacker never touched directly. There is no routine reason for anything
+  to write this key outside of Windows setup itself; a clean host has
+  essentially no legitimate day-to-day traffic against it.
+detection:
+  EventType|equals: SetValue
+  TargetObject|contains: '\session manager\appcertdlls\'
+condition: all

@@ -1,0 +1,20 @@
+id: SYS-245
+title: sdbinst.exe installed a custom application compatibility shim
+event_id: 1
+severity: high
+attack: [T1546.011]
+description: >
+  sdbinst.exe ran, installing a shim database (.sdb) into the compatibility
+  database. A shim can redirect a target executable's calls -- including
+  substituting a different binary entirely via InjectDll -- every time that
+  target launches, which is both a persistence mechanism and a way to keep
+  running attacker code under a trusted process's name. Enterprises do
+  deploy legitimate compatibility shims through the Application
+  Compatibility Toolkit, almost always via a scheduled deployment tool
+  rather than an interactively launched sdbinst.exe, so treat this
+  detection's context (parent process, staging path) as the deciding
+  factor. Validated against a real capture: sdbinst.exe -q installing and
+  later -q -u uninstalling C:\Windows\AppPatch\Test.SDB.
+detection:
+  image|endswith: '\sdbinst.exe'
+condition: all

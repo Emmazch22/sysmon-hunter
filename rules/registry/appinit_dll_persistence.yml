@@ -1,0 +1,17 @@
+id: SYS-244
+title: AppInit_DLLs registry value set
+event_id: 13
+severity: high
+attack: [T1546.010]
+description: >
+  AppInit_DLLs under Windows NT\CurrentVersion\Windows was written. Any DLL
+  path listed here loads into every process that links user32.dll --
+  effectively every GUI process on the host -- at process start, before the
+  process's own code runs. It also needs LoadAppInit_DLLs enabled to take
+  effect, but the write to the DLL list itself is the action worth catching:
+  a clean host has this value empty. Validated against a real capture:
+  reg.exe writing AppInit_DLLs to a pair of test DLLs under C:\Tools\.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\windows nt\currentversion\windows\appinit_dlls'
+condition: all

@@ -142,7 +142,12 @@ machine. The phases, roughly in kill-chain order:
       │   a TeamViewer memory-access dump, an LSA Secrets write, and a
       │   DirectInput keylogger artifact -- nineteen real shapes pulled from
       │   the "Execution", "Persistence", and "Credential Access"
-      │   EVTX-ATTACK-SAMPLES gap buckets (SYS-221 through SYS-239)
+      │   EVTX-ATTACK-SAMPLES gap buckets (SYS-221 through SYS-239); a
+      │   hijacked file association, a screensaver binary swap, a netsh
+      │   helper DLL, an AppCert DLL, an AppInit DLL, an sdbinst.exe shim
+      │   install, and a written PowerShell profile -- the T1546 Event
+      │   Triggered Execution gap found via an Atomic Red Team TTP survey
+      │   (SYS-240 through SYS-246)
       ├─ wmiprvse.exe          remote WMI/DCOM persistence   (SYS-078)
       ├─ PSEXESVC.exe          lateral movement arrival      (SYS-072, SYS-073)
       ├─ w3wp.exe -> cmd.exe, appcmd.exe                     (SYS-088/038/039)
@@ -197,7 +202,8 @@ EXPECTED_RULES = {
     "SYS-216", "SYS-217", "SYS-218", "SYS-219", "SYS-220", "SYS-221", "SYS-222",
     "SYS-223", "SYS-224", "SYS-225", "SYS-226", "SYS-227", "SYS-228", "SYS-229",
     "SYS-230", "SYS-231", "SYS-232", "SYS-233", "SYS-234", "SYS-235", "SYS-236",
-    "SYS-237", "SYS-238", "SYS-239",
+    "SYS-237", "SYS-238", "SYS-239", "SYS-240", "SYS-241", "SYS-242", "SYS-243",
+    "SYS-244", "SYS-245", "SYS-246",
 }
 
 
@@ -430,6 +436,14 @@ G = {
     "frida_helper": "{rng-frida-helper}",
     "teamviewer_proc": "{rng-teamviewer-proc}",
     "keylogger_dx": "{rng-keylogger-dx}",
+    # Coverage-expansion pass 16 (SYS-240..246), T1546 Event Triggered
+    # Execution gap batch from the Atomic Red Team TTP survey. The
+    # registry-only rules (SYS-240, SYS-241, SYS-243, SYS-244) reuse
+    # Image=reg.exe with no actor guid, same convention as pass 15's
+    # registry-only rules.
+    "netsh_helper": "{rng-netsh-helper}",
+    "sdbinst_install": "{rng-sdbinst-install}",
+    "ps_profile_write": "{rng-ps-profile-write}",
 }
 
 
@@ -1646,6 +1660,63 @@ def events() -> list[dict]:
                          TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\Software\Microsoft\DirectInput"
                                        r"\MostRecentApplication\Name"),
                          Details="KEYLOGGER_DIRECTX.EXE"))
+
+    # A file extension's shell\open\command handler is rewritten to launch
+    # cmd.exe instead of the real application (SYS-240).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\_Classes\.txt"
+                                       r"\shell\open\command"),
+                         Details=r"C:\Windows\System32\cmd.exe /c calc.exe"))
+
+    # SCRNSAVE.EXE is pointed at a binary staged outside System32, so it
+    # launches after the next idle timeout with no logon or boot needed
+    # (SYS-241).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKU\S-1-5-21-1-2-3-1000\Control Panel"
+                                       r"\Desktop\SCRNSAVE.EXE"),
+                         Details=r"C:\Users\redteam.ops\AppData\Local\evil.scr"))
+
+    # netsh add helper registers a DLL netsh loads into its own process on
+    # every future invocation, persisting through routine admin use rather
+    # than logon or boot (SYS-242).
+    ev.append(proc(step(1), G["netsh_helper"], G["ops"], r"C:\Windows\System32\netsh.exe",
+                    r"netsh.exe  add helper AllTheThings.dll", pid=6310, ppid=4510))
+
+    # A value is added under Session Manager\AppCertDlls, loading into every
+    # process created through the standard Win32 CreateProcess* APIs on the
+    # host (SYS-243).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKLM\System\CurrentControlSet\Control"
+                                       r"\Session Manager\AppCertDlls\AtomicTest"),
+                         Details=r"C:\Users\Public\AtomicTest.dll"))
+
+    # AppInit_DLLs is written, loading into every process that links
+    # user32.dll at process start -- effectively every GUI process on the
+    # host (SYS-244).
+    ev.append(raw_event(13, step(1), Image=r"C:\Windows\System32\reg.exe", EventType="SetValue",
+                         TargetObject=(r"HKLM\SOFTWARE\Microsoft\Windows NT"
+                                       r"\CurrentVersion\Windows\AppInit_DLLs"),
+                         Details=r"C:\Tools\MessageBox64.dll,C:\Tools\MessageBox32.dll"))
+
+    # sdbinst.exe installs a custom application compatibility shim, which can
+    # redirect a target executable's calls -- including substituting a
+    # different binary entirely -- every time that target launches (SYS-245).
+    ev.append(proc(step(1), G["sdbinst_install"], G["ops"], r"C:\Windows\System32\sdbinst.exe",
+                    r'"C:\Windows\system32\sdbinst.exe" -q "C:\Windows\AppPatch\Test.SDB"',
+                    pid=6320, ppid=4510))
+
+    # A PowerShell profile script is written, running automatically every
+    # time that scope's PowerShell host starts, with no separate execution
+    # event of its own since it runs as part of powershell.exe's own
+    # startup (SYS-246).
+    ev.append(proc(step(1), G["ps_profile_write"], G["ops"],
+                    r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                    r'powershell.exe -Command "Add-Content $PROFILE \'Start-Process evil.exe\'"',
+                    pid=6330, ppid=4510))
+    ev.append(raw_event(11, step(1), Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         ProcessGuid=G["ps_profile_write"],
+                         TargetFilename=(r"C:\Users\redteam.ops\Documents\WindowsPowerShell"
+                                          r"\Microsoft.PowerShell_profile.ps1")))
 
     return ev
 

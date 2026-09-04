@@ -1,0 +1,18 @@
+id: SYS-246
+title: A PowerShell profile script was written
+event_id: 11
+severity: high
+attack: [T1546.013]
+description: >
+  A file matching a PowerShell profile path (profile.ps1, under either the
+  per-user or AllUsers WindowsPowerShell/PowerShell folders) was created or
+  overwritten. A profile script runs automatically every time that scope's
+  PowerShell host starts -- interactively, or for every user on the host in
+  the AllUsers case -- with no separate execution event of its own, since it
+  runs as part of powershell.exe's own startup rather than as a child
+  process. A user customizing their own prompt writes this file too; what
+  makes it worth a rule is that the target is narrow and specific, not the
+  everyday-noise problem a Run key edit has.
+detection:
+  TargetFilename|re: '\\(windowspowershell|powershell)\\.*profile\.ps1$'
+condition: all

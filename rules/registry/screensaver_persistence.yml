@@ -1,0 +1,18 @@
+id: SYS-241
+title: Screensaver registry keys set to launch an arbitrary binary
+event_id: 13
+severity: high
+attack: [T1546.002]
+description: >
+  HKCU\Control Panel\Desktop\SCRNSAVE.EXE was set. Windows launches whatever
+  this value points to after the configured idle timeout, with no further
+  user interaction and no logon or boot needed to trigger it -- a persistence
+  hook tied purely to idle time, which lets it hide among the routine
+  Control Panel/Desktop writes a user's own theme changes produce. A
+  screensaver picked through Settings is a .scr file living in System32;
+  this fires on any write to the value so a handler pointing somewhere else
+  stands out in the evidence panel.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\control panel\desktop\scrnsave.exe'
+condition: all

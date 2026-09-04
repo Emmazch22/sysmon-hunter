@@ -1,0 +1,21 @@
+id: SYS-240
+title: Default file association hijacked to a script host or staged binary
+event_id: 13
+severity: high
+attack: [T1546.001]
+description: >
+  A file extension's shell\open\command handler -- what actually runs when a
+  file of that type is double-clicked -- was rewritten to launch a script
+  interpreter or something staged outside a normal install location, rather
+  than the expected application. Whoever opens the next file of that
+  extension runs the attacker's command instead, with no separate execution
+  event of its own to catch. Ordinary installers write this key constantly,
+  which is why this only fires when the new handler itself looks wrong --
+  pointing at a script host (cmd, powershell, wscript, cscript, mshta,
+  rundll32) or a path under Temp, AppData, ProgramData, or a public user
+  profile.
+detection:
+  EventType|equals: SetValue
+  TargetObject|endswith: '\shell\open\command'
+  Details|re: '\\(cmd|powershell|pwsh|wscript|cscript|mshta|rundll32)\.exe\b|\\(temp|appdata|programdata|users\\public)\\'
+condition: all

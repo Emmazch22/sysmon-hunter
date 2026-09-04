@@ -3356,6 +3356,172 @@ CASES = [
             EventType="SetValue",
         ),
     ),
+    # --- Default file association hijacked (SYS-240) ---
+    (
+        "SYS-240",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKU\S-1-5-21-1\_Classes\.txt\shell\open\command"
+            ),
+            Details=r"C:\Windows\System32\cmd.exe /c calc.exe",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-240",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\msiexec.exe",
+            TargetObject=r"HKLM\Software\Classes\.pdf\shell\open\command",
+            Details=r'"C:\Program Files\Adobe\Reader\AcroRd32.exe" "%1"',
+            EventType="SetValue",
+        ),
+    ),
+    # --- Screensaver registry keys set to an arbitrary binary (SYS-241) ---
+    (
+        "SYS-241",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=r"HKU\S-1-5-21-1\Control Panel\Desktop\SCRNSAVE.EXE",
+            Details=r"C:\Users\Public\evil.scr",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-241",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=r"HKU\S-1-5-21-1\Control Panel\Desktop\Wallpaper",
+            Details=r"C:\Users\bob\Pictures\wall.jpg",
+            EventType="SetValue",
+        ),
+    ),
+    # --- Netsh helper DLL registered (SYS-242) ---
+    # Taken from panache_sysmon_vs_EDRTestingScript.evtx.
+    (
+        "SYS-242",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\netsh.exe",
+            command_line=r"netsh.exe  add helper AllTheThings.dll",
+        ),
+    ),
+    (
+        "SYS-242",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\netsh.exe",
+            command_line=r"netsh.exe advfirewall show allprofiles",
+        ),
+    ),
+    # --- AppCert DLL persistence (SYS-243) ---
+    (
+        "SYS-243",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKLM\System\CurrentControlSet\Control\Session Manager"
+                r"\AppCertDlls\AtomicTest"
+            ),
+            Details=r"C:\Users\Public\AtomicTest.dll",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-243",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKLM\System\CurrentControlSet\Control\Session Manager"
+                r"\PendingFileRenameOperations"
+            ),
+            EventType="SetValue",
+        ),
+    ),
+    # --- AppInit_DLLs registry value set (SYS-244) ---
+    # Taken from PanacheSysmon_vs_AtomicRedTeam01.evtx.
+    (
+        "SYS-244",
+        True,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                r"\Windows\AppInit_DLLs"
+            ),
+            Details=r"C:\Tools\MessageBox64.dll,C:\Tools\MessageBox32.dll",
+            EventType="SetValue",
+        ),
+    ),
+    (
+        "SYS-244",
+        False,
+        event(
+            13,
+            image=r"C:\Windows\system32\reg.exe",
+            TargetObject=(
+                r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows\Load"
+            ),
+            EventType="SetValue",
+        ),
+    ),
+    # --- sdbinst.exe installed a custom compatibility shim (SYS-245) ---
+    # Taken from persistence_sysmon_11_13_1_shime_appfix.evtx.
+    (
+        "SYS-245",
+        True,
+        event(
+            1,
+            image=r"C:\Windows\System32\sdbinst.exe",
+            command_line=r'"C:\Windows\system32\sdbinst.exe" -q "C:\Windows\AppPatch\Test.SDB"',
+        ),
+    ),
+    (
+        "SYS-245",
+        False,
+        event(
+            1,
+            image=r"C:\Windows\System32\msiexec.exe",
+            command_line=r"msiexec.exe /i app.msi",
+        ),
+    ),
+    # --- A PowerShell profile script was written (SYS-246) ---
+    (
+        "SYS-246",
+        True,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=(
+                r"C:\Users\bob\Documents\WindowsPowerShell"
+                r"\Microsoft.PowerShell_profile.ps1"
+            ),
+        ),
+    ),
+    (
+        "SYS-246",
+        False,
+        event(
+            11,
+            image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            TargetFilename=r"C:\Users\bob\Documents\notes.ps1",
+        ),
+    ),
 ]
 
 
